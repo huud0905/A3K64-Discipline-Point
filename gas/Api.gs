@@ -144,7 +144,7 @@ function getWeekSheets() {
   ss.getSheets().forEach(function (sheet) {
     const week = getWeekNumberFromSheetName(sheet.getName());
     if (week === null) return;
-    if (IGNORED_WEEKS.indexOf(Number(week)) >= 0) return; // Bỏ qua TUẦN 0.
+    if (IGNORED_WEEKS.indexOf(Number(week)) >= 0) return;
 
     result.push({ sheet: sheet, week: Number(week) || DEFAULT_WEEK, name: sheet.getName() });
   });
@@ -194,13 +194,6 @@ function findFirstIndex(keys, targetKeys) {
   return undefined;
 }
 
-/**
- * Tìm đúng bảng chấm bên phải trong sheet TUẦN.
- * Không dùng bảng tổng hợp bên trái.
- *
- * Dấu hiệu bảng chấm bên phải:
- * STT | Họ và tên | ND điểm cộng | Tổng cộng | Nội dung điểm trừ | Tổng trừ | Tổng điểm | Xếp Loại | Người chỉnh sửa
- */
 function getScoreTableConfig(values) {
   for (let r = 0; r < Math.min(values.length, 40); r++) {
     const keys = (values[r] || []).map(normalizeKey);
@@ -220,18 +213,7 @@ function getScoreTableConfig(values) {
 
     if (nameCol === undefined || sttCol === undefined || totalCol === undefined || statusCol === undefined) continue;
 
-    return {
-      headerIndex: r,
-      sttCol: sttCol,
-      nameCol: nameCol,
-      plusTextCol: plusTextCol,
-      plusTotalCol: plusTotalCol,
-      minusTextCol: minusTextCol,
-      minusTotalCol: minusTotalCol,
-      totalCol: totalCol,
-      statusCol: statusCol,
-      editorCol: editorCol
-    };
+    return { headerIndex: r, sttCol: sttCol, nameCol: nameCol, plusTextCol: plusTextCol, plusTotalCol: plusTotalCol, minusTextCol: minusTextCol, minusTotalCol: minusTotalCol, totalCol: totalCol, statusCol: statusCol, editorCol: editorCol };
   }
 
   return null;
@@ -278,13 +260,7 @@ function readAccounts() {
 
     if (!username && !name) continue;
 
-    accounts.push({
-      username: username,
-      password: password,
-      role: role,
-      group: isFinite(group) ? group : "",
-      name: name,
-    });
+    accounts.push({ username: username, password: password, role: role, group: isFinite(group) ? group : "", name: name });
   }
 
   return accounts;
@@ -307,10 +283,7 @@ function readStudentsFromWeekSheets() {
       const name = cleanText(row[config.nameCol]);
 
       const groupNumber = getGroupNumber(name);
-      if (groupNumber) {
-        currentGroup = groupNumber;
-        continue;
-      }
+      if (groupNumber) { currentGroup = groupNumber; continue; }
 
       if (!isStudentDataRow(row, config.sttCol, config.nameCol)) continue;
       if (!currentGroup) currentGroup = 1;
@@ -319,16 +292,7 @@ function readStudentsFromWeekSheets() {
       if (studentsByName[key]) continue;
 
       const status = cleanText(row[config.statusCol]);
-
-      const student = {
-        id: makeStudentId(name, result.length),
-        name: name,
-        group: currentGroup,
-        role: "",
-        avatarInitial: getLastNameInitial(name),
-        statusOverride: status || ""
-      };
-
+      const student = { id: makeStudentId(name, result.length), name: name, group: currentGroup, role: "", avatarInitial: getLastNameInitial(name), statusOverride: status || "" };
       studentsByName[key] = student;
       result.push(student);
     }
@@ -344,18 +308,7 @@ function findStudentIdByName(students, name) {
 }
 
 function makeEvent(id, studentId, week, title, points, category, note) {
-  return {
-    id: id,
-    studentId: studentId,
-    week: week,
-    title: title,
-    points: Number(points) || 0,
-    type: Number(points) >= 0 ? "CONG" : "TRU",
-    category: category || "HOC_TAP",
-    note: note || "",
-    createdBy: "Google Sheets",
-    createdAt: new Date().toISOString()
-  };
+  return { id: id, studentId: studentId, week: week, title: title, points: Number(points) || 0, type: Number(points) >= 0 ? "CONG" : "TRU", category: category || "HOC_TAP", note: note || "", createdBy: "Google Sheets", createdAt: new Date().toISOString() };
 }
 
 function readEventsFromWeekSheets(students) {
@@ -374,10 +327,7 @@ function readEventsFromWeekSheets(students) {
       const name = cleanText(row[config.nameCol]);
 
       const groupNumber = getGroupNumber(name);
-      if (groupNumber) {
-        currentGroup = groupNumber;
-        continue;
-      }
+      if (groupNumber) { currentGroup = groupNumber; continue; }
 
       if (!isStudentDataRow(row, config.sttCol, config.nameCol)) continue;
       if (!currentGroup) currentGroup = 1;
@@ -395,8 +345,6 @@ function readEventsFromWeekSheets(students) {
 
       let visibleSum = 0;
 
-      // Chỉ đưa vào cột cộng/trừ khi có nội dung cộng/trừ thật.
-      // Không dùng Tổng điểm mặc định 50 làm điểm cộng.
       if (plusText || isFinite(plusTotalRaw)) {
         const points = isFinite(plusTotalRaw) ? Math.abs(plusTotalRaw) : 0;
         const title = plusText || "Điểm cộng từ trang tính";
@@ -411,19 +359,9 @@ function readEventsFromWeekSheets(students) {
         events.push(makeEvent("week-" + item.week + "-r" + (r + 1) + "-minus", studentId, item.week, title, points, "NE_NEP", editor));
       }
 
-      // Tổng điểm lấy từ cột N / cột "Tổng điểm".
-      // Event này chỉ để tính tổng, không hiển thị ở cột Cộng/Trừ.
       if (isFinite(totalRaw)) {
         const hiddenDiff = totalRaw - visibleSum;
-        events.push(makeEvent(
-          "week-" + item.week + "-r" + (r + 1) + "-sheet-total",
-          studentId,
-          item.week,
-          "Tổng điểm từ trang tính",
-          hiddenDiff,
-          hiddenDiff >= 0 ? "HOC_TAP" : "NE_NEP",
-          SHEET_TOTAL_NOTE + ";status=" + status
-        ));
+        events.push(makeEvent("week-" + item.week + "-r" + (r + 1) + "-sheet-total", studentId, item.week, "Tổng điểm từ trang tính", hiddenDiff, hiddenDiff >= 0 ? "HOC_TAP" : "NE_NEP", SHEET_TOTAL_NOTE + ";status=" + status));
       }
     }
   });
@@ -434,26 +372,17 @@ function readEventsFromWeekSheets(students) {
 function ensureExtraEventsSheet() {
   const ss = getSpreadsheet();
   let sheet = ss.getSheetByName(EXTRA_EVENTS_SHEET_NAME);
-
-  if (!sheet) {
-    sheet = ss.insertSheet(EXTRA_EVENTS_SHEET_NAME);
-    sheet.getRange(1, 1, 1, EXTRA_EVENT_HEADERS.length).setValues([EXTRA_EVENT_HEADERS]);
-    sheet.setFrozenRows(1);
-  }
-
+  if (!sheet) { sheet = ss.insertSheet(EXTRA_EVENTS_SHEET_NAME); sheet.getRange(1, 1, 1, EXTRA_EVENT_HEADERS.length).setValues([EXTRA_EVENT_HEADERS]); sheet.setFrozenRows(1); }
   return sheet;
 }
 
 function readExtraEvents() {
   const sheet = getSpreadsheet().getSheetByName(EXTRA_EVENTS_SHEET_NAME);
   if (!sheet) return [];
-
   const values = getDisplayValues(sheet);
   if (values.length < 2) return [];
-
   const headerIndex = findHeaderRow(values, ["id", "studentid", "week"]);
   if (headerIndex < 0) return [];
-
   const map = getHeaderMap(values, headerIndex);
   const events = [];
 
@@ -462,25 +391,10 @@ function readExtraEvents() {
     const id = cleanText(row[map.id]);
     const studentId = cleanText(row[map.studentid]);
     const title = cleanText(row[map.title]);
-
     if (!id || !studentId || !title) continue;
-
     const points = parseNumber(row[map.points]);
-
-    events.push({
-      id: id,
-      studentId: studentId,
-      week: parseNumber(row[map.week]) || DEFAULT_WEEK,
-      title: title,
-      points: isFinite(points) ? points : 0,
-      type: cleanText(row[map.type]) || (points >= 0 ? "CONG" : "TRU"),
-      category: cleanText(row[map.category]) || "HOC_TAP",
-      note: cleanText(row[map.note]),
-      createdBy: cleanText(row[map.createdby]) || "Web",
-      createdAt: cleanText(row[map.createdat]) || new Date().toISOString()
-    });
+    events.push({ id: id, studentId: studentId, week: parseNumber(row[map.week]) || DEFAULT_WEEK, title: title, points: isFinite(points) ? points : 0, type: cleanText(row[map.type]) || (points >= 0 ? "CONG" : "TRU"), category: cleanText(row[map.category]) || "HOC_TAP", note: cleanText(row[map.note]), createdBy: cleanText(row[map.createdby]) || "Web", createdAt: cleanText(row[map.createdat]) || new Date().toISOString() });
   }
-
   return events;
 }
 
@@ -488,34 +402,22 @@ function readRules() {
   const sheet = getSheetByAnyName([RULES_SHEET_NAME]);
   const values = getDisplayValues(sheet);
   if (!values.length) return [];
-
   const headerIndex = findHeaderRow(values, ["ten", "diem"]);
   if (headerIndex < 0) return [];
-
   const map = getHeaderMap(values, headerIndex);
   const result = [];
 
   for (let r = headerIndex + 1; r < values.length; r++) {
     const row = values[r];
     const title = cleanText(row[map.ten]);
-
     if (!title) continue;
-
     const rawPoints = parseNumber(row[map.diem]);
     const tinh = cleanText(map.tinh !== undefined ? row[map.tinh] : "");
     const points = isFinite(rawPoints) ? (normalizeKey(tinh) === "tru" ? -Math.abs(rawPoints) : Math.abs(rawPoints)) : 0;
     const category = toCategory(map.phanloai !== undefined ? row[map.phanloai] : "");
     const note = cleanText(map.ghichu !== undefined ? row[map.ghichu] : "");
-
-    result.push({
-      title: title,
-      points: points,
-      type: toType(tinh, points),
-      category: category,
-      note: note
-    });
+    result.push({ title: title, points: points, type: toType(tinh, points), category: category, note: note });
   }
-
   return result;
 }
 
@@ -524,76 +426,29 @@ function getScoreboardData() {
   const weekEvents = readEventsFromWeekSheets(students);
   const extraEvents = readExtraEvents();
   const events = weekEvents.concat(extraEvents);
-
-  const weeks = Array.from(new Set(
-    getWeekSheets()
-      .map(function (item) { return item.week; })
-      .concat(events.map(function (event) { return Number(event.week); }))
-  ))
-    .filter(function (week) { return isFinite(week) && IGNORED_WEEKS.indexOf(Number(week)) < 0; })
-    .sort(function (a, b) { return a - b; });
-
-  return {
-    students: students,
-    events: events,
-    weeks: weeks.length ? weeks : [DEFAULT_WEEK],
-    quickScoreReasons: readRules(),
-    updatedAt: new Date().toISOString()
-  };
+  const weeks = Array.from(new Set(getWeekSheets().map(function (item) { return item.week; }).concat(events.map(function (event) { return Number(event.week); })))).filter(function (week) { return isFinite(week) && IGNORED_WEEKS.indexOf(Number(week)) < 0; }).sort(function (a, b) { return a - b; });
+  return { students: students, events: events, weeks: weeks.length ? weeks : [DEFAULT_WEEK], quickScoreReasons: readRules(), updatedAt: new Date().toISOString() };
 }
 
 function validateLogin(payload) {
   const username = cleanText(payload.username).toLowerCase();
   const password = cleanText(payload.password);
-
   if (!username || !password) return { ok: false, error: "Thiếu tên đăng nhập hoặc mật khẩu." };
-
   const accounts = readAccounts();
-  const found = accounts.find(function (account) {
-    return cleanText(account.username).toLowerCase() === username && cleanText(account.password) === password;
-  });
-
+  const found = accounts.find(function (account) { return cleanText(account.username).toLowerCase() === username && cleanText(account.password) === password; });
   if (!found) return { ok: false, error: "Tên đăng nhập hoặc mật khẩu không đúng." };
-
-  return {
-    ok: true,
-    user: {
-      uid: "gas-" + makeStudentId(found.username || found.name, 0),
-      displayName: found.name || found.username,
-      email: found.username,
-      photoURL: null,
-      provider: "gas",
-      role: found.role || "hoc_sinh",
-      group: found.group || ""
-    }
-  };
+  return { ok: true, user: { uid: "gas-" + makeStudentId(found.username || found.name, 0), displayName: found.name || found.username, email: found.username, photoURL: null, provider: "gas", role: found.role || "hoc_sinh", group: found.group || "" } };
 }
 
 function appendObject(sheet, headers, record) {
-  const row = headers.map(function (header) {
-    return record[header] === undefined ? "" : record[header];
-  });
-
+  const row = headers.map(function (header) { return record[header] === undefined ? "" : record[header]; });
   sheet.appendRow(row);
 }
 
 function addScoreEvent(payload) {
   const points = Number(payload.points || 0);
-  const event = {
-    id: payload.id && String(payload.id).indexOf("local-") !== 0 ? payload.id : "e" + Date.now(),
-    studentId: cleanText(payload.studentId),
-    week: Number(payload.week || DEFAULT_WEEK),
-    title: cleanText(payload.title),
-    points: points,
-    type: cleanText(payload.type) || (points >= 0 ? "CONG" : "TRU"),
-    category: cleanText(payload.category) || "HOC_TAP",
-    note: cleanText(payload.note),
-    createdBy: cleanText(payload.createdBy) || "Web",
-    createdAt: payload.createdAt || new Date().toISOString()
-  };
-
+  const event = { id: payload.id && String(payload.id).indexOf("local-") !== 0 ? payload.id : "e" + Date.now(), studentId: cleanText(payload.studentId), week: Number(payload.week || DEFAULT_WEEK), title: cleanText(payload.title), points: points, type: cleanText(payload.type) || (points >= 0 ? "CONG" : "TRU"), category: cleanText(payload.category) || "HOC_TAP", note: cleanText(payload.note), createdBy: cleanText(payload.createdBy) || "Web", createdAt: payload.createdAt || new Date().toISOString() };
   if (!event.studentId || !event.title) throw new Error("Thiếu studentId hoặc title.");
-
   const sheet = ensureExtraEventsSheet();
   appendObject(sheet, EXTRA_EVENT_HEADERS, event);
   return event;
@@ -602,22 +457,60 @@ function addScoreEvent(payload) {
 function deleteScoreEvent(id) {
   const sheet = getSpreadsheet().getSheetByName(EXTRA_EVENTS_SHEET_NAME);
   if (!sheet) return { deleted: false };
-
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return { deleted: false };
-
   const ids = sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues();
-
-  for (let index = 0; index < ids.length; index++) {
-    if (String(ids[index][0]) === String(id)) {
-      sheet.deleteRow(index + 2);
-      return { deleted: true };
-    }
-  }
-
+  for (let index = 0; index < ids.length; index++) { if (String(ids[index][0]) === String(id)) { sheet.deleteRow(index + 2); return { deleted: true }; } }
   return { deleted: false };
 }
 
+function sheetExists(name) {
+  return Boolean(getSpreadsheet().getSheetByName(name));
+}
+
+function getWeekZeroTemplateSheet() {
+  const ss = getSpreadsheet();
+  const exact = ss.getSheetByName("TUẦN 0") || ss.getSheetByName("TUAN 0");
+  if (exact) return exact;
+  const candidates = ss.getSheets().filter(function (sheet) { return getWeekNumberFromSheetName(sheet.getName()) === 0; });
+  return candidates[0] || null;
+}
+
+function updateWeekTitleCell(sheet, week) {
+  const title = "LỚP 11A3- TUẦN " + week;
+  const candidates = ["B2", "B1"];
+  for (let i = 0; i < candidates.length; i++) {
+    const range = sheet.getRange(candidates[i]);
+    const value = cleanText(range.getDisplayValue());
+    if (value && normalizeKey(value).indexOf("tuan") >= 0) { range.setValue(title); return candidates[i]; }
+  }
+  for (let row = 1; row <= 5; row++) {
+    for (let col = 1; col <= 6; col++) {
+      const range = sheet.getRange(row, col);
+      const value = cleanText(range.getDisplayValue());
+      if (value && normalizeKey(value).indexOf("tuan") >= 0) { range.setValue(title); return range.getA1Notation(); }
+    }
+  }
+  sheet.getRange("B2").setValue(title);
+  return "B2";
+}
+
 function createWeek(week) {
-  return { created: true, week: Number(week || DEFAULT_WEEK) };
+  const nextWeek = Number(week || DEFAULT_WEEK);
+  if (!isFinite(nextWeek) || nextWeek <= 0) throw new Error("Số tuần không hợp lệ.");
+  const ss = getSpreadsheet();
+  const targetName = "TUẦN " + nextWeek;
+  if (sheetExists(targetName)) {
+    const existing = ss.getSheetByName(targetName);
+    if (existing) ss.setActiveSheet(existing);
+    return { created: false, existed: true, week: nextWeek, sheetName: targetName };
+  }
+  const template = getWeekZeroTemplateSheet();
+  if (!template) throw new Error("Không tìm thấy sheet TUẦN 0 để nhân bản.");
+  const copied = template.copyTo(ss);
+  copied.setName(targetName);
+  ss.setActiveSheet(copied);
+  ss.moveActiveSheet(ss.getNumSheets());
+  const titleCell = updateWeekTitleCell(copied, nextWeek);
+  return { created: true, week: nextWeek, sheetName: targetName, titleCell: titleCell };
 }
