@@ -1,10 +1,9 @@
 import { X, Zap, RotateCcw } from "lucide-react";
 import { FilterSelect } from "./FilterSelect";
-import { DragEvent, useMemo, useState } from "react";
+import { DragEvent, useEffect, useMemo, useState } from "react";
 import {
   categoryLabel,
   formatScore,
-  quickScoreReasons,
   ScoreCategory,
   ScoreEvent,
   StudentScoreSummary,
@@ -19,15 +18,82 @@ type ScoreEditModalProps = {
   onClose: () => void;
 };
 
-type QuickRule = (typeof quickScoreReasons)[number];
+type QuickRule = {
+  title: string;
+  points: number;
+  type: "CONG" | "TRU";
+  category: ScoreCategory;
+  note?: string;
+};
 
 const RULE_DRAG_TYPE = "application/x-score-rule";
 
-const categoryOptions: Array<{ value: ScoreCategory; label: string }> = [
-  { value: "HOC_TAP", label: "Học tập" },
-  { value: "NE_NEP", label: "Nề nếp" },
-  { value: "PHONG_TRAO", label: "Phong trào" },
+const subjects = [
+  "Toán",
+  "Vật Lí",
+  "Hoá Học",
+  "Sinh Học",
+  "Tin Học",
+  "Ngữ Văn",
+  "Lịch Sử",
+  "Tiếng Anh",
+  "Quốc Phòng",
+  "Thể Dục",
+  "GDĐP",
+  "TNHN",
+  "Chào Cờ",
+  "SHL",
 ];
+
+function normalizeCategory(value: unknown): ScoreCategory {
+  const raw = String(value || "").toUpperCase();
+  if (raw.includes("NỀ") || raw.includes("NE")) return "NE_NEP";
+  if (raw.includes("PHONG")) return "PHONG_TRAO";
+  return "HOC_TAP";
+}
+
+function normalizeType(value: unknown, points: number): "CONG" | "TRU" {
+  const raw = String(value || "").toUpperCase();
+  if (raw === "CONG" || raw === "TRU") return raw;
+  return points >= 0 ? "CONG" : "TRU";
+}
+
+function normalizeRules(raw: unknown): QuickRule[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((item) => {
+      const record = item as Record<string, unknown>;
+      const title = String(record.title ?? record["Tên"] ?? record["ten"] ?? "").trim();
+      const points = Number(record.points ?? record["Điểm"] ?? record["diem"] ?? 0);
+      if (!title || !Number.isFinite(points)) return null;
+
+      return {
+        title,
+        points,
+        type: normalizeType(record.type ?? record["Tính"] ?? record["tinh"], points),
+        category: normalizeCategory(record.category ?? record["Phân loại"] ?? record["phanloai"]),
+        note: String(record.note ?? record["Ghi chú"] ?? record["ghichu"] ?? "").trim() || undefined,
+      } satisfies QuickRule;
+    })
+    .filter((item): item is QuickRule => Boolean(item));
+}
+
+async function fetchRulesFromGas() {
+  const gasUrl = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
+  if (!gasUrl) return [];
+
+  const url = new URL(gasUrl);
+  url.searchParams.set("action", "getScoreboard");
+  url.searchParams.set("t", String(Date.now()));
+
+  const response = await fetch(url.toString(), { method: "GET", redirect: "follow" });
+  if (!response.ok) throw new Error(`Không đọc được VI_PHAM: ${response.status}`);
+
+  const json = await response.json();
+  const data = json?.data || json;
+  return normalizeRules(data?.quickScoreReasons);
+}
 
 function defaultPointByCategory(category: ScoreCategory) {
   if (category === "NE_NEP") return -50;
@@ -80,8 +146,7 @@ function shortTitle(title: string) {
 }
 
 function tooltipText(event: ScoreEvent) {
-  const day = days.find((item) => item.key === weekdayNumber(event.createdAt))?.full || "Không rõ ngày";
-  return `${day} • ${categoryLabel(event.category)} • ${event.title} • ${formatScore(event.points)}`;
+  return event.title;
 }
 
 function statusTone(status: string) {
@@ -109,6 +174,11 @@ function readDraggedRule(event: DragEvent) {
   }
 }
 
+function formatSavedTitle(day: number, category: ScoreCategory, subject: string, title: string, points: number) {
+  const dayLabel = days.find((item) => item.key === day)?.full || "Không rõ ngày";
+  return `${dayLabel}: [${categoryLabel(category)}]: [${subject}] ${title} (${formatScore(points)})`;
+}
+
 export function ScoreEditModal({
   student,
   week,
@@ -118,12 +188,35 @@ export function ScoreEditModal({
   onClose,
 }: ScoreEditModalProps) {
   const [activeDay, setActiveDay] = useState(2);
+  const [subject, setSubject] = useState(subjects[0]);
   const [category, setCategory] = useState<ScoreCategory>("HOC_TAP");
   const [title, setTitle] = useState("");
   const [violationCount, setViolationCount] = useState(1);
   const [pointPerCount, setPointPerCount] = useState(defaultPointByCategory("HOC_TAP"));
+  const [rules, setRules] = useState<QuickRule[]>([]);
+  const [rulesStatus, setRulesStatus] = useState("Đang đọc VI_PHAM...");
   const [dropHintDay, setDropHintDay] = useState<number | null>(null);
   const [inputDropActive, setInputDropActive] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetchRulesFromGas()
+      .then((nextRules) => {
+        if (!mounted) return;
+        setRules(nextRules);
+        setRulesStatus(nextRules.length ? "" : "Sheet VI_PHAM chưa có dữ liệu hoặc chưa đúng cột.");
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setRules([]);
+        setRulesStatus("Không đọc được sheet VI_PHAM.");
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const weekEvents = useMemo(
     () => events.filter((event) => event.studentId === student.id && event.week === week),
@@ -140,11 +233,6 @@ export function ScoreEditModal({
   const minusTotal = visibleWeekEvents.filter((event) => event.points < 0).reduce((sum, event) => sum + event.points, 0);
   const total = weekEvents.reduce((sum, event) => sum + event.points, 0);
 
-  const changeCategory = (nextCategory: ScoreCategory) => {
-    setCategory(nextCategory);
-    setPointPerCount(defaultPointByCategory(nextCategory));
-  };
-
   const addScoreToDay = (
     payload: {
       title: string;
@@ -156,10 +244,12 @@ export function ScoreEditModal({
     const cleanTitle = payload.title.trim();
     if (!cleanTitle || !payload.points) return;
 
+    const savedTitle = formatSavedTitle(day, payload.category, subject, cleanTitle, payload.points);
+
     onAddScore({
       studentId: student.id,
       week,
-      title: cleanTitle,
+      title: savedTitle,
       points: payload.points,
       type: payload.points >= 0 ? "CONG" : "TRU",
       category: payload.category,
@@ -385,17 +475,17 @@ export function ScoreEditModal({
                   onDrop={dropRuleIntoForm}
                 >
                   <div className="form-row">
-                    <div className="category-picker">
-                      <FilterSelect<ScoreCategory>
-                        value={category}
-                        options={categoryOptions}
-                        onChange={changeCategory}
+                    <div className="category-picker subject-picker">
+                      <FilterSelect<string>
+                        value={subject}
+                        options={subjects.map((item) => ({ value: item, label: item }))}
+                        onChange={setSubject}
                       />
                     </div>
                     <input
                       value={title}
                       onChange={(event) => setTitle(event.target.value)}
-                      placeholder="Kéo rule vào đây / nhập nội quy..."
+                      placeholder="Kéo rule từ VI_PHAM vào đây / nhập nội quy..."
                       onKeyDown={(event) => {
                         if (event.key === "Enter") handleCustomAdd();
                       }}
@@ -431,9 +521,7 @@ export function ScoreEditModal({
                   ) : (
                     activeDayEvents.map((event) => (
                       <div key={event.id} className={`day-event ${event.points >= 0 ? "plus" : "minus"}`}>
-                        <span>
-                          [{categoryLabel(event.category)}] {event.title}
-                        </span>
+                        <span>{event.title}</span>
                         <strong>{formatScore(event.points)}</strong>
                         <button type="button" onClick={() => onDeleteScore(event.id)} title="Xoá dòng này">
                           <X size={14} />
@@ -447,9 +535,10 @@ export function ScoreEditModal({
           </div>
 
           <aside className="rules-directory">
-            <h3>Rules directory</h3>
+            <h3>VI_PHAM</h3>
+            {rulesStatus && <p className="rules-status">{rulesStatus}</p>}
             <div className="rules-grid">
-              {quickScoreReasons.map((rule, index) => (
+              {rules.map((rule, index) => (
                 <button
                   key={`${rule.title}-${index}`}
                   type="button"
@@ -457,7 +546,7 @@ export function ScoreEditModal({
                   className={rule.points >= 0 ? "rule-card plus" : "rule-card minus"}
                   onClick={() => handleQuickRule(rule)}
                   onDragStart={(event) => handleRuleDragStart(event, rule)}
-                  title={`${rule.title} ${formatScore(rule.points)} • kéo vào ô nhập hoặc bảng tuần`}
+                  title={`${rule.title} ${formatScore(rule.points)} • ${categoryLabel(rule.category)} • kéo vào ô nhập hoặc bảng tuần`}
                 >
                   <span>{rule.title}</span>
                   <strong>{formatScore(rule.points)}</strong>
