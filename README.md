@@ -47,3 +47,27 @@ git add .
 git commit -m "Update A3K64 web source"
 git push -u origin main --force
 ```
+
+## Ghi chú Google Sheets
+
+Nếu link GAS trả về `"students":[]`, web sẽ không tự dùng dữ liệu mẫu nữa. Khi đó cần điền dữ liệu vào đúng các tab:
+
+### Students
+`id | name | group | role | avatarInitial`
+
+### ScoreEvents
+`id | studentId | week | title | points | type | category | note | createdBy | createdAt`
+
+### Weeks
+`week`
+
+## Tài khoản local tạm thời
+
+Các tài khoản local trong `src/components/Login.tsx`:
+
+- `gvcn` / `123456`
+- `lop_truong` / `123456`
+- `bi_thu` / `123456`
+- `hoc_sinh` / `123456`
+
+Đây chỉ là chặn nhập bậy ở frontend. Khi dùng thật nên chuyển đăng nhập sang Firebase hoặc xác thực qua Google Apps Script.

@@ -60,11 +60,11 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   const [groupFilter, setGroupFilter] = useState<GroupFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("score-desc");
-  const [students, setStudents] = useState<Student[]>(mockStudents);
-  const [events, setEvents] = useState<ScoreEvent[]>(readLocalEvents);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [events, setEvents] = useState<ScoreEvent[]>([]);
   const [dataSource, setDataSource] = useState<DataSource>("loading");
   const [syncMessage, setSyncMessage] = useState("Đang tải dữ liệu...");
-  const [selectedStudentId, setSelectedStudentId] = useState(mockStudents[0]?.id || "");
+  const [selectedStudentId, setSelectedStudentId] = useState("");
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
 
   const loadScoreboardData = useCallback(async () => {
@@ -82,17 +82,25 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
       return;
     }
 
-    const nextStudents = remoteData.students.length ? remoteData.students : mockStudents;
-    const nextWeeks = remoteData.weeks.length ? remoteData.weeks : SCORE_WEEKS;
+    const nextStudents = remoteData.students;
+    const nextEvents = remoteData.events;
+    const nextWeeks = remoteData.weeks.length ? remoteData.weeks : [week || 37];
     const nextWeek = nextWeeks.includes(week) ? week : nextWeeks[nextWeeks.length - 1] || 37;
 
     setStudents(nextStudents);
-    setEvents(remoteData.events);
+    setEvents(nextEvents);
     setWeeks(nextWeeks);
     setWeek(nextWeek);
     setSelectedStudentId((current) => (nextStudents.some((student) => student.id === current) ? current : nextStudents[0]?.id || ""));
     setDataSource("gas");
-    setSyncMessage(`Đã đồng bộ Google Sheets${remoteData.updatedAt ? ` lúc ${new Date(remoteData.updatedAt).toLocaleTimeString("vi-VN")}` : ""}.`);
+
+    const syncedAt = remoteData.updatedAt ? ` lúc ${new Date(remoteData.updatedAt).toLocaleTimeString("vi-VN")}` : "";
+    const emptyNote = !nextStudents.length
+      ? " Google Sheets đã kết nối nhưng tab Students đang rỗng hoặc chưa đúng header."
+      : !nextEvents.length
+        ? " Google Sheets đã kết nối, hiện chưa có dữ liệu chấm điểm trong ScoreEvents."
+        : "";
+    setSyncMessage(`Đã đồng bộ Google Sheets${syncedAt}.${emptyNote}`);
   }, [week]);
 
   const canCreateWeek = WEEK_CREATORS.includes(String(userRole || "lop_truong"));
@@ -102,12 +110,16 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
-  }, [events]);
+    if (dataSource !== "loading") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    }
+  }, [dataSource, events]);
 
   useEffect(() => {
-    localStorage.setItem(WEEK_STORAGE_KEY, JSON.stringify(weeks));
-  }, [weeks]);
+    if (dataSource !== "loading") {
+      localStorage.setItem(WEEK_STORAGE_KEY, JSON.stringify(weeks));
+    }
+  }, [dataSource, weeks]);
 
   const rawSummaries = useMemo(() => summarizeStudents(students, events, week), [events, students, week]);
 
