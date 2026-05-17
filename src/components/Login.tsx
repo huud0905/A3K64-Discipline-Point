@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "../lib/firebase";
+import { validateLoginWithGas } from "../lib/gasApi";
 import {
   AppWindow,
   CheckCircle2,
@@ -44,36 +45,6 @@ const ACCENTS: Record<
 };
 
 
-const LOCAL_ACCOUNTS = [
-  {
-    username: "gvcn",
-    password: "123456",
-    displayName: "GVCN",
-    email: "gvcn@local.12a3",
-    role: "gvcn",
-  },
-  {
-    username: "lop_truong",
-    password: "123456",
-    displayName: "Lớp trưởng",
-    email: "lop_truong@local.12a3",
-    role: "lop_truong",
-  },
-  {
-    username: "bi_thu",
-    password: "123456",
-    displayName: "Bí thư",
-    email: "bi_thu@local.12a3",
-    role: "bi_thu",
-  },
-  {
-    username: "hoc_sinh",
-    password: "123456",
-    displayName: "Học sinh",
-    email: "hoc_sinh@local.12a3",
-    role: "hoc_sinh",
-  },
-] as const;
 
 const getSystemTheme = (): ResolvedTheme => {
   if (typeof window === "undefined" || !window.matchMedia) return "dark";
@@ -151,7 +122,7 @@ export default function Login({ onLogin }: LoginProps) {
     event.preventDefault();
     setError("");
 
-    const cleanUsername = username.trim().toLowerCase();
+    const cleanUsername = username.trim();
 
     if (!cleanUsername) {
       setError("Vui lòng nhập tên đăng nhập trước");
@@ -163,28 +134,22 @@ export default function Login({ onLogin }: LoginProps) {
       return;
     }
 
-    const account = LOCAL_ACCOUNTS.find(
-      (item) => item.username.toLowerCase() === cleanUsername && item.password === password
-    );
-
-    if (!account) {
-      setError("Tên đăng nhập hoặc mật khẩu không đúng");
-      return;
-    }
-
     setLoadingLocal(true);
 
-    window.setTimeout(() => {
-      onLogin({
-        uid: `local-${account.username}`,
-        displayName: account.displayName,
-        email: account.email,
-        photoURL: null,
-        provider: "local",
-        role: account.role,
-      });
+    try {
+      const user = await validateLoginWithGas(cleanUsername, password);
+
+      if (!user) {
+        setError("Tên đăng nhập hoặc mật khẩu không đúng");
+        return;
+      }
+
+      onLogin(user);
+    } catch {
+      setError("Không kết nối được hệ thống tài khoản. Hãy kiểm tra Google Apps Script.");
+    } finally {
       setLoadingLocal(false);
-    }, 250);
+    }
   };
 
   const handleGoogleLogin = async () => {

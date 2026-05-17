@@ -71,3 +71,27 @@ Các tài khoản local trong `src/components/Login.tsx`:
 - `hoc_sinh` / `123456`
 
 Đây chỉ là chặn nhập bậy ở frontend. Khi dùng thật nên chuyển đăng nhập sang Firebase hoặc xác thực qua Google Apps Script.
+
+## Cấu trúc Google Sheet hiện tại
+
+Bản này đọc trực tiếp 3 sheet hiện có:
+
+### ACCOUNTS
+Header cần có:
+`username | password | role | to | hoten`
+
+- `username`: email hoặc tên đăng nhập
+- `password`: mật khẩu tạm thời
+- `role`: `gvcn`, `lop_truong`, `bi_thu`, `to_truong`, `hoc_sinh`
+- `to`: tổ 1/2/3/4
+- `hoten`: họ tên hiển thị
+
+### VI_PHAM
+Header cần có:
+`Tên | Điểm | Tính | Phân loại | Ghi chú`
+
+### TUẦN
+Bảng tuần đang dùng các cột:
+`STT | Họ và tên | ND điểm cộng | Tổng cộng | Nội dung điểm trừ | Tổng trừ | Tổng điểm | Xếp Loại | Người chỉnh sửa`
+
+Tab có thể tên `TUẦN`, `TUAN`, hoặc chứa chữ `Tuần`.

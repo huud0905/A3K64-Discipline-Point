@@ -1,5 +1,16 @@
 import type { ScoreCategory, ScoreEvent, ScoreType, Student } from "../apps/ScoreboardApp/data/mockScoreData";
 
+
+export type GasLoginUser = {
+  uid: string;
+  displayName: string;
+  email: string;
+  photoURL: string | null;
+  provider: string;
+  role?: string;
+  group?: number | string;
+};
+
 export type GasScoreboardPayload = {
   students: Student[];
   events: ScoreEvent[];
@@ -10,7 +21,7 @@ export type GasScoreboardPayload = {
 type RawGasResponse = {
   ok?: boolean;
   error?: string;
-  data?: Partial<GasScoreboardPayload> & { event?: unknown };
+  data?: (Partial<GasScoreboardPayload> & { event?: unknown; user?: unknown }) | { ok?: boolean; error?: string; user?: unknown };
   event?: unknown;
   students?: unknown;
   events?: unknown;
@@ -192,4 +203,27 @@ export async function deleteScoreEventInGas(eventId: string) {
 
 export async function createWeekInGas(week: number) {
   await gasPost("createWeek", { week });
+}
+
+
+export async function validateLoginWithGas(username: string, password: string): Promise<GasLoginUser | null> {
+  try {
+    const response = await gasPost("login", { username, password });
+    const data = response?.data as { ok?: boolean; error?: string; user?: unknown } | undefined;
+    if (!data?.ok || !data.user) return null;
+
+    const user = data.user as Partial<GasLoginUser> & Record<string, unknown>;
+    return {
+      uid: asText(user.uid, `gas-${username}`),
+      displayName: asText(user.displayName, username),
+      email: asText(user.email, username),
+      photoURL: null,
+      provider: asText(user.provider, "gas"),
+      role: asText(user.role),
+      group: asText(user.group),
+    };
+  } catch (error) {
+    console.error("Không đăng nhập được qua Google Sheets:", error);
+    return null;
+  }
 }
