@@ -18,15 +18,16 @@ export type GasScoreboardPayload = {
   updatedAt?: string;
 };
 
-type RawGasResponse = {
+type GasResponseData = Partial<GasScoreboardPayload> & {
   ok?: boolean;
   error?: string;
-  data?: (Partial<GasScoreboardPayload> & { event?: unknown; user?: unknown }) | { ok?: boolean; error?: string; user?: unknown };
   event?: unknown;
-  students?: unknown;
-  events?: unknown;
-  weeks?: unknown;
-  updatedAt?: string;
+  user?: unknown;
+  [key: string]: unknown;
+};
+
+type RawGasResponse = GasResponseData & {
+  data?: GasResponseData;
 };
 
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
@@ -182,7 +183,7 @@ export async function fetchScoreboardFromGas(): Promise<GasScoreboardPayload | n
       students,
       events,
       weeks,
-      updatedAt: data.updatedAt || response.updatedAt,
+      updatedAt: asText(data.updatedAt || response.updatedAt) || undefined,
     };
   } catch (error) {
     console.error("Không đọc được dữ liệu Google Sheets:", error);
@@ -209,7 +210,7 @@ export async function createWeekInGas(week: number) {
 export async function validateLoginWithGas(username: string, password: string): Promise<GasLoginUser | null> {
   try {
     const response = await gasPost("login", { username, password });
-    const data = response?.data as { ok?: boolean; error?: string; user?: unknown } | undefined;
+    const data = response?.data;
     if (!data?.ok || !data.user) return null;
 
     const user = data.user as Partial<GasLoginUser> & Record<string, unknown>;
