@@ -15,6 +15,10 @@ function weekdayLabel(value: string) {
   return `Thứ ${day + 1}`;
 }
 
+function isHiddenSheetTotal(event: ScoreEvent) {
+  return String(event.note || "").includes("__SHEET_TOTAL__");
+}
+
 function eventLine(event: ScoreEvent) {
   return `${weekdayLabel(event.createdAt)}: [${categoryLabel(event.category)}] ${event.title} (${formatScore(event.points)})`;
 }
@@ -83,8 +87,11 @@ export function StudentTable({ title, students, compact = false, onOpenStudent, 
           </thead>
           <tbody>
             {students.map((student, index) => {
-              const plusEvents = student.events.filter((event) => event.points > 0);
-              const minusEvents = student.events.filter((event) => event.points < 0);
+              const visibleEvents = student.events.filter((event) => !isHiddenSheetTotal(event));
+              const plusEvents = visibleEvents.filter((event) => event.points > 0);
+              const minusEvents = visibleEvents.filter((event) => event.points < 0);
+              const visiblePositive = plusEvents.reduce((sum, event) => sum + event.points, 0);
+              const visibleNegative = minusEvents.reduce((sum, event) => sum + event.points, 0);
 
               return (
                 <tr key={student.id}>
@@ -110,7 +117,7 @@ export function StudentTable({ title, students, compact = false, onOpenStudent, 
                     </div>
                   </td>
 
-                  <td className="point-cell score-positive">{student.positive > 0 ? formatScore(student.positive) : "0"}</td>
+                  <td className="point-cell score-positive">{visiblePositive > 0 ? formatScore(visiblePositive) : "0"}</td>
 
                   <td>
                     <div className="event-stack">
@@ -126,7 +133,7 @@ export function StudentTable({ title, students, compact = false, onOpenStudent, 
                     </div>
                   </td>
 
-                  <td className="point-cell score-negative">{student.negative < 0 ? student.negative : "0"}</td>
+                  <td className="point-cell score-negative">{visibleNegative < 0 ? visibleNegative : "0"}</td>
                   <td className={`total-cell ${student.total >= 0 ? "score-positive" : "score-negative"}`}>{formatScore(student.total)}</td>
                   <td>
                     <span className={`status-pill status-${statusClass(student.status)}`}>{student.status}</span>

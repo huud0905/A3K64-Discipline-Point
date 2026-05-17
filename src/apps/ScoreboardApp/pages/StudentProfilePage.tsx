@@ -18,7 +18,7 @@ type StudentProfilePageProps = {
 export function StudentProfilePage({ students, events, summaries, selectedStudentId, onSelectStudent }: StudentProfilePageProps) {
   const current = summaries.find((student) => student.id === selectedStudentId) || summaries[0];
   const student = students.find((item) => item.id === current?.id);
-  const history = events.filter((event) => event.studentId === current?.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const history = events.filter((event) => event.studentId === current?.id && !String(event.note || "").includes("__SHEET_TOTAL__")).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   const weeklyTrend = SCORE_WEEKS.map((week) => {
     const weekSummary = summarizeStudents(students, events, week).find((item) => item.id === current?.id);

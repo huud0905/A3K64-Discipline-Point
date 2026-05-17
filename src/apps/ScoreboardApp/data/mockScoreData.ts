@@ -33,6 +33,17 @@ export type StudentScoreSummary = Student & {
 
 export const SCORE_WEEKS = [37, 38, 39, 40];
 
+function isSheetTotalEvent(event: ScoreEvent) {
+  return String(event.note || "").includes("__SHEET_TOTAL__");
+}
+
+function getSheetStatusOverride(events: ScoreEvent[]) {
+  const marker = events.find((event) => String(event.note || "").includes("__SHEET_TOTAL__") && String(event.note || "").includes("status="));
+  const status = String(marker?.note || "").split("status=")[1]?.split(";")[0]?.trim();
+  if (status === "Tốt" || status === "Khá" || status === "Đạt" || status === "Chưa đạt") return status;
+  return null;
+}
+
 function getLastNameInitial(name: string) {
   const parts = name.trim().split(/\s+/);
   return (parts[parts.length - 1]?.[0] || name[0] || "?").toUpperCase();
@@ -124,11 +135,13 @@ export function getScoreStatus(total: number): StudentScoreSummary["status"] {
 export function summarizeStudents(students: Student[], events: ScoreEvent[], week: number) {
   const summaries = students.map((student) => {
     const studentEvents = events.filter((event) => event.studentId === student.id && event.week === week);
+    const visibleEvents = studentEvents.filter((event) => !isSheetTotalEvent(event));
     const total = studentEvents.reduce((sum, event) => sum + event.points, 0);
-    const positive = studentEvents.filter((event) => event.points > 0).reduce((sum, event) => sum + event.points, 0);
-    const negative = studentEvents.filter((event) => event.points < 0).reduce((sum, event) => sum + event.points, 0);
+    const positive = visibleEvents.filter((event) => event.points > 0).reduce((sum, event) => sum + event.points, 0);
+    const negative = visibleEvents.filter((event) => event.points < 0).reduce((sum, event) => sum + event.points, 0);
+    const sheetStatus = getSheetStatusOverride(studentEvents);
 
-    return { ...student, total, positive, negative, rank: 0, status: getScoreStatus(total), events: studentEvents };
+    return { ...student, total, positive, negative, rank: 0, status: sheetStatus || getScoreStatus(total), events: visibleEvents };
   });
 
   return summaries

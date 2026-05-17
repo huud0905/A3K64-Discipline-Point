@@ -95,3 +95,22 @@ Bảng tuần đang dùng các cột:
 `STT | Họ và tên | ND điểm cộng | Tổng cộng | Nội dung điểm trừ | Tổng trừ | Tổng điểm | Xếp Loại | Người chỉnh sửa`
 
 Tab có thể tên `TUẦN`, `TUAN`, hoặc chứa chữ `Tuần`.
+
+## GAS tuần v2
+
+Bản này đọc học sinh từ các sheet `TUẦN n`, ví dụ `TUẦN 1`, `TUẦN 2`.
+
+- `TUẦN 0` luôn bị bỏ qua.
+- `ACCOUNTS` chỉ dùng cho đăng nhập, không dùng làm danh sách học sinh.
+- Tổ được xác định bằng dòng `Tổ 1`, `Tổ 2`, `Tổ 3`, `Tổ 4` trong sheet tuần.
+- Khi gặp `Tổ 2` thì kết thúc tổ 1; tương tự cho các tổ còn lại.
+- Khi hết dữ liệu thì dừng.
+
+## GAS tuần v3
+
+- Chỉ đọc bảng chấm bên phải trong `TUẦN n`: `STT | Họ và tên | ND điểm cộng | Tổng cộng | Nội dung điểm trừ | Tổng trừ | Tổng điểm | Xếp Loại`.
+- `TUẦN 0` luôn bị bỏ qua.
+- `ACCOUNTS` chỉ dùng đăng nhập, không dùng để chia tổ học sinh.
+- Tổ được xác định theo dòng `Tổ 1`, `Tổ 2`, `Tổ 3`, `Tổ 4` trong chính bảng tuần.
+- Tổng điểm lấy từ cột `Tổng điểm` (cột N trong ảnh), xếp loại lấy từ cột `Xếp Loại` (cột O trong ảnh).
+- Điểm mặc định 50 không hiện ở cột `Cộng (+)` / `Điểm +`; nó chỉ dùng để tính `Tổng`.

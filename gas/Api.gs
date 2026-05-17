@@ -2,10 +2,11 @@ const SPREADSHEET_ID = "1GcmB64Tj2EPEpT9uhQ5IbIcO8Ysq-J5m12NDqSeiT0Y";
 
 const ACCOUNTS_SHEET_NAME = "ACCOUNTS";
 const RULES_SHEET_NAME = "VI_PHAM";
-const WEEK_SHEET_NAMES = ["TUẦN", "TUAN", "Tuần", "Tuan"];
 const EXTRA_EVENTS_SHEET_NAME = "ScoreEvents";
 
-const DEFAULT_WEEK = 37;
+const DEFAULT_WEEK = 1;
+const IGNORED_WEEKS = [0];
+const SHEET_TOTAL_NOTE = "__SHEET_TOTAL__";
 
 const EXTRA_EVENT_HEADERS = ["id", "studentId", "week", "title", "points", "type", "category", "note", "createdBy", "createdAt"];
 
@@ -40,9 +41,7 @@ function doPost(e) {
 }
 
 function jsonOutput(data) {
-  return ContentService
-    .createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
 }
 
 function getSpreadsheet() {
@@ -89,34 +88,9 @@ function toType(value, points) {
   return Number(points) >= 0 ? "CONG" : "TRU";
 }
 
-function getHeaderMap(values, preferredRowIndex) {
-  const headerRow = values[preferredRowIndex] || [];
-  const map = {};
-  headerRow.forEach(function (header, index) {
-    const key = normalizeKey(header);
-    if (key) map[key] = index;
-  });
-  return map;
-}
-
-function findHeaderRow(values, requiredKeys) {
-  for (let r = 0; r < Math.min(values.length, 30); r++) {
-    const map = getHeaderMap(values, r);
-    const ok = requiredKeys.every(function (key) { return map[key] !== undefined; });
-    if (ok) return r;
-  }
-  return -1;
-}
-
-function firstDefined() {
-  for (let i = 0; i < arguments.length; i++) {
-    if (arguments[i] !== undefined && arguments[i] !== null && cleanText(arguments[i]) !== "") return arguments[i];
-  }
-  return "";
-}
-
 function getSheetByAnyName(names) {
   const ss = getSpreadsheet();
+
   for (let i = 0; i < names.length; i++) {
     const sheet = ss.getSheetByName(names[i]);
     if (sheet) return sheet;
@@ -124,9 +98,9 @@ function getSheetByAnyName(names) {
 
   const normalizedNames = names.map(normalizeKey);
   const sheets = ss.getSheets();
+
   for (let i = 0; i < sheets.length; i++) {
-    const sheetNameKey = normalizeKey(sheets[i].getName());
-    if (normalizedNames.indexOf(sheetNameKey) >= 0) return sheets[i];
+    if (normalizedNames.indexOf(normalizeKey(sheets[i].getName())) >= 0) return sheets[i];
   }
 
   return null;
@@ -146,7 +120,140 @@ function makeStudentId(seed, index) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+
   return slug || ("s" + String(index + 1).padStart(2, "0"));
+}
+
+function getWeekNumberFromSheetName(sheetName) {
+  const name = cleanText(sheetName);
+  const key = normalizeKey(name);
+
+  if (key === "tuan") return DEFAULT_WEEK;
+  if (key.indexOf("tuan") < 0) return null;
+
+  const match = name.match(/\d+/);
+  if (!match) return DEFAULT_WEEK;
+
+  return Number(match[0]);
+}
+
+function getWeekSheets() {
+  const ss = getSpreadsheet();
+  const result = [];
+
+  ss.getSheets().forEach(function (sheet) {
+    const week = getWeekNumberFromSheetName(sheet.getName());
+    if (week === null) return;
+    if (IGNORED_WEEKS.indexOf(Number(week)) >= 0) return; // Bỏ qua TUẦN 0.
+
+    result.push({ sheet: sheet, week: Number(week) || DEFAULT_WEEK, name: sheet.getName() });
+  });
+
+  return result.sort(function (a, b) { return a.week - b.week; });
+}
+
+function isGroupRow(name) {
+  return cleanText(name).match(/^tổ\s*(\d+)/i) || cleanText(name).match(/^to\s*(\d+)/i);
+}
+
+function getGroupNumber(name) {
+  const match = cleanText(name).match(/^tổ\s*(\d+)/i) || cleanText(name).match(/^to\s*(\d+)/i);
+  if (!match) return null;
+  const group = Number(match[1]);
+  return group === 1 || group === 2 || group === 3 || group === 4 ? group : null;
+}
+
+function isStudentDataRow(row, sttCol, nameCol) {
+  const name = cleanText(row[nameCol]);
+  if (!name || isGroupRow(name)) return false;
+
+  const stt = sttCol !== undefined ? cleanText(row[sttCol]) : "";
+  if (sttCol !== undefined && (!stt || !/^\d+$/.test(stt))) return false;
+
+  return true;
+}
+
+function findLastIndexBefore(keys, targetKey, beforeIndex) {
+  for (let index = Math.min(beforeIndex - 1, keys.length - 1); index >= 0; index--) {
+    if (keys[index] === targetKey) return index;
+  }
+  return undefined;
+}
+
+function findIndexAfter(keys, targetKey, afterIndex) {
+  for (let index = Math.max(afterIndex + 1, 0); index < keys.length; index++) {
+    if (keys[index] === targetKey) return index;
+  }
+  return undefined;
+}
+
+function findFirstIndex(keys, targetKeys) {
+  for (let index = 0; index < keys.length; index++) {
+    if (targetKeys.indexOf(keys[index]) >= 0) return index;
+  }
+  return undefined;
+}
+
+/**
+ * Tìm đúng bảng chấm bên phải trong sheet TUẦN.
+ * Không dùng bảng tổng hợp bên trái.
+ *
+ * Dấu hiệu bảng chấm bên phải:
+ * STT | Họ và tên | ND điểm cộng | Tổng cộng | Nội dung điểm trừ | Tổng trừ | Tổng điểm | Xếp Loại | Người chỉnh sửa
+ */
+function getScoreTableConfig(values) {
+  for (let r = 0; r < Math.min(values.length, 40); r++) {
+    const keys = (values[r] || []).map(normalizeKey);
+
+    const plusTextCol = findFirstIndex(keys, ["nddiemcong", "noidungdiemcong"]);
+    const minusTextCol = findFirstIndex(keys, ["noidungdiemtru", "nddiemtru"]);
+
+    if (plusTextCol === undefined || minusTextCol === undefined) continue;
+
+    const nameCol = findLastIndexBefore(keys, "hovaten", plusTextCol);
+    const sttCol = nameCol === undefined ? undefined : findLastIndexBefore(keys, "stt", nameCol + 1);
+    const plusTotalCol = findIndexAfter(keys, "tongcong", plusTextCol);
+    const minusTotalCol = findIndexAfter(keys, "tongtru", minusTextCol);
+    const totalCol = findIndexAfter(keys, "tongdiem", minusTextCol);
+    const statusCol = findIndexAfter(keys, "xeploai", totalCol === undefined ? minusTextCol : totalCol);
+    const editorCol = findIndexAfter(keys, "nguoichinhsua", statusCol === undefined ? minusTextCol : statusCol);
+
+    if (nameCol === undefined || sttCol === undefined || totalCol === undefined || statusCol === undefined) continue;
+
+    return {
+      headerIndex: r,
+      sttCol: sttCol,
+      nameCol: nameCol,
+      plusTextCol: plusTextCol,
+      plusTotalCol: plusTotalCol,
+      minusTextCol: minusTextCol,
+      minusTotalCol: minusTotalCol,
+      totalCol: totalCol,
+      statusCol: statusCol,
+      editorCol: editorCol
+    };
+  }
+
+  return null;
+}
+
+function getHeaderMap(values, preferredRowIndex) {
+  const row = values[preferredRowIndex] || [];
+  const map = {};
+  row.forEach(function (header, index) {
+    const key = normalizeKey(header);
+    if (key) map[key] = index;
+  });
+  return map;
+}
+
+function findHeaderRow(values, requiredKeys) {
+  for (let r = 0; r < Math.min(values.length, 40); r++) {
+    const map = getHeaderMap(values, r);
+    const ok = requiredKeys.every(function (key) { return map[key] !== undefined; });
+    if (ok) return r;
+  }
+  return -1;
 }
 
 function readAccounts() {
@@ -158,21 +265,17 @@ function readAccounts() {
   if (headerIndex < 0) return [];
 
   const map = getHeaderMap(values, headerIndex);
-  const usernameCol = map.username;
-  const passwordCol = map.password;
-  const roleCol = map.role;
-  const groupCol = map.to !== undefined ? map.to : map["to"];
-  const nameCol = map.hoten !== undefined ? map.hoten : (map.name !== undefined ? map.name : map["hovaten"]);
-
   const accounts = [];
 
   for (let r = headerIndex + 1; r < values.length; r++) {
     const row = values[r];
-    const username = cleanText(row[usernameCol]);
-    const password = cleanText(row[passwordCol]);
-    const role = cleanText(row[roleCol]) || "hoc_sinh";
+    const username = cleanText(row[map.username]);
+    const password = cleanText(row[map.password]);
+    const role = cleanText(row[map.role]) || "hoc_sinh";
+    const nameCol = map.hoten !== undefined ? map.hoten : (map.name !== undefined ? map.name : map.hovaten);
     const name = cleanText(nameCol !== undefined ? row[nameCol] : "");
-    const group = parseNumber(groupCol !== undefined ? row[groupCol] : "");
+    const group = parseNumber(map.to !== undefined ? row[map.to] : "");
+
     if (!username && !name) continue;
 
     accounts.push({
@@ -187,121 +290,49 @@ function readAccounts() {
   return accounts;
 }
 
-function readStudentsFromAccounts() {
-  const accounts = readAccounts();
-  const students = [];
-
-  accounts.forEach(function (account, index) {
-    const roleKey = normalizeKey(account.role);
-    const groupNumber = Number(account.group);
-    const name = cleanText(account.name);
-
-    if (!name) return;
-    if (roleKey !== "hocsinh" && !isFinite(groupNumber)) return;
-
-    students.push({
-      id: makeStudentId(account.username || name, index),
-      name: name,
-      group: groupNumber === 1 || groupNumber === 2 || groupNumber === 3 || groupNumber === 4 ? groupNumber : 1,
-      role: account.role || "hoc_sinh",
-      avatarInitial: getLastNameInitial(name),
-      username: account.username
-    });
-  });
-
-  return students;
-}
-
-function readWeekSheetStudents() {
+function readStudentsFromWeekSheets() {
   const weekSheets = getWeekSheets();
   const studentsByName = {};
   const result = [];
 
   weekSheets.forEach(function (item) {
     const values = getDisplayValues(item.sheet);
-    const headerIndex = findHeaderRow(values, ["hovaten"]);
-    if (headerIndex < 0) return;
+    const config = getScoreTableConfig(values);
+    if (!config) return;
 
-    const map = getHeaderMap(values, headerIndex);
-    const nameCol = map["hovaten"];
-    const sttCol = map.stt;
-    let currentGroup = 1;
+    let currentGroup = null;
 
-    for (let r = headerIndex + 1; r < values.length; r++) {
+    for (let r = config.headerIndex + 1; r < values.length; r++) {
       const row = values[r];
-      const name = cleanText(row[nameCol]);
-      if (!name) continue;
+      const name = cleanText(row[config.nameCol]);
 
-      const groupMatch = name.match(/^tổ\s*(\d+)/i) || name.match(/^to\s*(\d+)/i);
-      if (groupMatch) {
-        currentGroup = Number(groupMatch[1]);
+      const groupNumber = getGroupNumber(name);
+      if (groupNumber) {
+        currentGroup = groupNumber;
         continue;
       }
 
-      const stt = sttCol !== undefined ? cleanText(row[sttCol]) : "";
-      if (!stt || !/^\d+$/.test(stt)) continue;
-      if (studentsByName[normalizeKey(name)]) continue;
+      if (!isStudentDataRow(row, config.sttCol, config.nameCol)) continue;
+      if (!currentGroup) currentGroup = 1;
+
+      const key = normalizeKey(name);
+      if (studentsByName[key]) continue;
+
+      const status = cleanText(row[config.statusCol]);
 
       const student = {
         id: makeStudentId(name, result.length),
         name: name,
-        group: currentGroup === 1 || currentGroup === 2 || currentGroup === 3 || currentGroup === 4 ? currentGroup : 1,
+        group: currentGroup,
         role: "",
-        avatarInitial: getLastNameInitial(name)
+        avatarInitial: getLastNameInitial(name),
+        statusOverride: status || ""
       };
 
-      studentsByName[normalizeKey(name)] = student;
+      studentsByName[key] = student;
       result.push(student);
     }
   });
-
-  return result;
-}
-
-function mergeStudents() {
-  const fromAccounts = readStudentsFromAccounts();
-  const fromWeek = readWeekSheetStudents();
-  const byName = {};
-  const result = [];
-
-  fromAccounts.forEach(function (student) {
-    byName[normalizeKey(student.name)] = student;
-    result.push(student);
-  });
-
-  fromWeek.forEach(function (student) {
-    const key = normalizeKey(student.name);
-    if (byName[key]) {
-      if (!byName[key].group && student.group) byName[key].group = student.group;
-      return;
-    }
-    byName[key] = student;
-    result.push(student);
-  });
-
-  return result;
-}
-
-function getWeekSheets() {
-  const ss = getSpreadsheet();
-  const sheets = ss.getSheets();
-  const result = [];
-
-  sheets.forEach(function (sheet) {
-    const key = normalizeKey(sheet.getName());
-    if (key === "tuan" || key.indexOf("tuan") >= 0) {
-      const numberMatch = sheet.getName().match(/\d+/);
-      result.push({
-        sheet: sheet,
-        week: numberMatch ? Number(numberMatch[0]) : DEFAULT_WEEK
-      });
-    }
-  });
-
-  const foundExact = getSheetByAnyName(WEEK_SHEET_NAMES);
-  if (foundExact && !result.some(function (item) { return item.sheet.getSheetId() === foundExact.getSheetId(); })) {
-    result.push({ sheet: foundExact, week: DEFAULT_WEEK });
-  }
 
   return result;
 }
@@ -310,15 +341,6 @@ function findStudentIdByName(students, name) {
   const key = normalizeKey(name);
   const found = students.find(function (student) { return normalizeKey(student.name) === key; });
   return found ? found.id : "";
-}
-
-function splitContent(text) {
-  const value = cleanText(text);
-  if (!value) return [];
-  return value
-    .split(/\n|;|,/)
-    .map(function (item) { return cleanText(item); })
-    .filter(Boolean);
 }
 
 function makeEvent(id, studentId, week, title, points, category, note) {
@@ -342,65 +364,65 @@ function readEventsFromWeekSheets(students) {
 
   weekSheets.forEach(function (item) {
     const values = getDisplayValues(item.sheet);
-    const headerIndex = findHeaderRow(values, ["hovaten"]);
-    if (headerIndex < 0) return;
+    const config = getScoreTableConfig(values);
+    if (!config) return;
 
-    const map = getHeaderMap(values, headerIndex);
-    const nameCol = map["hovaten"];
-    const sttCol = map.stt;
+    let currentGroup = null;
 
-    const plusTextCol = map["nddiemcong"] !== undefined ? map["nddiemcong"] : map["noidungdiemcong"];
-    const plusTotalCol = map["tongcong"];
-    const minusTextCol = map["noidungdiemtru"] !== undefined ? map["noidungdiemtru"] : map["nddiemtru"];
-    const minusTotalCol = map["tongtru"];
-    const totalCol = map["tongdiem"];
-    const editorCol = map["nguoichinhsua"];
-
-    for (let r = headerIndex + 1; r < values.length; r++) {
+    for (let r = config.headerIndex + 1; r < values.length; r++) {
       const row = values[r];
-      const name = cleanText(row[nameCol]);
-      if (!name) continue;
-      if (/^tổ\s*\d+/i.test(name) || /^to\s*\d+/i.test(name)) continue;
+      const name = cleanText(row[config.nameCol]);
 
-      const stt = sttCol !== undefined ? cleanText(row[sttCol]) : "";
-      if (sttCol !== undefined && (!stt || !/^\d+$/.test(stt))) continue;
+      const groupNumber = getGroupNumber(name);
+      if (groupNumber) {
+        currentGroup = groupNumber;
+        continue;
+      }
+
+      if (!isStudentDataRow(row, config.sttCol, config.nameCol)) continue;
+      if (!currentGroup) currentGroup = 1;
 
       const studentId = findStudentIdByName(students, name);
       if (!studentId) continue;
 
-      const plusText = plusTextCol !== undefined ? cleanText(row[plusTextCol]) : "";
-      const minusText = minusTextCol !== undefined ? cleanText(row[minusTextCol]) : "";
-      const plusTotalRaw = plusTotalCol !== undefined ? parseNumber(row[plusTotalCol]) : NaN;
-      const minusTotalRaw = minusTotalCol !== undefined ? parseNumber(row[minusTotalCol]) : NaN;
-      const totalRaw = totalCol !== undefined ? parseNumber(row[totalCol]) : NaN;
-      const editor = editorCol !== undefined ? cleanText(row[editorCol]) : "";
+      const plusText = config.plusTextCol !== undefined ? cleanText(row[config.plusTextCol]) : "";
+      const minusText = config.minusTextCol !== undefined ? cleanText(row[config.minusTextCol]) : "";
+      const plusTotalRaw = config.plusTotalCol !== undefined ? parseNumber(row[config.plusTotalCol]) : NaN;
+      const minusTotalRaw = config.minusTotalCol !== undefined ? parseNumber(row[config.minusTotalCol]) : NaN;
+      const totalRaw = config.totalCol !== undefined ? parseNumber(row[config.totalCol]) : NaN;
+      const status = config.statusCol !== undefined ? cleanText(row[config.statusCol]) : "";
+      const editor = config.editorCol !== undefined ? cleanText(row[config.editorCol]) : "";
 
-      let detailSum = 0;
+      let visibleSum = 0;
 
+      // Chỉ đưa vào cột cộng/trừ khi có nội dung cộng/trừ thật.
+      // Không dùng Tổng điểm mặc định 50 làm điểm cộng.
       if (plusText || isFinite(plusTotalRaw)) {
         const points = isFinite(plusTotalRaw) ? Math.abs(plusTotalRaw) : 0;
         const title = plusText || "Điểm cộng từ trang tính";
-        detailSum += points;
+        visibleSum += points;
         events.push(makeEvent("week-" + item.week + "-r" + (r + 1) + "-plus", studentId, item.week, title, points, "HOC_TAP", editor));
       }
 
       if (minusText || isFinite(minusTotalRaw)) {
         const points = -(isFinite(minusTotalRaw) ? Math.abs(minusTotalRaw) : 0);
         const title = minusText || "Điểm trừ từ trang tính";
-        detailSum += points;
+        visibleSum += points;
         events.push(makeEvent("week-" + item.week + "-r" + (r + 1) + "-minus", studentId, item.week, title, points, "NE_NEP", editor));
       }
 
-      if (isFinite(totalRaw) && totalRaw !== detailSum) {
-        const diff = totalRaw - detailSum;
+      // Tổng điểm lấy từ cột N / cột "Tổng điểm".
+      // Event này chỉ để tính tổng, không hiển thị ở cột Cộng/Trừ.
+      if (isFinite(totalRaw)) {
+        const hiddenDiff = totalRaw - visibleSum;
         events.push(makeEvent(
-          "week-" + item.week + "-r" + (r + 1) + "-total-adjust",
+          "week-" + item.week + "-r" + (r + 1) + "-sheet-total",
           studentId,
           item.week,
-          diff >= 0 ? "Điểm nền từ trang tính" : "Điều chỉnh từ trang tính",
-          diff,
-          diff >= 0 ? "HOC_TAP" : "NE_NEP",
-          editor
+          "Tổng điểm từ trang tính",
+          hiddenDiff,
+          hiddenDiff >= 0 ? "HOC_TAP" : "NE_NEP",
+          SHEET_TOTAL_NOTE + ";status=" + status
         ));
       }
     }
@@ -412,17 +434,20 @@ function readEventsFromWeekSheets(students) {
 function ensureExtraEventsSheet() {
   const ss = getSpreadsheet();
   let sheet = ss.getSheetByName(EXTRA_EVENTS_SHEET_NAME);
+
   if (!sheet) {
     sheet = ss.insertSheet(EXTRA_EVENTS_SHEET_NAME);
     sheet.getRange(1, 1, 1, EXTRA_EVENT_HEADERS.length).setValues([EXTRA_EVENT_HEADERS]);
     sheet.setFrozenRows(1);
   }
+
   return sheet;
 }
 
 function readExtraEvents() {
   const sheet = getSpreadsheet().getSheetByName(EXTRA_EVENTS_SHEET_NAME);
   if (!sheet) return [];
+
   const values = getDisplayValues(sheet);
   if (values.length < 2) return [];
 
@@ -437,9 +462,11 @@ function readExtraEvents() {
     const id = cleanText(row[map.id]);
     const studentId = cleanText(row[map.studentid]);
     const title = cleanText(row[map.title]);
+
     if (!id || !studentId || !title) continue;
 
     const points = parseNumber(row[map.points]);
+
     events.push({
       id: id,
       studentId: studentId,
@@ -471,7 +498,9 @@ function readRules() {
   for (let r = headerIndex + 1; r < values.length; r++) {
     const row = values[r];
     const title = cleanText(row[map.ten]);
+
     if (!title) continue;
+
     const rawPoints = parseNumber(row[map.diem]);
     const tinh = cleanText(map.tinh !== undefined ? row[map.tinh] : "");
     const points = isFinite(rawPoints) ? (normalizeKey(tinh) === "tru" ? -Math.abs(rawPoints) : Math.abs(rawPoints)) : 0;
@@ -491,15 +520,18 @@ function readRules() {
 }
 
 function getScoreboardData() {
-  const students = mergeStudents();
+  const students = readStudentsFromWeekSheets();
   const weekEvents = readEventsFromWeekSheets(students);
   const extraEvents = readExtraEvents();
   const events = weekEvents.concat(extraEvents);
 
   const weeks = Array.from(new Set(
-    getWeekSheets().map(function (item) { return item.week; })
+    getWeekSheets()
+      .map(function (item) { return item.week; })
       .concat(events.map(function (event) { return Number(event.week); }))
-  )).filter(isFinite).sort(function (a, b) { return a - b; });
+  ))
+    .filter(function (week) { return isFinite(week) && IGNORED_WEEKS.indexOf(Number(week)) < 0; })
+    .sort(function (a, b) { return a - b; });
 
   return {
     students: students,
@@ -541,6 +573,7 @@ function appendObject(sheet, headers, record) {
   const row = headers.map(function (header) {
     return record[header] === undefined ? "" : record[header];
   });
+
   sheet.appendRow(row);
 }
 
@@ -574,6 +607,7 @@ function deleteScoreEvent(id) {
   if (lastRow < 2) return { deleted: false };
 
   const ids = sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues();
+
   for (let index = 0; index < ids.length; index++) {
     if (String(ids[index][0]) === String(id)) {
       sheet.deleteRow(index + 2);

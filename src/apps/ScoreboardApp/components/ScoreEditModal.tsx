@@ -45,6 +45,10 @@ const days = [
   { key: 0, label: "CN", full: "Chủ nhật" },
 ];
 
+function isHiddenSheetTotal(event: ScoreEvent) {
+  return String(event.note || "").includes("__SHEET_TOTAL__");
+}
+
 function weekdayNumber(value: string) {
   return new Date(value).getDay();
 }
@@ -59,7 +63,7 @@ function newEventDateForDay(day: number) {
 }
 
 function summarizeDay(events: ScoreEvent[], day: number) {
-  const dayEvents = events.filter((event) => weekdayNumber(event.createdAt) === day);
+  const dayEvents = events.filter((event) => weekdayNumber(event.createdAt) === day && !isHiddenSheetTotal(event));
   const plus = dayEvents.filter((event) => event.points > 0);
   const minus = dayEvents.filter((event) => event.points < 0);
 
@@ -127,13 +131,14 @@ export function ScoreEditModal({
   );
 
   const activeDayEvents = useMemo(
-    () => weekEvents.filter((event) => weekdayNumber(event.createdAt) === activeDay),
+    () => weekEvents.filter((event) => weekdayNumber(event.createdAt) === activeDay && !isHiddenSheetTotal(event)),
     [activeDay, weekEvents]
   );
 
-  const plusTotal = weekEvents.filter((event) => event.points > 0).reduce((sum, event) => sum + event.points, 0);
-  const minusTotal = weekEvents.filter((event) => event.points < 0).reduce((sum, event) => sum + event.points, 0);
-  const total = plusTotal + minusTotal;
+  const visibleWeekEvents = weekEvents.filter((event) => !isHiddenSheetTotal(event));
+  const plusTotal = visibleWeekEvents.filter((event) => event.points > 0).reduce((sum, event) => sum + event.points, 0);
+  const minusTotal = visibleWeekEvents.filter((event) => event.points < 0).reduce((sum, event) => sum + event.points, 0);
+  const total = weekEvents.reduce((sum, event) => sum + event.points, 0);
 
   const changeCategory = (nextCategory: ScoreCategory) => {
     setCategory(nextCategory);
