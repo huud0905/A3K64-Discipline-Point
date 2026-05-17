@@ -1,5 +1,5 @@
 import { Camera, Download, RefreshCcw, Sparkles } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { WeekSelector } from "./components/WeekSelector";
 import { FilterSelect } from "./components/FilterSelect";
 import { ScoreEditModal } from "./components/ScoreEditModal";
@@ -11,9 +11,11 @@ import {
   mockScoreEvents,
   mockStudents,
   ScoreEvent,
+  Student,
   SCORE_WEEKS,
   summarizeStudents,
 } from "./data/mockScoreData";
+import { createScoreEventInGas, createWeekInGas, deleteScoreEventInGas, fetchScoreboardFromGas } from "../../lib/gasApi";
 
 type ScoreboardTab = "overview" | "scoring" | "profile";
 type GroupFilter = "all" | "1" | "2" | "3" | "4";
@@ -27,6 +29,7 @@ type ScoreboardAppProps = {
 const STORAGE_KEY = "scoreboard-local-events-v1";
 const WEEK_STORAGE_KEY = "scoreboard-local-weeks-v1";
 const WEEK_CREATORS = ["to_truong", "lop_truong", "bi_thu", "gvcn"];
+type DataSource = "loading" | "gas" | "local" | "error";
 
 function readLocalEvents() {
   try {
@@ -57,11 +60,46 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   const [groupFilter, setGroupFilter] = useState<GroupFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("score-desc");
+  const [students, setStudents] = useState<Student[]>(mockStudents);
   const [events, setEvents] = useState<ScoreEvent[]>(readLocalEvents);
+  const [dataSource, setDataSource] = useState<DataSource>("loading");
+  const [syncMessage, setSyncMessage] = useState("Đang tải dữ liệu...");
   const [selectedStudentId, setSelectedStudentId] = useState(mockStudents[0]?.id || "");
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
 
+  const loadScoreboardData = useCallback(async () => {
+    setDataSource("loading");
+    setSyncMessage("Đang tải dữ liệu từ Google Sheets...");
+
+    const remoteData = await fetchScoreboardFromGas();
+
+    if (!remoteData) {
+      setStudents(mockStudents);
+      setEvents(readLocalEvents());
+      setWeeks(readLocalWeeks());
+      setDataSource("local");
+      setSyncMessage("Đang dùng dữ liệu cục bộ. Chưa cấu hình hoặc chưa đọc được Google Apps Script.");
+      return;
+    }
+
+    const nextStudents = remoteData.students.length ? remoteData.students : mockStudents;
+    const nextWeeks = remoteData.weeks.length ? remoteData.weeks : SCORE_WEEKS;
+    const nextWeek = nextWeeks.includes(week) ? week : nextWeeks[nextWeeks.length - 1] || 37;
+
+    setStudents(nextStudents);
+    setEvents(remoteData.events);
+    setWeeks(nextWeeks);
+    setWeek(nextWeek);
+    setSelectedStudentId((current) => (nextStudents.some((student) => student.id === current) ? current : nextStudents[0]?.id || ""));
+    setDataSource("gas");
+    setSyncMessage(`Đã đồng bộ Google Sheets${remoteData.updatedAt ? ` lúc ${new Date(remoteData.updatedAt).toLocaleTimeString("vi-VN")}` : ""}.`);
+  }, [week]);
+
   const canCreateWeek = WEEK_CREATORS.includes(String(userRole || "lop_truong"));
+
+  useEffect(() => {
+    void loadScoreboardData();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
@@ -71,7 +109,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
     localStorage.setItem(WEEK_STORAGE_KEY, JSON.stringify(weeks));
   }, [weeks]);
 
-  const rawSummaries = useMemo(() => summarizeStudents(mockStudents, events, week), [events, week]);
+  const rawSummaries = useMemo(() => summarizeStudents(students, events, week), [events, students, week]);
 
   const summaries = useMemo(() => {
     const filtered = rawSummaries.filter((student) => {
@@ -104,19 +142,37 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
 
   const deleteScore = (eventId: string) => {
     setEvents((current) => current.filter((event) => event.id !== eventId));
+
+    if (dataSource === "gas") {
+      void deleteScoreEventInGas(eventId).catch(() => {
+        setSyncMessage("Không xoá được trên Google Sheets. Hãy bấm làm mới để kiểm tra lại.");
+        void loadScoreboardData();
+      });
+    }
   };
 
   const addScore = (event: Omit<ScoreEvent, "id"> | Omit<ScoreEvent, "id" | "createdAt">) => {
     const eventData = event as Omit<ScoreEvent, "id"> & { createdAt?: string };
 
-    const nextEvent: ScoreEvent = {
+    const temporaryEvent: ScoreEvent = {
       ...eventData,
       id: `local-${Date.now()}`,
       createdAt: eventData.createdAt || new Date().toISOString(),
     };
 
-    setEvents((current) => [nextEvent, ...current]);
+    setEvents((current) => [temporaryEvent, ...current]);
     setSelectedStudentId(eventData.studentId);
+
+    if (dataSource === "gas") {
+      void createScoreEventInGas(temporaryEvent)
+        .then((savedEvent) => {
+          setEvents((current) => current.map((item) => (item.id === temporaryEvent.id ? savedEvent : item)));
+          setSyncMessage("Đã lưu điểm lên Google Sheets.");
+        })
+        .catch(() => {
+          setSyncMessage("Không lưu được lên Google Sheets. Dữ liệu đang tạm nằm trên trình duyệt.");
+        });
+    }
   };
 
   const createNewWeek = () => {
@@ -126,14 +182,28 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
     setWeeks((current) => Array.from(new Set([...current, nextWeek])).sort((a, b) => a - b));
     setWeek(nextWeek);
     setActiveTab("scoring");
+
+    if (dataSource === "gas") {
+      void createWeekInGas(nextWeek).catch(() => {
+        setSyncMessage("Không tạo được tuần mới trên Google Sheets.");
+      });
+    }
   };
 
   const resetLocalData = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(WEEK_STORAGE_KEY);
+
+    if (dataSource === "gas") {
+      void loadScoreboardData();
+      return;
+    }
+
+    setStudents(mockStudents);
     setEvents(mockScoreEvents);
     setWeeks(SCORE_WEEKS);
     setWeek(37);
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(WEEK_STORAGE_KEY);
+    setSyncMessage("Đã reset dữ liệu cục bộ.");
   };
 
   return (
@@ -145,6 +215,12 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
           <span>Bảng điểm A3K64</span>
           <strong>Bộ lọc</strong>
           <small>Điều khiển bảng điểm</small>
+        </div>
+
+        <div className={`sync-status ${dataSource}`}>
+          <strong>{dataSource === "gas" ? "Google Sheets" : dataSource === "loading" ? "Đang tải" : "Local"}</strong>
+          <span>{syncMessage}</span>
+          <button type="button" onClick={loadScoreboardData}>Làm mới</button>
         </div>
 
         <WeekSelector
@@ -259,7 +335,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
             </button>
             <button type="button" className="toolbar-button" onClick={resetLocalData}>
               <RefreshCcw size={16} />
-              Reset local
+              Làm mới dữ liệu
             </button>
           </div>
         </div>
@@ -268,7 +344,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
           {activeTab === "overview" && <OverviewPage summaries={summaries} week={week} onOpenStudent={openStudent} />}
           {activeTab === "scoring" && (
             <ScoringPage
-              students={mockStudents}
+              students={students}
               summaries={summaries}
               events={events}
               week={week}
@@ -279,7 +355,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
           )}
           {activeTab === "profile" && (
             <StudentProfilePage
-              students={mockStudents}
+              students={students}
               events={events}
               summaries={rawSummaries}
               selectedStudentId={selectedStudentId}
@@ -363,6 +439,53 @@ const scoreboardCss = `
     color: #94a3b8;
     font-size: 12px;
     line-height: 1.45;
+  }
+
+
+
+
+  .sync-status {
+    display: grid;
+    gap: 6px;
+    border: 1px solid #273244;
+    border-radius: 18px;
+    padding: 12px;
+    background: #0b1220;
+  }
+
+  .sync-status strong {
+    color: #f8fafc;
+    font-size: 13px;
+  }
+
+  .sync-status span {
+    color: #94a3b8;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .sync-status button {
+    width: fit-content;
+    border: 1px solid #273244;
+    border-radius: 999px;
+    padding: 6px 10px;
+    color: #f8fafc;
+    background: #111827;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 850;
+    cursor: pointer;
+  }
+
+  .sync-status.gas {
+    border-color: rgba(16,185,129,.35);
+    background: rgba(6,78,59,.18);
+  }
+
+  .sync-status.error,
+  .sync-status.local {
+    border-color: rgba(245,158,11,.32);
+    background: rgba(120,53,15,.16);
   }
 
 
@@ -3308,6 +3431,37 @@ const scoreboardCss = `
       padding-top: 8px;
       padding-bottom: 8px;
     }
+  }
+
+
+  .win-root.theme-light .sync-status {
+    border-color: #d7dee8;
+    background: #ffffff;
+  }
+
+  .win-root.theme-light .sync-status strong {
+    color: #0f172a;
+  }
+
+  .win-root.theme-light .sync-status span {
+    color: #475569;
+  }
+
+  .win-root.theme-light .sync-status button {
+    color: #0f172a;
+    border-color: #d7dee8;
+    background: #f8fafc;
+  }
+
+  .win-root.theme-light .sync-status.gas {
+    border-color: #a7f3d0;
+    background: #ecfdf5;
+  }
+
+  .win-root.theme-light .sync-status.local,
+  .win-root.theme-light .sync-status.error {
+    border-color: #fde68a;
+    background: #fffbeb;
   }
 
   @media (max-width: 980px) {
