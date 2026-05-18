@@ -4,7 +4,7 @@ import { WeekSelector } from "./components/WeekSelector";
 import { FilterSelect } from "./components/FilterSelect";
 import { ScoreEditModal } from "./components/ScoreEditModal";
 import { StudentTable } from "./components/StudentTable";
-import { OverviewPage } from "./pages/OverviewPage";
+import { OverviewGroupsPage } from "./pages/OverviewGroupsPage";
 import { ScoringPage } from "./pages/ScoringPage";
 import { getGroupStats, mockScoreEvents, mockStudents, ScoreEvent, Student, SCORE_WEEKS, summarizeStudents } from "./data/mockScoreData";
 import { createScoreEventInGas, createWeekInGas, deleteScoreEventInGas, fetchScoreboardFromGas } from "../../lib/gasApi";
@@ -197,7 +197,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
     if (viewMode === "students") {
       return <StudentTable title="Danh sách cá nhân" students={summaries} compact onOpenStudent={openStudent} />;
     }
-    return <OverviewPage summaries={rawSummaries} week={week} onOpenStudent={openStudent} />;
+    return <OverviewGroupsPage summaries={rawSummaries} week={week} onOpenStudent={openStudent} />;
   };
 
   return (
