@@ -1,5 +1,5 @@
 import { Pencil } from "lucide-react";
-import { categoryLabel, formatScore, ScoreEvent, StudentScoreSummary } from "../data/mockScoreData";
+import { formatScore, ScoreEvent, StudentScoreSummary } from "../data/mockScoreData";
 
 type StudentTableProps = {
   title?: string;
@@ -9,18 +9,12 @@ type StudentTableProps = {
   onEditStudent?: (studentId: string) => void;
 };
 
-function weekdayLabel(value: string) {
-  const day = new Date(value).getDay();
-  if (day === 0) return "Chủ nhật";
-  return `Thứ ${day + 1}`;
-}
-
 function isHiddenSheetTotal(event: ScoreEvent) {
   return String(event.note || "").includes("__SHEET_TOTAL__");
 }
 
 function eventLine(event: ScoreEvent) {
-  return `${weekdayLabel(event.createdAt)}: [${categoryLabel(event.category)}] ${event.title} (${formatScore(event.points)})`;
+  return event.title;
 }
 
 function statusClass(status: string) {
