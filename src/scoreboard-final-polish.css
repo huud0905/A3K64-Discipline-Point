@@ -1,0 +1,55 @@
+/* Final scoreboard polish */
+.scoreboard-app .filter-select-button:disabled {
+  opacity: .48 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  border-style: dashed !important;
+  filter: saturate(.65) !important;
+}
+
+.scoreboard-app .movable-group-title {
+  display: grid !important;
+  grid-template-columns: 34px 1fr 34px !important;
+  gap: 8px !important;
+  align-items: center !important;
+  padding: 0 8px !important;
+}
+
+.scoreboard-app .movable-group-title > span {
+  text-align: center !important;
+}
+
+.scoreboard-app .group-move-button {
+  width: 28px !important;
+  height: 24px !important;
+  border: 1px solid var(--desktop-accent, #3b82f6) !important;
+  border-radius: 9px !important;
+  display: grid !important;
+  place-items: center !important;
+  color: #fff !important;
+  background: var(--desktop-accent, #3b82f6) !important;
+  font-size: 15px !important;
+  font-weight: 950 !important;
+  cursor: pointer !important;
+}
+
+.scoreboard-app .group-move-button:disabled {
+  opacity: .24 !important;
+  cursor: not-allowed !important;
+}
+
+.scoreboard-app .ordered-group-card {
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease !important;
+}
+
+.scoreboard-app .ordered-group-card:hover {
+  transform: translateY(-2px) !important;
+  border-color: var(--desktop-accent, #3b82f6) !important;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, .18) !important;
+}
+
+.win-root.theme-light .scoreboard-app .filter-select-button:disabled {
+  color: #64748b !important;
+  background: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+}
