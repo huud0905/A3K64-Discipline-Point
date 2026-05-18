@@ -85,18 +85,20 @@ export function summarizeStudents(students: Student[], events: ScoreEvent[], wee
     };
   });
 
-  const sorted = summaries.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "vi"));
+  const rankById = new Map<string, number>();
+  const sortedForRank = [...summaries].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "vi"));
   let currentRank = 0;
   let previousTotal: number | null = null;
 
-  return sorted.map((student, index) => {
+  sortedForRank.forEach((student, index) => {
     if (previousTotal === null || student.total !== previousTotal) {
       currentRank = index + 1;
       previousTotal = student.total;
     }
-
-    return { ...student, rank: currentRank };
+    rankById.set(student.id, currentRank);
   });
+
+  return summaries.map((student) => ({ ...student, rank: rankById.get(student.id) || 0 }));
 }
 
 export function getGroupStats(summaries: StudentScoreSummary[]) {
