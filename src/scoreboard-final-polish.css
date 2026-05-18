@@ -10,11 +10,7 @@
   filter: grayscale(.75) saturate(.35) !important;
   box-shadow: inset 0 0 0 1px rgba(148, 163, 184, .08) !important;
 }
-
-.scoreboard-app .filter-select-button:disabled svg {
-  opacity: .45 !important;
-}
-
+.scoreboard-app .filter-select-button:disabled svg { opacity: .45 !important; }
 .win-root.theme-light .scoreboard-app .filter-select-button:disabled {
   color: #94a3b8 !important;
   background: #e5e7eb !important;
@@ -24,73 +20,79 @@
 
 .scoreboard-app .overview-feature-grid {
   display: grid !important;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr) !important;
-  gap: 18px !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: 16px !important;
   align-items: stretch !important;
 }
-
 .scoreboard-app .overview-feature-grid .score-panel {
-  min-height: 260px !important;
+  min-height: 240px !important;
+}
+.scoreboard-app .overview-feature-grid .chart-panel,
+.scoreboard-app .overview-feature-grid .ranking-panel {
+  margin: 0 !important;
+}
+.scoreboard-app .overview-feature-grid .group-chart-modern {
+  min-height: 168px !important;
+  height: 176px !important;
+  padding: 10px 12px 8px 42px !important;
+}
+.scoreboard-app .overview-feature-grid .chart-modern-track {
+  height: 112px !important;
+}
+.scoreboard-app .overview-feature-grid .chart-modern-column strong {
+  font-size: 12px !important;
+}
+.scoreboard-app .overview-feature-grid .chart-modern-column small {
+  font-size: 10px !important;
 }
 
-.scoreboard-app .ranking-panel {
-  overflow: hidden !important;
-}
-
+.scoreboard-app .ranking-panel { overflow: hidden !important; }
 .scoreboard-app .podium-grid {
-  min-height: 172px !important;
-  padding: 16px 22px 22px !important;
+  min-height: 160px !important;
+  padding: 12px 18px 18px !important;
   display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  gap: 22px !important;
+  gap: 16px !important;
   align-items: end !important;
 }
-
 .scoreboard-app .podium-card {
   min-width: 0 !important;
-  min-height: 132px !important;
-  padding: 0 14px 16px !important;
+  min-height: 118px !important;
+  padding: 0 12px 12px !important;
   border: 0 !important;
   border-bottom: 4px solid #64748b !important;
   border-radius: 0 !important;
   display: grid !important;
   place-items: center !important;
   align-content: end !important;
-  gap: 6px !important;
+  gap: 5px !important;
   color: #f8fafc !important;
   background: linear-gradient(180deg, rgba(30,41,59,0), rgba(30,41,59,.62)) !important;
   cursor: pointer !important;
 }
-
 .scoreboard-app .podium-card.rank-1 {
-  min-height: 154px !important;
+  min-height: 140px !important;
   border-bottom-color: #facc15 !important;
   background: linear-gradient(180deg, rgba(250,204,21,0), rgba(250,204,21,.14), rgba(30,41,59,.64)) !important;
 }
-
-.scoreboard-app .podium-card.rank-2 {
-  border-bottom-color: #94a3b8 !important;
-}
-
+.scoreboard-app .podium-card.rank-2 { border-bottom-color: #94a3b8 !important; }
 .scoreboard-app .podium-card.rank-3 {
   border-bottom-color: #ea580c !important;
   background: linear-gradient(180deg, rgba(234,88,12,0), rgba(234,88,12,.12), rgba(30,41,59,.64)) !important;
 }
-
 .scoreboard-app .podium-rank {
-  height: 22px !important;
+  height: 20px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 4px !important;
   color: #facc15 !important;
-  font-size: 11px !important;
+  font-size: 10px !important;
   font-weight: 950 !important;
 }
-
 .scoreboard-app .podium-avatar {
-  width: 46px !important;
-  height: 46px !important;
+  width: 42px !important;
+  height: 42px !important;
   border: 4px solid #94a3b8 !important;
   border-radius: 14px !important;
   display: grid !important;
@@ -99,39 +101,23 @@
   background: #111827 !important;
   box-shadow: 0 10px 30px rgba(59,130,246,.24) !important;
 }
-
 .scoreboard-app .rank-1 .podium-avatar { border-color: #facc15 !important; box-shadow: 0 10px 30px rgba(250,204,21,.25) !important; }
 .scoreboard-app .rank-3 .podium-avatar { border-color: #ea580c !important; box-shadow: 0 10px 30px rgba(234,88,12,.22) !important; }
-.scoreboard-app .podium-avatar span { font-size: 18px !important; font-weight: 950 !important; }
-.scoreboard-app .podium-card strong { max-width: 100% !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; color: #f8fafc !important; font-size: 13px !important; }
-.scoreboard-app .podium-card > span:last-child { font-size: 14px !important; font-weight: 950 !important; }
-
-.win-root.theme-light .scoreboard-app .podium-card {
-  color: #0f172a !important;
-  background: linear-gradient(180deg, rgba(255,255,255,0), rgba(226,232,240,.88)) !important;
-}
+.scoreboard-app .podium-avatar span { font-size: 17px !important; font-weight: 950 !important; }
+.scoreboard-app .podium-card strong { max-width: 100% !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; color: #f8fafc !important; font-size: 12px !important; }
+.scoreboard-app .podium-card > span:last-child { font-size: 13px !important; font-weight: 950 !important; }
+.win-root.theme-light .scoreboard-app .podium-card { color: #0f172a !important; background: linear-gradient(180deg, rgba(255,255,255,0), rgba(226,232,240,.88)) !important; }
 .win-root.theme-light .scoreboard-app .podium-card strong { color: #0f172a !important; }
 .win-root.theme-light .scoreboard-app .podium-avatar { color: #0f172a !important; background: #ffffff !important; }
 
-.scoreboard-app .ordered-groups {
-  user-select: none !important;
-}
-
-.scoreboard-app .ordered-groups.is-dragging {
-  cursor: grabbing !important;
-}
-
+.scoreboard-app .ordered-groups { user-select: none !important; }
+.scoreboard-app .ordered-groups.is-dragging { cursor: grabbing !important; }
 .scoreboard-app .ordered-group-card {
   touch-action: pan-y !important;
   transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, opacity .18s ease !important;
   will-change: transform !important;
 }
-
-.scoreboard-app .ordered-group-card:hover {
-  border-color: var(--desktop-accent, #3b82f6) !important;
-  box-shadow: 0 16px 36px rgba(15, 23, 42, .18) !important;
-}
-
+.scoreboard-app .ordered-group-card:hover { border-color: var(--desktop-accent, #3b82f6) !important; box-shadow: 0 16px 36px rgba(15, 23, 42, .18) !important; }
 .scoreboard-app .ordered-group-card.dragging {
   cursor: grabbing !important;
   opacity: .96 !important;
@@ -139,7 +125,6 @@
   box-shadow: 0 32px 80px rgba(0, 0, 0, .42) !important;
   transition: none !important;
 }
-
 .scoreboard-app .clean-draggable-title,
 .scoreboard-app .draggable-group-title {
   display: flex !important;
@@ -149,23 +134,12 @@
   cursor: grab !important;
   touch-action: none !important;
 }
-
 .scoreboard-app .clean-draggable-title:active,
-.scoreboard-app .draggable-group-title:active {
-  cursor: grabbing !important;
-}
-
+.scoreboard-app .draggable-group-title:active { cursor: grabbing !important; }
 .scoreboard-app .group-drag-grip,
-.scoreboard-app .draggable-group-title small {
-  display: none !important;
-}
+.scoreboard-app .draggable-group-title small { display: none !important; }
+.win-root.theme-light .scoreboard-app .ordered-group-card.dragging { box-shadow: 0 28px 70px rgba(15, 23, 42, .22) !important; }
 
-.win-root.theme-light .scoreboard-app .ordered-group-card.dragging {
-  box-shadow: 0 28px 70px rgba(15, 23, 42, .22) !important;
-}
-
-@media (max-width: 1280px) {
-  .scoreboard-app .overview-feature-grid {
-    grid-template-columns: 1fr !important;
-  }
+@media (max-width: 980px) {
+  .scoreboard-app .overview-feature-grid { grid-template-columns: 1fr !important; }
 }
