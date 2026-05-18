@@ -16,6 +16,49 @@
 .scoreboard-app .scoreboard-tabs.two-tabs, .scoreboard-app .scoreboard-tabs { min-width: 300px !important; height: 50px !important; padding: 5px !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 .scoreboard-app .scoreboard-tabs button { font-size: 12px !important; }
 
+/* Accent based modal colors */
+.scoreboard-app .score-edit-header h2 b,
+.scoreboard-app .matrix-head.day-head,
+.scoreboard-app .matrix-head:not(:first-child) { color: var(--desktop-accent, #3b82f6) !important; }
+
+.scoreboard-app .day-tabs button {
+  min-width: 60px !important;
+  height: 42px !important;
+  border-radius: 15px !important;
+  border-color: color-mix(in srgb, var(--desktop-accent, #3b82f6) 28%, #273244) !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.015)), #111827 !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.025) !important;
+}
+
+.scoreboard-app .day-tabs button.active {
+  color: #fff !important;
+  border-color: var(--desktop-accent, #3b82f6) !important;
+  background: linear-gradient(135deg, var(--desktop-accent, #3b82f6), color-mix(in srgb, var(--desktop-accent, #3b82f6) 82%, #0f172a)) !important;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--desktop-accent, #3b82f6) 34%, transparent), inset 0 0 0 1px rgba(255,255,255,.22) !important;
+  transform: translateY(-1px) !important;
+}
+
+.scoreboard-app .day-tabs button.active:empty::after {
+  content: "T2";
+}
+
+.scoreboard-app .score-add-button,
+.scoreboard-app .score-edit-footer button,
+.scoreboard-app .save-score-button {
+  background: linear-gradient(135deg, var(--desktop-accent, #3b82f6), color-mix(in srgb, var(--desktop-accent, #3b82f6) 76%, #0f172a)) !important;
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--desktop-accent, #3b82f6) 22%, transparent) !important;
+}
+
+.scoreboard-app .rule-card.plus,
+.scoreboard-app .rule-chip.plus,
+.scoreboard-app .day-event.plus,
+.scoreboard-app .day-event-item.plus {
+  color: color-mix(in srgb, var(--desktop-accent, #10b981) 72%, #10b981) !important;
+  border-color: color-mix(in srgb, var(--desktop-accent, #10b981) 55%, #047857) !important;
+  background: color-mix(in srgb, var(--desktop-accent, #10b981) 20%, #052e2b) !important;
+}
+
+/* Full light mode for score edit modal */
 .win-root.theme-light .scoreboard-app .score-edit-backdrop { background: rgba(226, 232, 240, .72) !important; backdrop-filter: blur(16px) saturate(1.08) !important; }
 .win-root.theme-light .scoreboard-app .score-edit-modal,
 .win-root.theme-light .scoreboard-app .score-edit-left,
@@ -35,6 +78,9 @@
 .win-root.theme-light .scoreboard-app .rules-directory h3,
 .win-root.theme-light .scoreboard-app .small-action,
 .win-root.theme-light .scoreboard-app .score-edit-footer > strong { color: #0f172a !important; }
+.win-root.theme-light .scoreboard-app .score-edit-header h2 b,
+.win-root.theme-light .scoreboard-app .matrix-head.day-head,
+.win-root.theme-light .scoreboard-app .matrix-head:not(:first-child) { color: var(--desktop-accent, #2563eb) !important; }
 .win-root.theme-light .scoreboard-app .score-edit-close,
 .win-root.theme-light .scoreboard-app .week-matrix,
 .win-root.theme-light .scoreboard-app .score-add-panel,
@@ -52,16 +98,17 @@
 .win-root.theme-light .scoreboard-app .count-box span,
 .win-root.theme-light .scoreboard-app .score-edit-close,
 .win-root.theme-light .scoreboard-app .day-tabs button { color: #0f172a !important; }
+.win-root.theme-light .scoreboard-app .day-tabs button.active { color: #fff !important; border-color: var(--desktop-accent, #2563eb) !important; background: linear-gradient(135deg, var(--desktop-accent, #2563eb), color-mix(in srgb, var(--desktop-accent, #2563eb) 80%, #0f172a)) !important; }
 .win-root.theme-light .scoreboard-app .score-custom-form { background: #f1f5f9 !important; }
 .win-root.theme-light .scoreboard-app .filter-select-button { color: #0f172a !important; border-color: #d6e0ef !important; background: #ffffff !important; }
 .win-root.theme-light .scoreboard-app .filter-select-menu { border-color: #d6e0ef !important; background: #ffffff !important; box-shadow: 0 18px 50px rgba(15, 23, 42, .14) !important; }
 .win-root.theme-light .scoreboard-app .filter-select-option { color: #0f172a !important; }
 .win-root.theme-light .scoreboard-app .filter-select-option:hover,
-.win-root.theme-light .scoreboard-app .filter-select-option.active { background: #e2e8f0 !important; }
+.win-root.theme-light .scoreboard-app .filter-select-option.active { background: color-mix(in srgb, var(--desktop-accent, #2563eb) 12%, #e2e8f0) !important; }
 .win-root.theme-light .scoreboard-app .rule-card.plus,
 .win-root.theme-light .scoreboard-app .rule-chip.plus,
 .win-root.theme-light .scoreboard-app .day-event.plus,
-.win-root.theme-light .scoreboard-app .day-event-item.plus { color: #047857 !important; border-color: #34d399 !important; background: #dcfce7 !important; }
+.win-root.theme-light .scoreboard-app .day-event-item.plus { color: color-mix(in srgb, var(--desktop-accent, #047857) 72%, #047857) !important; border-color: color-mix(in srgb, var(--desktop-accent, #34d399) 58%, #34d399) !important; background: color-mix(in srgb, var(--desktop-accent, #dcfce7) 16%, #dcfce7) !important; }
 .win-root.theme-light .scoreboard-app .rule-card.minus,
 .win-root.theme-light .scoreboard-app .rule-chip.minus,
 .win-root.theme-light .scoreboard-app .day-event.minus,
@@ -73,12 +120,30 @@
 .win-root.theme-light .scoreboard-app .matrix-content span:hover::after { color: #0f172a !important; border-color: #cbd5e1 !important; background: #ffffff !important; box-shadow: 0 14px 40px rgba(15,23,42,.18) !important; }
 .win-root.theme-light .scoreboard-app .score-edit-footer button,
 .win-root.theme-light .scoreboard-app .save-score-button,
-.win-root.theme-light .scoreboard-app .score-add-button,
-.win-root.theme-light .scoreboard-app .day-tabs button.active { color: #ffffff !important; }
+.win-root.theme-light .scoreboard-app .score-add-button { color: #ffffff !important; }
 .win-root.theme-light .scoreboard-app .footer-final-total { color: #0f172a !important; }
 .win-root.theme-light .scoreboard-app .rules-directory,
 .win-root.theme-light .scoreboard-app .score-edit-left,
 .win-root.theme-light .scoreboard-app .day-event-list { scrollbar-color: color-mix(in srgb, var(--desktop-accent, #3b82f6) 70%, #94a3b8) #f1f5f9 !important; }
+
+/* White processing overlay */
+.a3k64-processing-card,
+.processing-card,
+.processing-toast,
+.scoreboard-processing-card {
+  color: #0f172a !important;
+  border: 1px solid #d6e0ef !important;
+  background: #ffffff !important;
+  box-shadow: 0 22px 60px rgba(15,23,42,.18) !important;
+}
+.a3k64-processing-card *,
+.processing-card *,
+.processing-toast *,
+.scoreboard-processing-card * { color: #0f172a !important; }
+.a3k64-processing-card .spinner,
+.processing-card .spinner,
+.processing-toast .spinner,
+.scoreboard-processing-card .spinner { border-color: #bfdbfe !important; border-top-color: var(--desktop-accent, #2563eb) !important; }
 
 @media (prefers-reduced-motion: no-preference) {
   .scoreboard-app { animation: a3ScoreAppIn .38s cubic-bezier(.2,.9,.2,1) both !important; }
