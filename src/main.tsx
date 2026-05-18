@@ -4,6 +4,7 @@ import App from './App';
 import './taskViewEnhancer';
 import './startMenuListEnhancer';
 import './mobileAppShell';
+import './scoreboardMobilePolish';
 import './index.css';
 import './login-responsive-polish.css';
 import './desktopBrandPanelWide.css';
