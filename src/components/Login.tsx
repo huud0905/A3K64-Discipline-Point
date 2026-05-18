@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "../lib/firebase";
-import { validateLoginWithGas } from "../lib/gasApi";
-import { Eye, EyeOff, Lock, Menu, Monitor, Moon, ShieldCheck, Sun, User, X } from "lucide-react";
+import { resetPasswordWithGas, validateLoginWithGas } from "../lib/gasApi";
+import { Eye, EyeOff, Lock, Mail, Menu, Monitor, Moon, Phone, ShieldCheck, Sun, User, X } from "lucide-react";
 
 interface LoginProps {
   onLogin: (user: any) => void;
@@ -11,6 +11,7 @@ interface LoginProps {
 type ThemeMode = "light" | "dark" | "auto";
 type ResolvedTheme = "light" | "dark";
 type AccentKey = "blue" | "violet" | "pink" | "green" | "amber" | "red";
+type LoginTab = "login" | "forgot";
 
 type SavedSession = {
   user: any;
@@ -44,6 +45,10 @@ function getStoredTheme(): ThemeMode {
 function getStoredAccent(): AccentKey {
   const saved = localStorage.getItem("login-accent") as AccentKey | null;
   return saved && saved in ACCENTS ? saved : "blue";
+}
+
+function isEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 function saveSession(user: any, lastPath = window.location.pathname) {
@@ -83,13 +88,21 @@ export default function Login({ onLogin }: LoginProps) {
   const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(getSystemTheme);
   const [accentKey, setAccentKey] = useState<AccentKey>(getStoredAccent);
+  const [tab, setTab] = useState<LoginTab>("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loadingLocal, setLoadingLocal] = useState(false);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
+  const [loadingReset, setLoadingReset] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const accent = ACCENTS[accentKey];
   const resolvedTheme = theme === "auto" ? systemTheme : theme;
@@ -141,6 +154,7 @@ export default function Login({ onLogin }: LoginProps) {
   const handleLocalLogin = async (event: React.FormEvent) => {
     event.preventDefault();
     setError("");
+    setSuccess("");
 
     const cleanUsername = username.trim();
     if (!cleanUsername) return setError("Vui lòng nhập tên đăng nhập");
@@ -160,8 +174,32 @@ export default function Login({ onLogin }: LoginProps) {
     }
   };
 
+  const handleResetPassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!fullName.trim()) return setError("Vui lòng nhập họ và tên");
+    if (!phone.trim()) return setError("Vui lòng nhập số điện thoại cá nhân/bố/mẹ");
+    if (!isEmail(newEmail)) return setError("Gmail mới phải đúng định dạng email");
+    if (newPassword.trim().length < 4) return setError("Mật khẩu mới tối thiểu 4 ký tự");
+
+    setLoadingReset(true);
+    try {
+      const result = await resetPasswordWithGas(fullName, phone, newEmail, newPassword);
+      if (!result.ok) return setError(result.message || "Không cập nhật được tài khoản");
+      setUsername(newEmail.trim());
+      setPassword(newPassword);
+      setTab("login");
+      setSuccess("Đã cập nhật Gmail và mật khẩu. Bạn có thể đăng nhập ngay.");
+    } finally {
+      setLoadingReset(false);
+    }
+  };
+
   const handleGoogleLogin = async () => {
     setError("");
+    setSuccess("");
     setLoadingGoogle(true);
     try {
       const provider = new GoogleAuthProvider();
@@ -205,7 +243,7 @@ export default function Login({ onLogin }: LoginProps) {
   return (
     <main className="login-root" style={cssVars}>
       <style>{`
-        .login-root{min-height:100vh;display:grid;place-items:center;padding:28px;color:var(--text);font-family:"Segoe UI",system-ui,Arial,sans-serif;background:radial-gradient(circle at 16% 18%,var(--accent-soft),transparent 28%),radial-gradient(circle at 86% 12%,rgba(96,165,250,.2),transparent 28%),linear-gradient(135deg,var(--bg),${isLight ? "#dbeafe" : "#020617"});overflow:auto}.login-shell{width:min(1080px,100%);display:grid;grid-template-columns:minmax(0,1.03fr) minmax(320px,.75fr);gap:22px;align-items:stretch}.login-card{border:1px solid var(--line);border-radius:30px;background:var(--panel);box-shadow:0 28px 90px rgba(0,0,0,.22);backdrop-filter:blur(24px);overflow:hidden}.login-left{position:relative;padding:32px;display:grid;grid-template-rows:auto 1fr;gap:24px;min-height:590px}.brand-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}.brand{display:flex;align-items:center;gap:13px}.brand-logo{width:50px;height:50px;border-radius:17px;display:grid;place-items:center;color:white;background:linear-gradient(135deg,var(--accent),var(--accent-strong));box-shadow:0 18px 38px color-mix(in srgb,var(--accent) 36%,transparent)}.brand h1{margin:0;font-size:24px;letter-spacing:-.04em}.brand p,.muted{margin:4px 0 0;color:var(--muted)}.brand-tools{display:grid;justify-items:end;gap:10px}.theme-toggle,.accent-list{display:flex;gap:7px;padding:6px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.08)}.theme-toggle button,.accent-dot{width:34px;height:34px;border:0;border-radius:999px;display:grid;place-items:center;cursor:pointer;color:var(--muted);background:transparent}.theme-toggle button.active{color:white;background:var(--accent)}.accent-dot{background:var(--dot);border:2px solid transparent}.accent-dot.active{border-color:var(--text);transform:scale(1.05)}.contest-placeholder{border:1px dashed color-mix(in srgb,var(--line) 80%,transparent);border-radius:24px;min-height:320px;background:linear-gradient(180deg,transparent,rgba(255,255,255,.025));opacity:.7}.mobile-menu-button{display:none;width:44px;height:44px;border:1px solid var(--line);border-radius:15px;place-items:center;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent-strong));box-shadow:0 14px 30px color-mix(in srgb,var(--accent) 25%,transparent);cursor:pointer}.mobile-drawer{display:none}.login-panel{padding:28px}.login-panel h2{margin:0 0 22px;font-size:30px;letter-spacing:-.04em}.field{display:grid;gap:8px;margin-bottom:14px}.field label{font-weight:800;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.input-wrap{height:52px;border:1px solid var(--line);border-radius:17px;display:grid;grid-template-columns:42px 1fr 42px;align-items:center;background:var(--input)}.input-wrap input{height:100%;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-weight:700;min-width:0}.input-wrap svg{justify-self:center;color:var(--muted)}.eye{border:0;background:transparent;color:var(--muted);cursor:pointer}.login-button,.google-button{width:100%;height:52px;border:0;border-radius:17px;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:900;cursor:pointer}.login-button{margin-top:8px;color:white;background:linear-gradient(135deg,var(--accent),var(--accent-strong));box-shadow:0 18px 36px color-mix(in srgb,var(--accent) 28%,transparent)}.google-button{margin-top:12px;border:1px solid var(--line);color:var(--text);background:var(--panel-strong)}.error{margin-top:14px;border:1px solid rgba(239,68,68,.35);border-radius:15px;padding:12px;color:#fecaca;background:rgba(127,29,29,.32);font-weight:800}.session-note{display:none}@media(max-width:900px){.login-root{display:block;min-height:100svh;padding:16px;background:radial-gradient(circle at 50% -10%,var(--accent-soft),transparent 38%),linear-gradient(180deg,var(--bg),${isLight ? "#e2e8f0" : "#020617"})}.login-shell{display:grid;grid-template-columns:1fr;gap:14px}.login-card{border-radius:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}.login-left{min-height:260px;padding:22px;gap:16px}.brand-top{align-items:center}.brand-logo{width:48px;height:48px;border-radius:16px}.brand h1{font-size:22px}.brand p{font-size:14px}.brand-tools{display:none}.mobile-menu-button{display:grid}.contest-placeholder{min-height:130px;border-style:solid;background:rgba(255,255,255,.025)}.login-panel{padding:22px}.login-panel h2{font-size:28px;margin-bottom:18px}.login-button,.google-button,.input-wrap{height:50px}.mobile-drawer{position:fixed;inset:0;z-index:50;display:grid;grid-template-rows:auto 1fr;background:rgba(2,6,23,.62);backdrop-filter:blur(18px);animation:drawerIn .18s ease both}.mobile-drawer-panel{margin:12px;border:1px solid var(--line);border-radius:24px;background:var(--panel-strong);padding:18px}.mobile-drawer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.mobile-drawer-head strong{font-size:18px}.mobile-drawer-close{width:40px;height:40px;border:1px solid var(--line);border-radius:14px;color:var(--text);background:transparent;display:grid;place-items:center}.mobile-contest-empty{min-height:150px;border:1px dashed var(--line);border-radius:18px;background:rgba(255,255,255,.025)}@keyframes drawerIn{from{opacity:0}to{opacity:1}}}@media(max-width:520px){.login-root{padding:10px}.login-left{min-height:220px}.brand{gap:10px}.brand-logo{width:44px;height:44px}.brand h1{font-size:20px}.brand p{font-size:13px}.contest-placeholder{display:none}.login-panel{padding:20px}.field label{font-size:12px}.login-panel h2{font-size:26px}.login-card{border-radius:22px}.google-button{font-size:14px}}
+        .login-root{min-height:100vh;display:grid;place-items:center;padding:28px;color:var(--text);font-family:"Segoe UI",system-ui,Arial,sans-serif;background:radial-gradient(circle at 16% 18%,var(--accent-soft),transparent 28%),radial-gradient(circle at 86% 12%,rgba(96,165,250,.2),transparent 28%),linear-gradient(135deg,var(--bg),${isLight ? "#dbeafe" : "#020617"});overflow:auto}.login-shell{width:min(1080px,100%);display:grid;grid-template-columns:minmax(0,1.03fr) minmax(320px,.75fr);gap:22px;align-items:stretch}.login-card{border:1px solid var(--line);border-radius:30px;background:var(--panel);box-shadow:0 28px 90px rgba(0,0,0,.22);backdrop-filter:blur(24px);overflow:hidden}.login-left{position:relative;padding:32px;display:grid;grid-template-rows:auto 1fr;gap:24px;min-height:590px}.brand-top{display:grid;grid-template-columns:1fr;gap:16px;align-content:start}.brand{display:flex;align-items:center;gap:13px}.brand-logo{width:50px;height:50px;border-radius:17px;display:grid;place-items:center;color:white;background:linear-gradient(135deg,var(--accent),var(--accent-strong));box-shadow:0 18px 38px color-mix(in srgb,var(--accent) 36%,transparent)}.brand h1{margin:0;font-size:24px;letter-spacing:-.04em}.brand p,.muted{margin:4px 0 0;color:var(--muted)}.brand-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.theme-toggle,.accent-list{display:flex;gap:7px;padding:6px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.08)}.theme-toggle button,.accent-dot{width:34px;height:34px;border:0;border-radius:999px;display:grid;place-items:center;cursor:pointer;color:var(--muted);background:transparent}.theme-toggle button.active{color:white;background:var(--accent)}.accent-dot{background:var(--dot);border:2px solid transparent}.accent-dot.active{border-color:var(--text);transform:scale(1.05)}.contest-placeholder{border:1px dashed color-mix(in srgb,var(--line) 80%,transparent);border-radius:24px;min-height:320px;background:linear-gradient(180deg,transparent,rgba(255,255,255,.025));opacity:.7}.mobile-menu-button{display:none;width:44px;height:44px;border:1px solid var(--line);border-radius:15px;place-items:center;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent-strong));box-shadow:0 14px 30px color-mix(in srgb,var(--accent) 25%,transparent);cursor:pointer}.mobile-drawer{display:none}.login-panel{padding:28px}.login-panel h2{margin:0 0 16px;font-size:30px;letter-spacing:-.04em}.login-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;padding:5px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.055)}.login-tabs button{height:40px;border:0;border-radius:14px;color:var(--muted);background:transparent;font-weight:900;cursor:pointer}.login-tabs button.active{color:white;background:var(--accent);box-shadow:0 12px 24px color-mix(in srgb,var(--accent) 24%,transparent)}.field{display:grid;gap:8px;margin-bottom:14px}.field label{font-weight:800;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.input-wrap{height:52px;border:1px solid var(--line);border-radius:17px;display:grid;grid-template-columns:42px 1fr 42px;align-items:center;background:var(--input)}.input-wrap input{height:100%;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-weight:700;min-width:0}.input-wrap svg{justify-self:center;color:var(--muted)}.eye{border:0;background:transparent;color:var(--muted);cursor:pointer}.login-button,.google-button{width:100%;height:52px;border:0;border-radius:17px;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:900;cursor:pointer}.login-button{margin-top:8px;color:white;background:linear-gradient(135deg,var(--accent),var(--accent-strong));box-shadow:0 18px 36px color-mix(in srgb,var(--accent) 28%,transparent)}.google-button{margin-top:12px;border:1px solid var(--line);color:var(--text);background:var(--panel-strong)}.error,.success{margin-top:14px;border-radius:15px;padding:12px;font-weight:800}.error{border:1px solid rgba(239,68,68,.35);color:#fecaca;background:rgba(127,29,29,.32)}.success{border:1px solid rgba(16,185,129,.38);color:#bbf7d0;background:rgba(6,95,70,.28)}.hint{margin:-3px 0 14px;color:var(--muted);font-size:13px;line-height:1.5}.session-note{display:none}@media(max-width:900px){.login-root{display:block;min-height:100svh;padding:16px;background:radial-gradient(circle at 50% -10%,var(--accent-soft),transparent 38%),linear-gradient(180deg,var(--bg),${isLight ? "#e2e8f0" : "#020617"})}.login-shell{display:grid;grid-template-columns:1fr;gap:14px}.login-card{border-radius:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}.login-left{min-height:300px;padding:22px;gap:16px}.brand-top{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:12px}.brand{min-width:0}.brand-logo{width:48px;height:48px;border-radius:16px}.brand h1{font-size:22px}.brand p{font-size:14px}.brand-tools{grid-column:1/-1;display:flex;align-items:center;justify-content:flex-start;gap:8px;overflow-x:auto;padding:2px 2px 4px;scrollbar-width:none}.brand-tools::-webkit-scrollbar{display:none}.theme-toggle,.accent-list{gap:5px;padding:5px}.theme-toggle button{width:30px;height:30px}.accent-dot{width:28px;height:28px}.mobile-menu-button{display:grid}.contest-placeholder{min-height:90px;border-style:solid;background:rgba(255,255,255,.025)}.login-panel{padding:22px}.login-panel h2{font-size:28px;margin-bottom:14px}.login-button,.google-button,.input-wrap{height:50px}.mobile-drawer{position:fixed;inset:0;z-index:50;display:grid;grid-template-rows:auto 1fr;background:rgba(2,6,23,.62);backdrop-filter:blur(18px);animation:drawerIn .18s ease both}.mobile-drawer-panel{margin:12px;border:1px solid var(--line);border-radius:24px;background:var(--panel-strong);padding:18px}.mobile-drawer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.mobile-drawer-head strong{font-size:18px}.mobile-drawer-close{width:40px;height:40px;border:1px solid var(--line);border-radius:14px;color:var(--text);background:transparent;display:grid;place-items:center}.mobile-contest-empty{min-height:150px;border:1px dashed var(--line);border-radius:18px;background:rgba(255,255,255,.025)}@keyframes drawerIn{from{opacity:0}to{opacity:1}}}@media(max-width:520px){.login-root{padding:10px}.login-left{min-height:255px}.brand{gap:10px}.brand-logo{width:44px;height:44px}.brand h1{font-size:20px}.brand p{font-size:13px}.contest-placeholder{display:block;min-height:70px}.login-panel{padding:20px}.field label{font-size:12px}.login-panel h2{font-size:26px}.login-card{border-radius:22px}.google-button{font-size:14px}}
       `}</style>
 
       <section className="login-shell">
@@ -215,22 +253,41 @@ export default function Login({ onLogin }: LoginProps) {
               <div className="brand-logo"><ShieldCheck size={25} /></div>
               <div><h1>Bảng điểm A3K64</h1><p>Quản lý thi đua lớp 12A3</p></div>
             </div>
-            {themeTools}
             <button type="button" className="mobile-menu-button" onClick={() => setMobileMenuOpen(true)} aria-label="Mở danh sách cuộc thi"><Menu size={22} /></button>
+            {themeTools}
           </div>
           <div className="contest-placeholder" aria-hidden="true" />
         </div>
 
         <div className="login-card login-panel">
-          <h2>Đăng nhập</h2>
-          <form onSubmit={handleLocalLogin}>
-            <div className="field"><label>Tên đăng nhập</label><div className="input-wrap"><User size={18} /><input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" placeholder="username / email" /><span /></div></div>
-            <div className="field"><label>Mật khẩu</label><div className="input-wrap"><Lock size={18} /><input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="••••••••" /><button type="button" className="eye" onClick={() => setShowPassword((v) => !v)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></div>
-            <button type="submit" className="login-button" disabled={loadingLocal}>{loadingLocal ? "Đang kiểm tra..." : "Đăng nhập"}</button>
-          </form>
+          <h2>{tab === "login" ? "Đăng nhập" : "Quên mật khẩu"}</h2>
+          <div className="login-tabs">
+            <button type="button" className={tab === "login" ? "active" : ""} onClick={() => { setTab("login"); setError(""); }}>Đăng nhập</button>
+            <button type="button" className={tab === "forgot" ? "active" : ""} onClick={() => { setTab("forgot"); setError(""); }}>Quên mật khẩu</button>
+          </div>
 
-          <button type="button" className="google-button" onClick={handleGoogleLogin} disabled={loadingGoogle}>{loadingGoogle ? "Đang mở Google..." : "Đăng nhập bằng Google"}</button>
+          {tab === "login" ? (
+            <>
+              <form onSubmit={handleLocalLogin}>
+                <div className="field"><label>Tên đăng nhập</label><div className="input-wrap"><User size={18} /><input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" placeholder="username / email" /><span /></div></div>
+                <div className="field"><label>Mật khẩu</label><div className="input-wrap"><Lock size={18} /><input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="••••••••" /><button type="button" className="eye" onClick={() => setShowPassword((v) => !v)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></div>
+                <button type="submit" className="login-button" disabled={loadingLocal}>{loadingLocal ? "Đang kiểm tra..." : "Đăng nhập"}</button>
+              </form>
+              <button type="button" className="google-button" onClick={handleGoogleLogin} disabled={loadingGoogle}>{loadingGoogle ? "Đang mở Google..." : "Đăng nhập bằng Google"}</button>
+            </>
+          ) : (
+            <form onSubmit={handleResetPassword}>
+              <p className="hint">Nhập đúng họ tên trong TTCN và một trong các số điện thoại cá nhân/bố/mẹ để đổi Gmail và mật khẩu.</p>
+              <div className="field"><label>Họ và tên</label><div className="input-wrap"><User size={18} /><input value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" placeholder="Nguyễn Văn A" /><span /></div></div>
+              <div className="field"><label>Số điện thoại</label><div className="input-wrap"><Phone size={18} /><input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="SĐT cá nhân / bố / mẹ" /><span /></div></div>
+              <div className="field"><label>Gmail mới</label><div className="input-wrap"><Mail size={18} /><input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} inputMode="email" placeholder="email@gmail.com" /><span /></div></div>
+              <div className="field"><label>Mật khẩu mới</label><div className="input-wrap"><Lock size={18} /><input type={showNewPassword ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Mật khẩu mới" /><button type="button" className="eye" onClick={() => setShowNewPassword((v) => !v)}>{showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></div>
+              <button type="submit" className="login-button" disabled={loadingReset}>{loadingReset ? "Đang cập nhật..." : "Cập nhật tài khoản"}</button>
+            </form>
+          )}
+
           {error && <div className="error">{error}</div>}
+          {success && <div className="success">{success}</div>}
           <div className="session-note">Phiên đăng nhập tự lưu tối đa 7 ngày.</div>
         </div>
       </section>
