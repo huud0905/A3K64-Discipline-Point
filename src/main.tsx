@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './taskViewEnhancer';
 import './startMenuListEnhancer';
+import './mobileAppShell';
 import './index.css';
 import './login-responsive-polish.css';
 import './desktopBrandPanelWide.css';
