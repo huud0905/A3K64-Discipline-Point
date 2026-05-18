@@ -1,12 +1,14 @@
 import { CalendarDays, Filter, Plus } from "lucide-react";
 import { FilterSelect } from "./FilterSelect";
 
+type ViewMode = "overview" | "students";
+
 type WeekSelectorProps = {
   week: number;
   weeks: number[];
   onWeekChange: (week: number) => void;
-  viewMode?: "overview" | "groups" | "students";
-  onViewModeChange?: (mode: "overview" | "groups" | "students") => void;
+  viewMode?: ViewMode;
+  onViewModeChange?: (mode: ViewMode) => void;
   canCreateWeek?: boolean;
   onCreateWeek?: () => void;
 };
@@ -58,12 +60,11 @@ export function WeekSelector({
             <Filter size={15} />
             Chế độ xem
           </span>
-          <FilterSelect<"overview" | "students" | "groups">
+          <FilterSelect<ViewMode>
             value={viewMode}
             options={[
               { value: "overview", label: "Tổng quan" },
               { value: "students", label: "Cá nhân" },
-              { value: "groups", label: "Theo tổ" },
             ]}
             onChange={onViewModeChange}
           />
