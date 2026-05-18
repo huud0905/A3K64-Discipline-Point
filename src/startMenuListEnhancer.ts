@@ -8,15 +8,15 @@ const START_MENU_CSS = `
   width: 430px !important;
   min-height: 570px !important;
   max-height: min(720px, calc(100vh - 86px)) !important;
-  left: 12px !important;
+  left: 16px !important;
   right: auto !important;
-  bottom: 64px !important;
+  bottom: 70px !important;
   transform: none !important;
-  padding: 18px 16px 18px 78px !important;
-  border-radius: 0 18px 18px 0 !important;
+  padding: 20px 18px 20px 80px !important;
+  border-radius: 26px !important;
   border: 1px solid rgba(148, 163, 184, .24) !important;
-  background: rgba(17, 24, 39, .92) !important;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, .46) !important;
+  background: linear-gradient(180deg, rgba(17, 24, 39, .96), rgba(15, 23, 42, .92)) !important;
+  box-shadow: 0 26px 80px rgba(0, 0, 0, .48), inset 0 1px 0 rgba(255,255,255,.04) !important;
   backdrop-filter: blur(24px) saturate(1.12) !important;
   -webkit-backdrop-filter: blur(24px) saturate(1.12) !important;
   overflow: hidden !important;
@@ -34,16 +34,17 @@ const START_MENU_CSS = `
   left: 0;
   top: 0;
   bottom: 0;
-  width: 62px;
+  width: 64px;
   background: rgba(3, 7, 18, .42);
   border-right: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 26px 0 0 26px;
 }
 
 .start-menu::after {
   content: "A3K64";
   position: absolute;
-  left: 78px;
-  top: 18px;
+  left: 84px;
+  top: 20px;
   color: #cbd5e1;
   font-size: 12px;
   font-weight: 900;
@@ -57,11 +58,11 @@ const START_MENU_CSS = `
 
 .start-menu .start-app-grid {
   height: calc(100% - 92px) !important;
-  margin-top: 42px !important;
+  margin-top: 44px !important;
   padding: 0 6px 12px 0 !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 4px !important;
+  gap: 8px !important;
   overflow-y: auto !important;
   scrollbar-width: thin;
 }
@@ -75,11 +76,12 @@ const START_MENU_CSS = `
 }
 
 .start-menu .start-app {
+  position: relative !important;
   width: 100% !important;
-  min-height: 52px !important;
-  padding: 6px 12px !important;
-  border: 0 !important;
-  border-radius: 0 !important;
+  min-height: 56px !important;
+  padding: 7px 46px 7px 12px !important;
+  border: 1px solid transparent !important;
+  border-radius: 16px !important;
   display: grid !important;
   grid-template-columns: 42px minmax(0, 1fr) !important;
   align-items: center !important;
@@ -87,23 +89,45 @@ const START_MENU_CSS = `
   color: #f8fafc !important;
   background: transparent !important;
   text-align: left !important;
-  transition: background .12s ease, transform .12s ease !important;
+  transition: background .14s ease, transform .14s ease, border-color .14s ease, box-shadow .14s ease !important;
 }
 
 .start-menu .start-app:hover {
   background: rgba(255, 255, 255, .105) !important;
-  transform: translateX(2px) !important;
+  border-color: rgba(148, 163, 184, .18) !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .18) !important;
+  transform: translateX(3px) !important;
+}
+
+.start-menu .start-app::after {
+  content: attr(data-app-initial);
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 27px;
+  height: 27px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #f8fafc;
+  background: color-mix(in srgb, var(--desktop-accent, #ef4444) 82%, #020617);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .02em;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--desktop-accent, #ef4444) 22%, transparent);
 }
 
 .start-menu .start-app-icon {
-  width: 38px !important;
-  height: 38px !important;
-  border-radius: 0 !important;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 14px !important;
   display: grid !important;
   place-items: center !important;
   color: #fff !important;
-  background: var(--desktop-accent, #ef4444) !important;
-  box-shadow: none !important;
+  background: linear-gradient(135deg, var(--desktop-accent, #ef4444), color-mix(in srgb, var(--desktop-accent, #ef4444) 72%, #020617)) !important;
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--desktop-accent, #ef4444) 25%, transparent) !important;
 }
 
 .start-menu .start-app-icon svg {
@@ -116,7 +140,7 @@ const START_MENU_CSS = `
   min-width: 0 !important;
   color: #f8fafc !important;
   font-size: 15px !important;
-  font-weight: 600 !important;
+  font-weight: 700 !important;
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
@@ -127,8 +151,8 @@ const START_MENU_CSS = `
   left: 0 !important;
   top: 0 !important;
   bottom: 0 !important;
-  width: 62px !important;
-  padding: 0 0 16px !important;
+  width: 64px !important;
+  padding: 0 0 18px !important;
   border: 0 !important;
   display: flex !important;
   flex-direction: column !important;
@@ -192,9 +216,9 @@ const START_MENU_CSS = `
 
 .win-root.theme-light .start-menu {
   color: #0f172a !important;
-  background: rgba(248, 250, 252, .94) !important;
+  background: linear-gradient(180deg, rgba(248, 250, 252, .96), rgba(241, 245, 249, .92)) !important;
   border-color: rgba(15, 23, 42, .14) !important;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, .18) !important;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .18), inset 0 1px 0 rgba(255,255,255,.86) !important;
 }
 
 .win-root.theme-light .start-menu::before {
@@ -214,6 +238,11 @@ const START_MENU_CSS = `
 
 .win-root.theme-light .start-menu .start-app:hover {
   background: rgba(15, 23, 42, .075) !important;
+}
+
+.win-root.theme-light .start-menu .start-app::after {
+  color: #fff !important;
+  border-color: rgba(15, 23, 42, .1) !important;
 }
 
 .win-root.theme-light .start-menu .start-footer .logout-button {
@@ -241,6 +270,13 @@ function textOf(element: Element) {
   return (element.textContent || "").replace(/\s+/g, " ").trim();
 }
 
+function getAppInitial(label: string) {
+  const clean = label.trim();
+  if (clean.includes("Cài đặt")) return "C";
+  if (clean.includes("Bảng điểm")) return "B";
+  return (clean[0] || "A").toUpperCase();
+}
+
 function cleanupStartMenu() {
   const startMenu = document.querySelector<HTMLElement>(".start-menu");
   if (!startMenu) return;
@@ -254,7 +290,10 @@ function cleanupStartMenu() {
       button.classList.add("a3-removed-start-app");
       button.setAttribute("aria-hidden", "true");
       button.tabIndex = -1;
+      return;
     }
+
+    button.dataset.appInitial = getAppInitial(label);
   });
 }
 
