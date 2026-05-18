@@ -10,6 +10,7 @@ import { getGroupStats, mockScoreEvents, mockStudents, ScoreEvent, Student, SCOR
 import { createScoreEventInGas, createWeekInGas, deleteScoreEventInGas, fetchScoreboardFromGas } from "../../lib/gasApi";
 
 type ScoreboardTab = "overview" | "scoring";
+type ViewMode = "overview" | "students";
 type GroupFilter = "all" | "1" | "2" | "3" | "4";
 type StatusFilter = "all" | "Tốt" | "Khá" | "Đạt" | "Chưa đạt";
 type SortMode = "score-desc" | "name-az";
@@ -54,7 +55,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   const [activeTab, setActiveTab] = useState<ScoreboardTab>("overview");
   const [weeks, setWeeks] = useState<number[]>(readLocalWeeks);
   const [week, setWeek] = useState(1);
-  const [viewMode, setViewMode] = useState<"overview" | "groups" | "students">("overview");
+  const [viewMode, setViewMode] = useState<ViewMode>("overview");
   const [groupFilter, setGroupFilter] = useState<GroupFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("score-desc");
@@ -191,7 +192,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
     if (viewMode === "students") {
       return <StudentTable title="Danh sách cá nhân" students={summaries} compact onOpenStudent={openStudent} />;
     }
-    return <OverviewPage summaries={viewMode === "groups" ? filteredSummaries : rawSummaries} week={week} onOpenStudent={openStudent} />;
+    return <OverviewPage summaries={rawSummaries} week={week} onOpenStudent={openStudent} />;
   };
 
   return (
