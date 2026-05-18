@@ -84,7 +84,12 @@ function eventDay(event: ScoreEvent) { return parseDay(event.title) ?? new Date(
 function shortTitle(title: string) { return title.length > 22 ? `${title.slice(0, 22)}...` : title; }
 function statusTone(status: string) { const s = status.toLowerCase(); return s.includes("tốt") ? "good" : s.includes("khá") ? "warning" : s.includes("đạt") && !s.includes("chưa") ? "orange" : "danger"; }
 function newEventDateForDay(day: number) { const now = new Date(); now.setDate(now.getDate() + (day - now.getDay())); now.setHours(12, 0, 0, 0); return now.toISOString(); }
-function formatSavedTitle(day: number, category: ScoreCategory, subject: string, title: string, points: number) { return `${days.find((item) => item.key === day)?.full || "Không rõ ngày"}: [${categoryLabel(category)}]: [${subject}] ${title} (${formatScore(points)})`; }
+function formatSavedTitle(day: number, category: ScoreCategory, subject: string, title: string, points: number) {
+  const dayLabel = days.find((item) => item.key === day)?.full || "Không rõ ngày";
+  const categoryText = categoryLabel(category);
+  const subjectPart = category === "HOC_TAP" ? `: [${subject}]` : "";
+  return `${dayLabel}: [${categoryText}]${subjectPart} ${title} (${formatScore(points)})`;
+}
 function makeDraft(event: Omit<ScoreEvent, "id">): ScoreEvent { return { ...event, id: `draft-${Date.now()}-${Math.random().toString(36).slice(2)}` }; }
 function readDraggedRule(event: DragEvent) { try { const raw = event.dataTransfer.getData(RULE_DRAG_TYPE) || event.dataTransfer.getData("text/plain"); const rule = JSON.parse(raw) as QuickRule; return rule?.title && typeof rule.points === "number" ? rule : null; } catch { return null; } }
 
