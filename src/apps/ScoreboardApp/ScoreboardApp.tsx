@@ -99,20 +99,25 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   useEffect(() => { if (dataSource !== "loading") localStorage.setItem(STORAGE_KEY, JSON.stringify(events)); }, [dataSource, events]);
   useEffect(() => { if (dataSource !== "loading") localStorage.setItem(WEEK_STORAGE_KEY, JSON.stringify(weeks)); }, [dataSource, weeks]);
 
+  const isOverviewMode = viewMode === "overview";
+  const shownGroupFilter = isOverviewMode ? "all" : groupFilter;
+  const shownStatusFilter = isOverviewMode ? "all" : statusFilter;
+  const shownSortMode = isOverviewMode ? "score-desc" : sortMode;
+
   const rawSummaries = useMemo(() => summarizeStudents(students, events, week), [events, students, week]);
 
   const filteredSummaries = useMemo(() => rawSummaries.filter((student) => {
-    const matchGroup = groupFilter === "all" || String(student.group) === groupFilter;
-    const matchStatus = statusFilter === "all" || student.status === statusFilter;
+    const matchGroup = shownGroupFilter === "all" || String(student.group) === shownGroupFilter;
+    const matchStatus = shownStatusFilter === "all" || student.status === shownStatusFilter;
     return matchGroup && matchStatus;
-  }), [groupFilter, rawSummaries, statusFilter]);
+  }), [rawSummaries, shownGroupFilter, shownStatusFilter]);
 
   const summaries = useMemo(() => {
     return [...filteredSummaries].sort((a, b) => {
-      if (sortMode === "name-az") return compareByGivenName(a, b);
+      if (shownSortMode === "name-az") return compareByGivenName(a, b);
       return b.total - a.total || compareByGivenName(a, b);
     });
-  }, [filteredSummaries, sortMode]);
+  }, [filteredSummaries, shownSortMode]);
 
   const scoringSummaries = useMemo(() => {
     const byId = new Map(rawSummaries.map((student) => [student.id, student]));
@@ -120,11 +125,11 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
       .map((student) => byId.get(student.id))
       .filter((student): student is NonNullable<typeof student> => Boolean(student))
       .filter((student) => {
-        const matchGroup = groupFilter === "all" || String(student.group) === groupFilter;
-        const matchStatus = statusFilter === "all" || student.status === statusFilter;
+        const matchGroup = shownGroupFilter === "all" || String(student.group) === shownGroupFilter;
+        const matchStatus = shownStatusFilter === "all" || student.status === shownStatusFilter;
         return matchGroup && matchStatus;
       });
-  }, [groupFilter, rawSummaries, statusFilter, students]);
+  }, [rawSummaries, shownGroupFilter, shownStatusFilter, students]);
 
   const groupStats = useMemo(() => getGroupStats(rawSummaries), [rawSummaries]);
   const totalScore = rawSummaries.reduce((sum, student) => sum + student.total, 0);
@@ -202,9 +207,9 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
         <WeekSelector week={week} weeks={weeks} onWeekChange={setWeek} viewMode={viewMode} onViewModeChange={setViewMode} canCreateWeek={canCreateWeek && !isCreatingWeek} onCreateWeek={createNewWeek} />
         {syncMessage && <div className="score-sync-warning">{syncMessage}</div>}
 
-        <label className="score-filter"><span>Tổ</span><FilterSelect<GroupFilter> value={groupFilter} options={[{ value: "all", label: "Tất cả tổ" }, { value: "1", label: "Tổ 1" }, { value: "2", label: "Tổ 2" }, { value: "3", label: "Tổ 3" }, { value: "4", label: "Tổ 4" }]} onChange={setGroupFilter} /></label>
-        <label className="score-filter"><span>Xếp loại</span><FilterSelect<StatusFilter> value={statusFilter} options={[{ value: "all", label: "Tất cả xếp loại" }, { value: "Tốt", label: "Tốt" }, { value: "Khá", label: "Khá" }, { value: "Đạt", label: "Đạt" }, { value: "Chưa đạt", label: "Chưa đạt" }]} onChange={setStatusFilter} /></label>
-        <label className="score-filter"><span>Sắp xếp</span><FilterSelect<SortMode> value={sortMode} options={[{ value: "score-desc", label: "Điểm cao đến thấp" }, { value: "name-az", label: "Theo tên học sinh A-Z" }]} onChange={setSortMode} /></label>
+        <label className="score-filter"><span>Tổ</span><FilterSelect<GroupFilter> value={shownGroupFilter} options={[{ value: "all", label: "Tất cả tổ" }, { value: "1", label: "Tổ 1" }, { value: "2", label: "Tổ 2" }, { value: "3", label: "Tổ 3" }, { value: "4", label: "Tổ 4" }]} onChange={setGroupFilter} disabled={isOverviewMode} title={isOverviewMode ? "Tổng quan luôn hiển thị đủ 4 tổ" : undefined} /></label>
+        <label className="score-filter"><span>Xếp loại</span><FilterSelect<StatusFilter> value={shownStatusFilter} options={[{ value: "all", label: "Tất cả xếp loại" }, { value: "Tốt", label: "Tốt" }, { value: "Khá", label: "Khá" }, { value: "Đạt", label: "Đạt" }, { value: "Chưa đạt", label: "Chưa đạt" }]} onChange={setStatusFilter} disabled={isOverviewMode} title={isOverviewMode ? "Chỉ mở khi xem Cá nhân" : undefined} /></label>
+        <label className="score-filter"><span>Sắp xếp</span><FilterSelect<SortMode> value={shownSortMode} options={[{ value: "score-desc", label: "Điểm cao đến thấp" }, { value: "name-az", label: "Theo tên học sinh A-Z" }]} onChange={setSortMode} disabled={isOverviewMode} title={isOverviewMode ? "Chỉ mở khi xem Cá nhân" : undefined} /></label>
 
         <div className="left-mini-section"><div className="left-mini-title">Tóm tắt tuần</div><div className="mini-stat"><span>Tổng điểm</span><strong className={totalScore >= 0 ? "score-positive" : "score-negative"}>{totalScore > 0 ? `+${totalScore}` : totalScore}</strong></div><div className="mini-stat"><span>Ổn định</span><strong>{goodCount}/{rawSummaries.length}</strong></div><div className="mini-stat"><span>Cần chú ý</span><strong>{warningCount}</strong></div><div className="mini-stat"><span>Tổ dẫn đầu</span><strong>{topGroup?.label || "Chưa có"}</strong></div></div>
       </aside>
