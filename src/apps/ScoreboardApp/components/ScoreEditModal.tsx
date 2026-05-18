@@ -20,8 +20,10 @@ type QuickRule = {
   note?: string;
 };
 
+type RuleCacheGlobal = typeof globalThis & { __A3K64_SCORE_RULES?: QuickRule[] };
+
 const RULE_DRAG_TYPE = "application/x-score-rule";
-let cachedRules: QuickRule[] | null = null;
+let cachedRules: QuickRule[] | null = (globalThis as RuleCacheGlobal).__A3K64_SCORE_RULES || null;
 let cachedRulesPromise: Promise<QuickRule[]> | null = null;
 
 const subjects = ["Toán", "Vật Lí", "Hoá Học", "Sinh Học", "Tin Học", "Ngữ Văn", "Lịch Sử", "Tiếng Anh", "Quốc Phòng", "Thể Dục", "GDĐP", "TNHN", "Chào Cờ", "SHL"];
@@ -69,6 +71,11 @@ function normalizeRules(raw: unknown): QuickRule[] {
 }
 
 async function fetchRulesFromGas() {
+  const globalRules = (globalThis as RuleCacheGlobal).__A3K64_SCORE_RULES;
+  if (globalRules?.length) {
+    cachedRules = globalRules;
+    return globalRules;
+  }
   if (cachedRules) return cachedRules;
   if (cachedRulesPromise) return cachedRulesPromise;
   const gasUrl = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
@@ -83,6 +90,7 @@ async function fetchRulesFromGas() {
     const json = await response.json();
     const data = json?.data || json;
     cachedRules = normalizeRules(data?.rules || data?.quickScoreReasons || data);
+    (globalThis as RuleCacheGlobal).__A3K64_SCORE_RULES = cachedRules;
     return cachedRules;
   })();
 
@@ -160,14 +168,19 @@ export function ScoreEditModal({ student, week, events, onAddScore, onDeleteScor
   const [title, setTitle] = useState("");
   const [violationCount, setViolationCount] = useState(1);
   const [pointPerCount, setPointPerCount] = useState(5);
-  const [rules, setRules] = useState<QuickRule[]>(cachedRules || []);
-  const [rulesStatus, setRulesStatus] = useState(cachedRules ? "" : "Đang đọc VI_PHAM...");
+  const [rules, setRules] = useState<QuickRule[]>(cachedRules || (globalThis as RuleCacheGlobal).__A3K64_SCORE_RULES || []);
+  const [rulesStatus, setRulesStatus] = useState(rules.length ? "" : "Đang đọc VI_PHAM...");
   const [dropHintDay, setDropHintDay] = useState<number | null>(null);
   const [inputDropActive, setInputDropActive] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-    if (cachedRules) return;
+    const globalRules = (globalThis as RuleCacheGlobal).__A3K64_SCORE_RULES;
+    if (globalRules?.length) {
+      setRules(globalRules);
+      setRulesStatus("");
+      return;
+    }
     fetchRulesFromGas()
       .then((nextRules) => {
         if (!mounted) return;
