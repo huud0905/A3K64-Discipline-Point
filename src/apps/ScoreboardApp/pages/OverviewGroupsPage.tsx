@@ -1,5 +1,6 @@
 import { PointerEvent, useMemo, useRef, useState } from "react";
 import { GroupStatsChart } from "../components/GroupStatsChart";
+import { RankingPodium } from "../components/RankingPodium";
 import { StudentTable } from "../components/StudentTable";
 import { getGroupStats, StudentScoreSummary } from "../data/mockScoreData";
 
@@ -75,10 +76,17 @@ export function OverviewGroupsPage({ summaries, week, onOpenStudent }: OverviewG
   const finishDrag = () => {
     if (!drag) return;
 
+    const currentIndex = order.indexOf(drag.group);
     const cards = Array.from(gridRef.current?.querySelectorAll<HTMLElement>(".ordered-group-card") || []);
-    const targetIndex = cards.findIndex((card) => drag.currentX < card.getBoundingClientRect().left + card.getBoundingClientRect().width / 2);
-    const finalIndex = targetIndex === -1 ? cards.length - 1 : targetIndex;
-    const nextOrder = moveItem(order, drag.group, finalIndex);
+    const activeCard = cards.find((card) => card.dataset.group === String(drag.group));
+    const firstCard = cards[0];
+    const secondCard = cards[1];
+    const cardWidth = activeCard?.getBoundingClientRect().width || firstCard?.getBoundingClientRect().width || 1;
+    const columnGap = firstCard && secondCard ? Math.max(0, secondCard.getBoundingClientRect().left - firstCard.getBoundingClientRect().right) : 12;
+    const columnSize = Math.max(1, cardWidth + columnGap);
+    const offset = Math.round(drag.deltaX / columnSize);
+    const targetIndex = currentIndex + offset;
+    const nextOrder = moveItem(order, drag.group, targetIndex);
 
     setOrder(nextOrder);
     localStorage.setItem(GROUP_ORDER_KEY, JSON.stringify(nextOrder));
@@ -87,12 +95,18 @@ export function OverviewGroupsPage({ summaries, week, onOpenStudent }: OverviewG
 
   return (
     <div className="score-page overview-compact-page">
-      <GroupStatsChart summaries={summaries} />
+      <section className="overview-feature-grid">
+        <RankingPodium students={summaries} onOpenStudent={onOpenStudent} />
+        <GroupStatsChart summaries={summaries} />
+      </section>
 
       <section
         ref={gridRef}
         className={`group-overview-grid ordered-groups ${drag ? "is-dragging" : ""}`}
         aria-label={`Bảng tổng quan tuần ${week}`}
+        onPointerMove={updateDrag}
+        onPointerUp={finishDrag}
+        onPointerCancel={() => setDrag(null)}
       >
         {orderedGroups.map((group) => {
           const isDragging = drag?.group === group.group;
@@ -101,10 +115,8 @@ export function OverviewGroupsPage({ summaries, week, onOpenStudent }: OverviewG
             <div
               className={`group-overview-card ordered-group-card ${isDragging ? "dragging" : ""}`}
               key={group.group}
-              style={isDragging ? { transform: `translate3d(${drag.deltaX}px, -8px, 0) scale(1.015)`, zIndex: 8 } : undefined}
-              onPointerMove={updateDrag}
-              onPointerUp={finishDrag}
-              onPointerCancel={() => setDrag(null)}
+              data-group={group.group}
+              style={isDragging ? { transform: `translate3d(${drag.deltaX}px, -14px, 0) scale(1.025)`, zIndex: 10 } : undefined}
             >
               <div
                 className="group-overview-title draggable-group-title clean-draggable-title"
