@@ -15,6 +15,7 @@ const GROUP_ORDER_KEY = "a3k64-overview-group-order-v2";
 type DragState = {
   group: number;
   startX: number;
+  currentX: number;
   deltaX: number;
   pointerId: number;
 };
@@ -56,26 +57,28 @@ export function OverviewGroupsPage({ summaries, week, onOpenStudent }: OverviewG
   }, [groupStats, order]);
 
   const startDrag = (event: PointerEvent<HTMLDivElement>, groupNumber: number) => {
-    const target = event.target as HTMLElement;
-    if (target.closest("button, a, input, select, textarea")) return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    setDrag({ group: groupNumber, startX: event.clientX, deltaX: 0, pointerId: event.pointerId });
+    setDrag({
+      group: groupNumber,
+      startX: event.clientX,
+      currentX: event.clientX,
+      deltaX: 0,
+      pointerId: event.pointerId,
+    });
   };
 
   const updateDrag = (event: PointerEvent<HTMLElement>) => {
-    if (!drag) return;
-    setDrag({ ...drag, deltaX: event.clientX - drag.startX });
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    setDrag({ ...drag, currentX: event.clientX, deltaX: event.clientX - drag.startX });
   };
 
   const finishDrag = () => {
     if (!drag) return;
 
-    const currentIndex = order.indexOf(drag.group);
-    const gridWidth = gridRef.current?.clientWidth || 1;
-    const columnWidth = Math.max(1, gridWidth / DEFAULT_ORDER.length);
-    const offset = Math.round(drag.deltaX / columnWidth);
-    const targetIndex = currentIndex + offset;
-    const nextOrder = moveItem(order, drag.group, targetIndex);
+    const cards = Array.from(gridRef.current?.querySelectorAll<HTMLElement>(".ordered-group-card") || []);
+    const targetIndex = cards.findIndex((card) => drag.currentX < card.getBoundingClientRect().left + card.getBoundingClientRect().width / 2);
+    const finalIndex = targetIndex === -1 ? cards.length - 1 : targetIndex;
+    const nextOrder = moveItem(order, drag.group, finalIndex);
 
     setOrder(nextOrder);
     localStorage.setItem(GROUP_ORDER_KEY, JSON.stringify(nextOrder));
@@ -90,9 +93,6 @@ export function OverviewGroupsPage({ summaries, week, onOpenStudent }: OverviewG
         ref={gridRef}
         className={`group-overview-grid ordered-groups ${drag ? "is-dragging" : ""}`}
         aria-label={`Bảng tổng quan tuần ${week}`}
-        onPointerMove={updateDrag}
-        onPointerUp={finishDrag}
-        onPointerCancel={() => setDrag(null)}
       >
         {orderedGroups.map((group) => {
           const isDragging = drag?.group === group.group;
@@ -101,16 +101,17 @@ export function OverviewGroupsPage({ summaries, week, onOpenStudent }: OverviewG
             <div
               className={`group-overview-card ordered-group-card ${isDragging ? "dragging" : ""}`}
               key={group.group}
-              style={isDragging ? { transform: `translateX(${drag.deltaX}px)`, zIndex: 6 } : undefined}
+              style={isDragging ? { transform: `translate3d(${drag.deltaX}px, -8px, 0) scale(1.015)`, zIndex: 8 } : undefined}
+              onPointerMove={updateDrag}
+              onPointerUp={finishDrag}
+              onPointerCancel={() => setDrag(null)}
             >
               <div
-                className="group-overview-title draggable-group-title"
+                className="group-overview-title draggable-group-title clean-draggable-title"
                 onPointerDown={(event) => startDrag(event, group.group)}
                 title="Giữ chuột và kéo ngang để đổi vị trí tổ"
               >
-                <span className="group-drag-grip" aria-hidden="true">⋮⋮</span>
-                <span>Tổ {group.group}</span>
-                <small>Kéo ngang</small>
+                Tổ {group.group}
               </div>
               <StudentTable students={group.members} compact onOpenStudent={onOpenStudent} />
             </div>
