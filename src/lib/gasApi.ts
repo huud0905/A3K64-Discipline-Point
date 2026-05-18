@@ -26,6 +26,12 @@ export type GasScoreboardPayload = {
   updatedAt?: string;
 };
 
+export type GasRecoveryResult = {
+  ok: boolean;
+  message?: string;
+  user?: GasLoginUser;
+};
+
 type GasResponseData = Partial<GasScoreboardPayload> & {
   ok?: boolean;
   error?: string;
@@ -307,5 +313,36 @@ export async function validateLoginWithGas(username: string, password: string): 
   } catch (error) {
     console.error("Không đăng nhập được qua Google Sheets:", error);
     return null;
+  }
+}
+
+export async function resetPasswordWithGas(fullName: string, phone: string, newEmail: string, newPassword: string): Promise<GasRecoveryResult> {
+  try {
+    const response = await gasPost(
+      "resetPassword",
+      { fullName, phone, newEmail, newPassword },
+      "Đang cập nhật tài khoản..."
+    );
+    const data = response?.data;
+    if (!data?.ok) return { ok: false, message: asText(data?.error, "Không cập nhật được tài khoản.") };
+    const user = data.user as Partial<GasLoginUser> & Record<string, unknown> | undefined;
+    return {
+      ok: true,
+      message: asText(data.message, "Đã cập nhật email và mật khẩu."),
+      user: user
+        ? {
+            uid: asText(user.uid, `gas-${newEmail}`),
+            displayName: asText(user.displayName, fullName),
+            email: asText(user.email, newEmail),
+            photoURL: null,
+            provider: asText(user.provider, "gas"),
+            role: asText(user.role, "hoc_sinh"),
+            group: asText(user.group),
+          }
+        : undefined,
+    };
+  } catch (error) {
+    console.error("Không khôi phục được mật khẩu qua Google Sheets:", error);
+    return { ok: false, message: error instanceof Error ? error.message : "Không kết nối được Google Apps Script." };
   }
 }
