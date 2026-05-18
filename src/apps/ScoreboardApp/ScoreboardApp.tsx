@@ -6,11 +6,10 @@ import { ScoreEditModal } from "./components/ScoreEditModal";
 import { StudentTable } from "./components/StudentTable";
 import { OverviewPage } from "./pages/OverviewPage";
 import { ScoringPage } from "./pages/ScoringPage";
-import { StudentProfilePage } from "./pages/StudentProfilePage";
 import { getGroupStats, mockScoreEvents, mockStudents, ScoreEvent, Student, SCORE_WEEKS, summarizeStudents } from "./data/mockScoreData";
 import { createScoreEventInGas, createWeekInGas, deleteScoreEventInGas, fetchScoreboardFromGas } from "../../lib/gasApi";
 
-type ScoreboardTab = "overview" | "scoring" | "profile";
+type ScoreboardTab = "overview" | "scoring";
 type GroupFilter = "all" | "1" | "2" | "3" | "4";
 type StatusFilter = "all" | "Tốt" | "Khá" | "Đạt" | "Chưa đạt";
 type SortMode = "score-desc" | "name-az";
@@ -63,7 +62,6 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   const [events, setEvents] = useState<ScoreEvent[]>([]);
   const [dataSource, setDataSource] = useState<DataSource>("loading");
   const [syncMessage, setSyncMessage] = useState("");
-  const [selectedStudentId, setSelectedStudentId] = useState("");
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [isCreatingWeek, setIsCreatingWeek] = useState(false);
 
@@ -90,7 +88,6 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
     setEvents(nextEvents);
     setWeeks(nextWeeks);
     setWeek(nextWeek);
-    setSelectedStudentId((current) => (nextStudents.some((student) => student.id === current) ? current : nextStudents[0]?.id || ""));
     setDataSource("gas");
     setSyncMessage(!nextStudents.length ? "Không đọc được học sinh trong sheet TUẦN hiện tại." : "");
   }, [week]);
@@ -135,7 +132,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   const topGroup = [...groupStats].sort((a, b) => b.average - a.average || b.total - a.total)[0];
   const editingStudent = rawSummaries.find((student) => student.id === editingStudentId) || null;
 
-  const openStudent = (studentId: string) => { setSelectedStudentId(studentId); setActiveTab("profile"); };
+  const openStudent = (studentId: string) => setEditingStudentId(studentId);
 
   const deleteScore = (eventId: string) => {
     setEvents((current) => current.filter((event) => event.id !== eventId));
@@ -151,7 +148,6 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
     const eventData = event as Omit<ScoreEvent, "id"> & { createdAt?: string };
     const temporaryEvent: ScoreEvent = { ...eventData, id: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`, createdAt: eventData.createdAt || new Date().toISOString() };
     setEvents((current) => [temporaryEvent, ...current]);
-    setSelectedStudentId(eventData.studentId);
 
     if (dataSource === "gas") {
       void createScoreEventInGas(temporaryEvent)
@@ -213,9 +209,9 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
       </aside>
 
       <section className="scoreboard-main">
-        <header className="scoreboard-header"><div><span className="app-eyebrow">Bảng chấm điểm</span><h1>System <b>A3K64</b></h1><p>Quản lý điểm thi đua, xếp hạng học tập và nề nếp theo tuần.</p></div><nav className="scoreboard-tabs"><button className={activeTab === "overview" ? "active" : ""} type="button" onClick={() => setActiveTab("overview")}>Tổng quan</button><button className={activeTab === "scoring" ? "active" : ""} type="button" onClick={() => setActiveTab("scoring")}>Bảng chấm</button><button className={activeTab === "profile" ? "active" : ""} type="button" onClick={() => setActiveTab("profile")}>Hồ sơ học sinh</button></nav></header>
-        <div className="scoreboard-actionbar"><div className="toolbar-actions"><button type="button" className="toolbar-button export"><Download size={16} />Xuất Excel</button><button type="button" className="toolbar-button camera"><Camera size={16} />Chụp ảnh</button><button type="button" className="toolbar-button auto"><Sparkles size={16} />Tự tính điểm</button><button type="button" className="toolbar-button" onClick={resetLocalData}><RefreshCcw size={16} />Làm mới dữ liệu</button></div></div>
-        <main className="scoreboard-content">{activeTab === "overview" && renderOverviewContent()}{activeTab === "scoring" && <ScoringPage students={students} summaries={scoringSummaries} events={events} week={week} onAddScore={addScore} onOpenStudent={openStudent} onEditStudent={setEditingStudentId} />}{activeTab === "profile" && <StudentProfilePage students={students} events={events} summaries={rawSummaries} selectedStudentId={selectedStudentId} onSelectStudent={setSelectedStudentId} />}</main>
+        <header className="scoreboard-header"><div><span className="app-eyebrow">Bảng chấm điểm</span><h1>System <b>A3K64</b></h1><p>Quản lý điểm thi đua, xếp hạng học tập và nề nếp theo tuần.</p></div><nav className="scoreboard-tabs two-tabs"><button className={activeTab === "overview" ? "active" : ""} type="button" onClick={() => setActiveTab("overview")}>Tổng quan</button><button className={activeTab === "scoring" ? "active" : ""} type="button" onClick={() => setActiveTab("scoring")}>Bảng chấm</button></nav></header>
+        <div className="scoreboard-actionbar"><div className="toolbar-actions"><button type="button" className="toolbar-button export"><Download size={15} />Xuất Excel</button><button type="button" className="toolbar-button camera"><Camera size={15} />Chụp ảnh</button><button type="button" className="toolbar-button auto"><Sparkles size={15} />Tự tính điểm</button><button type="button" className="toolbar-button" onClick={resetLocalData}><RefreshCcw size={15} />Làm mới dữ liệu</button></div></div>
+        <main className="scoreboard-content">{activeTab === "overview" && renderOverviewContent()}{activeTab === "scoring" && <ScoringPage students={students} summaries={scoringSummaries} events={events} week={week} onAddScore={addScore} onOpenStudent={openStudent} onEditStudent={setEditingStudentId} />}</main>
       </section>
 
       {editingStudent && <ScoreEditModal student={editingStudent} week={week} events={events} onAddScore={addScore} onDeleteScore={deleteScore} onClose={() => setEditingStudentId(null)} />}
