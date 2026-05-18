@@ -1,4 +1,4 @@
-/* Final scoreboard fixes: compact status chips + short processing overlay */
+/* Final scoreboard fixes: compact status chips + overview group layout + short processing overlay */
 .scoreboard-app .status-pill,
 .scoreboard-app .footer-status {
   min-width: 48px !important;
@@ -49,6 +49,90 @@
   height: 48px !important;
 }
 
+.scoreboard-app .overview-compact-page {
+  gap: 14px !important;
+}
+
+.scoreboard-app .overview-compact-page .chart-panel {
+  min-height: 300px !important;
+}
+
+.scoreboard-app .group-overview-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  align-items: start !important;
+}
+
+.scoreboard-app .group-overview-card {
+  min-width: 0 !important;
+  border: 1px solid #273244 !important;
+  border-radius: 18px !important;
+  overflow: hidden !important;
+  background: #0b1220 !important;
+}
+
+.scoreboard-app .group-overview-title {
+  height: 34px !important;
+  display: grid !important;
+  place-items: center !important;
+  color: #60a5fa !important;
+  background: #172554 !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+  letter-spacing: .12em !important;
+  text-transform: uppercase !important;
+}
+
+.scoreboard-app .group-overview-card .score-panel,
+.scoreboard-app .group-overview-card .student-table-panel {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.scoreboard-app .group-overview-card .score-table {
+  min-width: 0 !important;
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+.scoreboard-app .group-overview-card .score-table th,
+.scoreboard-app .group-overview-card .score-table td {
+  padding: 8px 8px !important;
+  font-size: 10px !important;
+}
+
+.scoreboard-app .group-overview-card .score-table th:nth-child(1),
+.scoreboard-app .group-overview-card .score-table td:nth-child(1) { width: 34px !important; }
+.scoreboard-app .group-overview-card .score-table th:nth-child(2),
+.scoreboard-app .group-overview-card .score-table td:nth-child(2) { width: auto !important; }
+.scoreboard-app .group-overview-card .score-table th:nth-child(3),
+.scoreboard-app .group-overview-card .score-table td:nth-child(3) { width: 54px !important; text-align: right !important; }
+.scoreboard-app .group-overview-card .score-table th:nth-child(4),
+.scoreboard-app .group-overview-card .score-table td:nth-child(4) { width: 42px !important; text-align: center !important; }
+.scoreboard-app .group-overview-card .score-table th:nth-child(5),
+.scoreboard-app .group-overview-card .score-table td:nth-child(5) { width: 48px !important; text-align: center !important; }
+
+.scoreboard-app .group-overview-card .student-name-button {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: 11px !important;
+}
+
+.scoreboard-app .group-overview-card .student-role {
+  display: none !important;
+}
+
+.scoreboard-app .group-overview-card .status-pill {
+  min-width: 36px !important;
+  height: 18px !important;
+  padding: 0 7px !important;
+  font-size: 8px !important;
+}
+
 .a3k64-processing-mask {
   animation: a3k64AutoHide 2.2s ease forwards !important;
 }
@@ -61,4 +145,10 @@
 .scoreboard-app .day-event.draft {
   outline: 1px dashed rgba(59,130,246,.75) !important;
   outline-offset: -3px !important;
+}
+
+@media (max-width: 1280px) {
+  .scoreboard-app .group-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
 }
