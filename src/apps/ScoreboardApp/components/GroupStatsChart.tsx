@@ -33,9 +33,7 @@ function buildScale(values: number[]) {
   if (minY === 0) minY = -step;
 
   const ticks: number[] = [];
-  for (let value = maxY; value >= minY; value -= step) {
-    ticks.push(value);
-  }
+  for (let value = maxY; value >= minY; value -= step) ticks.push(value);
 
   if (!ticks.includes(0)) {
     ticks.push(0);
@@ -51,7 +49,7 @@ function percentFor(value: number, minY: number, maxY: number) {
 
 export function GroupStatsChart({ summaries }: GroupStatsChartProps) {
   const groupStats = getGroupStats(summaries);
-  const values = groupStats.map((item) => item.total);
+  const values = groupStats.map((item) => item.average);
   const { minY, maxY, ticks } = buildScale(values);
   const zeroTop = percentFor(0, minY, maxY);
 
@@ -73,18 +71,15 @@ export function GroupStatsChart({ summaries }: GroupStatsChartProps) {
 
         <div className="chart-grid-lines" aria-hidden="true">
           {ticks.map((tick) => (
-            <i
-              key={tick}
-              className={tick === 0 ? "zero" : ""}
-              style={{ top: `${percentFor(tick, minY, maxY)}%` }}
-            />
+            <i key={tick} className={tick === 0 ? "zero" : ""} style={{ top: `${percentFor(tick, minY, maxY)}%` }} />
           ))}
         </div>
 
         <div className="chart-columns-area">
           {groupStats.map((item) => {
-            const valueTop = percentFor(item.total, minY, maxY);
-            const isPositive = item.total >= 0;
+            const value = item.average;
+            const valueTop = percentFor(value, minY, maxY);
+            const isPositive = value >= 0;
             const height = Math.max(8, Math.abs(valueTop - zeroTop));
 
             return (
@@ -92,18 +87,15 @@ export function GroupStatsChart({ summaries }: GroupStatsChartProps) {
                 <div className="chart-modern-track">
                   <div
                     className={`chart-modern-bar group-${item.group} ${isPositive ? "positive" : "negative"}`}
-                    style={{
-                      top: isPositive ? `${valueTop}%` : `${zeroTop}%`,
-                      height: `${height}%`,
-                    }}
+                    style={{ top: isPositive ? `${valueTop}%` : `${zeroTop}%`, height: `${height}%` }}
                   >
-                    <span className="chart-value">{item.total > 0 ? `+${item.total}` : item.total}</span>
+                    <span className="chart-value">{value > 0 ? `+${value}` : value}</span>
                   </div>
                 </div>
 
                 <strong>{item.label}</strong>
                 <small>
-                  TB {item.average} · {item.good} ổn · {item.warning} cần chú ý
+                  TB {item.average} · Tổng {item.total} · {item.members.length} HS
                 </small>
               </div>
             );
