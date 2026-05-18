@@ -1,55 +1,99 @@
 /* Final scoreboard polish */
 .scoreboard-app .filter-select-button:disabled {
-  opacity: .48 !important;
+  opacity: 1 !important;
   cursor: not-allowed !important;
   pointer-events: none !important;
+  color: #64748b !important;
+  border-color: #475569 !important;
   border-style: dashed !important;
-  filter: saturate(.65) !important;
+  background: #1f2937 !important;
+  filter: grayscale(.75) saturate(.35) !important;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, .08) !important;
 }
 
-.scoreboard-app .movable-group-title {
-  display: grid !important;
-  grid-template-columns: 34px 1fr 34px !important;
-  gap: 8px !important;
-  align-items: center !important;
-  padding: 0 8px !important;
+.scoreboard-app .filter-select-button:disabled svg {
+  opacity: .45 !important;
 }
 
-.scoreboard-app .movable-group-title > span {
-  text-align: center !important;
+.win-root.theme-light .scoreboard-app .filter-select-button:disabled {
+  color: #94a3b8 !important;
+  background: #e5e7eb !important;
+  border-color: #cbd5e1 !important;
+  filter: grayscale(.9) saturate(.25) !important;
 }
 
-.scoreboard-app .group-move-button {
-  width: 28px !important;
-  height: 24px !important;
-  border: 1px solid var(--desktop-accent, #3b82f6) !important;
-  border-radius: 9px !important;
-  display: grid !important;
-  place-items: center !important;
-  color: #fff !important;
-  background: var(--desktop-accent, #3b82f6) !important;
-  font-size: 15px !important;
-  font-weight: 950 !important;
-  cursor: pointer !important;
+.scoreboard-app .ordered-groups {
+  user-select: none !important;
 }
 
-.scoreboard-app .group-move-button:disabled {
-  opacity: .24 !important;
-  cursor: not-allowed !important;
+.scoreboard-app .ordered-groups.is-dragging {
+  cursor: grabbing !important;
 }
 
 .scoreboard-app .ordered-group-card {
-  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease !important;
+  touch-action: pan-y !important;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, opacity .18s ease !important;
+  will-change: transform !important;
 }
 
 .scoreboard-app .ordered-group-card:hover {
-  transform: translateY(-2px) !important;
   border-color: var(--desktop-accent, #3b82f6) !important;
   box-shadow: 0 16px 36px rgba(15, 23, 42, .18) !important;
 }
 
-.win-root.theme-light .scoreboard-app .filter-select-button:disabled {
-  color: #64748b !important;
-  background: #e2e8f0 !important;
-  border-color: #cbd5e1 !important;
+.scoreboard-app .ordered-group-card.dragging {
+  cursor: grabbing !important;
+  opacity: .94 !important;
+  border-color: var(--desktop-accent, #3b82f6) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .32) !important;
+  transition: none !important;
+}
+
+.scoreboard-app .draggable-group-title {
+  display: grid !important;
+  grid-template-columns: 32px 1fr 64px !important;
+  gap: 6px !important;
+  align-items: center !important;
+  padding: 0 10px !important;
+  cursor: grab !important;
+}
+
+.scoreboard-app .draggable-group-title:active {
+  cursor: grabbing !important;
+}
+
+.scoreboard-app .draggable-group-title > span:not(.group-drag-grip) {
+  text-align: center !important;
+}
+
+.scoreboard-app .group-drag-grip {
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 9px !important;
+  display: grid !important;
+  place-items: center !important;
+  color: #fff !important;
+  background: color-mix(in srgb, var(--desktop-accent, #3b82f6) 72%, #0f172a) !important;
+  font-size: 12px !important;
+  letter-spacing: -3px !important;
+  opacity: .88 !important;
+}
+
+.scoreboard-app .draggable-group-title small {
+  color: #bfdbfe !important;
+  font-size: 9px !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .04em !important;
+  opacity: .78 !important;
+  white-space: nowrap !important;
+}
+
+.win-root.theme-light .scoreboard-app .group-drag-grip {
+  color: #fff !important;
+  background: var(--desktop-accent, #2563eb) !important;
+}
+
+.win-root.theme-light .scoreboard-app .draggable-group-title small {
+  color: #2563eb !important;
 }
