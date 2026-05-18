@@ -17,6 +17,7 @@ type ScoreEditModalProps = {
 };
 
 const RULE_DRAG_TYPE = "application/x-score-rule";
+const PINNED_RULES_KEY = "a3k64-pinned-vi-pham-rules";
 const subjects = ["Toán", "Vật Lí", "Hoá Học", "Sinh Học", "Tin Học", "Ngữ Văn", "Lịch Sử", "Tiếng Anh", "Quốc Phòng", "Thể Dục", "GDĐP", "TNHN", "Chào Cờ", "SHL"];
 const days = [
   { key: 2, label: "T2", full: "Thứ 2" },
@@ -92,6 +93,16 @@ function formatSavedTitle(day: number, category: ScoreCategory, subject: string,
 }
 function makeDraft(event: Omit<ScoreEvent, "id">): ScoreEvent { return { ...event, id: `draft-${Date.now()}-${Math.random().toString(36).slice(2)}` }; }
 function readDraggedRule(event: DragEvent) { try { const raw = event.dataTransfer.getData(RULE_DRAG_TYPE) || event.dataTransfer.getData("text/plain"); const rule = JSON.parse(raw) as QuickRule; return rule?.title && typeof rule.points === "number" ? rule : null; } catch { return null; } }
+function ruleKey(rule: QuickRule) { return `${rule.title}::${rule.points}::${rule.category}`; }
+function readPinnedRuleKeys() { try { const saved = JSON.parse(localStorage.getItem(PINNED_RULES_KEY) || "[]"); return Array.isArray(saved) ? saved.filter((item) => typeof item === "string") : []; } catch { return []; } }
+function ruleTooltip(rule: QuickRule) { return `${rule.title} ${formatScore(rule.points)} · ${categoryLabel(rule.category)}${rule.note ? ` · ${rule.note}` : ""}`; }
+function createDragPreview(rule: QuickRule) {
+  const preview = document.createElement("div");
+  preview.className = `rule-drag-preview ${rule.points >= 0 ? "plus" : "minus"}`;
+  preview.innerHTML = `<div class="rule-drag-icon">${rule.points >= 0 ? "+" : "−"}</div><div><strong>${rule.title}</strong><span>${formatScore(rule.points)} · ${categoryLabel(rule.category)}</span></div>`;
+  document.body.appendChild(preview);
+  return preview;
+}
 
 export function ScoreEditModal({ student, week, events, onSaveChanges, onAddScore, onDeleteScore, onClose }: ScoreEditModalProps) {
   const [activeDay, setActiveDay] = useState(2);
@@ -101,6 +112,7 @@ export function ScoreEditModal({ student, week, events, onSaveChanges, onAddScor
   const [violationCount, setViolationCount] = useState(1);
   const [pointPerCount, setPointPerCount] = useState(5);
   const [rules, setRules] = useState<QuickRule[]>(cachedRules || (globalThis as RuleCacheGlobal).__A3K64_SCORE_RULES || []);
+  const [pinnedRuleKeys, setPinnedRuleKeys] = useState<string[]>(readPinnedRuleKeys);
   const [rulesStatus, setRulesStatus] = useState(rules.length ? "" : "Đang đọc VI_PHAM...");
   const [draftEvents, setDraftEvents] = useState<ScoreEvent[]>(events.filter((event) => event.studentId === student.id && event.week === week));
   const [deletedEventIds, setDeletedEventIds] = useState<string[]>([]);
@@ -112,6 +124,10 @@ export function ScoreEditModal({ student, week, events, onSaveChanges, onAddScor
     setDraftEvents(events.filter((event) => event.studentId === student.id && event.week === week));
     setDeletedEventIds([]);
   }, [events, student.id, week]);
+
+  useEffect(() => {
+    localStorage.setItem(PINNED_RULES_KEY, JSON.stringify(pinnedRuleKeys));
+  }, [pinnedRuleKeys]);
 
   useEffect(() => {
     const globalRules = (globalThis as RuleCacheGlobal).__A3K64_SCORE_RULES;
@@ -129,6 +145,10 @@ export function ScoreEditModal({ student, week, events, onSaveChanges, onAddScor
   const total = weekEvents.reduce((sum, event) => sum + event.points, 0);
   const draftAdditions = draftEvents.filter((event) => event.id.startsWith("draft-"));
   const hasChanges = draftAdditions.length > 0 || deletedEventIds.length > 0;
+  const orderedRules = useMemo(() => {
+    const pinned = new Set(pinnedRuleKeys);
+    return [...rules].sort((a, b) => Number(pinned.has(ruleKey(b))) - Number(pinned.has(ruleKey(a))));
+  }, [pinnedRuleKeys, rules]);
 
   const stageScore = (payload: { title: string; points: number; category: ScoreCategory }, day = activeDay) => {
     const cleanTitle = payload.title.trim();
@@ -139,6 +159,7 @@ export function ScoreEditModal({ student, week, events, onSaveChanges, onAddScor
   const handleCustomAdd = () => { const count = Math.max(1, Math.trunc(Number(violationCount) || 1)); stageScore({ title, points: pointPerCount * count, category }); setTitle(""); setViolationCount(1); };
   const handleQuickRule = (rule: QuickRule) => { setCategory(rule.category); setPointPerCount(rule.points); stageScore({ title: rule.title, points: rule.points, category: rule.category }); };
   const removeEvent = (eventId: string) => { setDraftEvents((current) => current.filter((event) => event.id !== eventId)); if (!eventId.startsWith("draft-")) setDeletedEventIds((current) => current.includes(eventId) ? current : [...current, eventId]); };
+  const togglePinnedRule = (rule: QuickRule) => { const key = ruleKey(rule); setPinnedRuleKeys((current) => current.includes(key) ? current.filter((item) => item !== key) : [key, ...current]); };
 
   const handleSave = async () => {
     if (!hasChanges || isSaving) { onClose(); return; }
@@ -154,7 +175,15 @@ export function ScoreEditModal({ student, week, events, onSaveChanges, onAddScor
     } finally { setIsSaving(false); }
   };
 
-  const dragStart = (event: DragEvent<HTMLButtonElement>, rule: QuickRule) => { const raw = JSON.stringify(rule); event.dataTransfer.setData(RULE_DRAG_TYPE, raw); event.dataTransfer.setData("text/plain", raw); event.dataTransfer.effectAllowed = "copy"; };
+  const dragStart = (event: DragEvent<HTMLButtonElement>, rule: QuickRule) => {
+    const raw = JSON.stringify(rule);
+    event.dataTransfer.setData(RULE_DRAG_TYPE, raw);
+    event.dataTransfer.setData("text/plain", raw);
+    event.dataTransfer.effectAllowed = "copy";
+    const preview = createDragPreview(rule);
+    event.dataTransfer.setDragImage(preview, 18, 18);
+    window.setTimeout(() => preview.remove(), 0);
+  };
   const dropRuleIntoForm = (event: DragEvent<HTMLDivElement>) => { event.preventDefault(); const rule = readDraggedRule(event); setInputDropActive(false); if (!rule) return; setTitle(rule.title); setPointPerCount(rule.points); setViolationCount(1); setCategory(rule.category); };
   const dropRuleIntoDay = (event: DragEvent<HTMLDivElement>, day: number) => { event.preventDefault(); const rule = readDraggedRule(event); setDropHintDay(null); if (!rule) return; setActiveDay(day); setCategory(rule.category); setPointPerCount(rule.points); stageScore({ title: rule.title, points: rule.points, category: rule.category }, day); };
   const summaryForDay = (day: number) => { const list = weekEvents.filter((event) => eventDay(event) === day && !isSheetTotal(event)); const plus = list.filter((event) => event.points > 0); const minus = list.filter((event) => event.points < 0); return { plus, minus, plusTotal: plus.reduce((sum, event) => sum + event.points, 0), minusTotal: minus.reduce((sum, event) => sum + event.points, 0) }; };
@@ -175,7 +204,7 @@ export function ScoreEditModal({ student, week, events, onSaveChanges, onAddScor
             <div className="day-tabs">{days.map((day) => <button type="button" key={day.key} className={activeDay === day.key ? "active" : ""} onClick={() => setActiveDay(day.key)} disabled={isSaving}>{day.label}</button>)}</div>
             <div className="score-edit-columns"><div className="score-add-panel"><div className="score-inline-actions"><button type="button" className="small-action disabled">Nháp: {hasChanges ? `${draftAdditions.length} thêm · ${deletedEventIds.length} xoá` : "chưa có thay đổi"}</button><button type="button" className="small-action disabled"><RotateCcw size={14} /> Hoàn tác</button><button type="button" className="small-action"><Zap size={14} /> Mẫu nhanh</button></div><div className={`score-custom-form ${inputDropActive ? "drop-ready" : ""}`} onDragOver={(e) => { e.preventDefault(); setInputDropActive(true); }} onDragLeave={() => setInputDropActive(false)} onDrop={dropRuleIntoForm}><div className="form-row"><div className="category-picker subject-picker"><FilterSelect<string> value={subject} options={subjects.map((item) => ({ value: item, label: item }))} onChange={setSubject} /></div><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Kéo rule từ VI_PHAM vào đây / nhập nội quy..." onKeyDown={(e) => { if (e.key === "Enter") handleCustomAdd(); }} disabled={isSaving} /><div className="count-box"><span>Lần</span><input type="number" min={1} step={1} value={violationCount} onChange={(e) => setViolationCount(Math.max(1, Math.trunc(Number(e.target.value) || 1)))} disabled={isSaving} /></div></div><button type="button" className="score-add-button" onClick={handleCustomAdd} disabled={isSaving}>Thêm mới (chưa lưu)</button></div></div><div className="day-record-panel"><div className="day-record-head"><strong>Ngày {days.find((day) => day.key === activeDay)?.label}</strong><span>Chỉ ghi vào Google Sheets khi bấm Save all changes.</span></div><div className="day-event-list">{activeDayEvents.length === 0 ? <div className="empty-day-record">Chưa có nội dung cho ngày này.</div> : activeDayEvents.map((event) => <div key={event.id} className={`day-event ${event.points >= 0 ? "plus" : "minus"} ${event.id.startsWith("draft-") ? "draft" : ""}`}><span>{event.title}</span><strong>{formatScore(event.points)}</strong><button type="button" onClick={() => removeEvent(event.id)} disabled={isSaving} title="Xoá dòng này"><X size={14} /></button></div>)}</div></div></div>
           </div>
-          <aside className="rules-directory"><h3>VI_PHAM</h3>{rulesStatus && <p className="rules-status">{rulesStatus}</p>}<div className="rules-grid">{rules.map((rule, index) => <button key={`${rule.title}-${index}`} type="button" draggable={!isSaving} className={rule.points >= 0 ? "rule-card plus" : "rule-card minus"} onClick={() => handleQuickRule(rule)} onDragStart={(e) => dragStart(e, rule)} disabled={isSaving}><span>{rule.title}</span><strong>{formatScore(rule.points)}</strong></button>)}</div></aside>
+          <aside className="rules-directory"><h3>VI_PHAM</h3>{rulesStatus && <p className="rules-status">{rulesStatus}</p>}<div className="rules-grid">{orderedRules.map((rule, index) => { const pinned = pinnedRuleKeys.includes(ruleKey(rule)); return <button key={`${rule.title}-${index}`} type="button" draggable={!isSaving} className={`${rule.points >= 0 ? "rule-card plus" : "rule-card minus"} ${pinned ? "pinned" : ""}`} onClick={() => handleQuickRule(rule)} onDragStart={(e) => dragStart(e, rule)} onContextMenu={(e) => { e.preventDefault(); togglePinnedRule(rule); }} data-tooltip={ruleTooltip(rule)} title="Chuột phải để ghim/bỏ ghim lên đầu" disabled={isSaving}><span>{pinned ? "📌 " : ""}{rule.title}</span><strong>{formatScore(rule.points)}</strong></button>; })}</div></aside>
         </section>
         <footer className="score-edit-footer"><strong className="footer-plus">{formatScore(plusTotal)}</strong><strong className="footer-minus">{minusTotal}</strong><strong className="footer-final-total">TỔNG {formatScore(total)}</strong><strong className={`footer-status ${statusTone(student.status)}`}>{student.status}</strong><button type="button" onClick={handleSave} disabled={isSaving}>{isSaving ? "Đang lưu..." : hasChanges ? "Save all changes" : "Đóng"}</button></footer>
       </div>
