@@ -220,7 +220,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
         <main className="scoreboard-content">{activeTab === "overview" && renderOverviewContent()}{activeTab === "scoring" && <ScoringPage students={students} summaries={scoringSummaries} events={events} week={week} onAddScore={addScore} onOpenStudent={openStudent} onEditStudent={setEditingStudentId} />}</main>
       </section>
 
-      {editingStudent && <ScoreEditModal student={editingStudent} week={week} events={events} onAddScore={addScore} onDeleteScore={deleteScore} onClose={() => setEditingStudentId(null)} />}
+      {editingStudent && <ScoreEditModal student={editingStudent} allStudents={rawSummaries} week={week} events={events} onAddScore={addScore} onDeleteScore={deleteScore} onClose={() => setEditingStudentId(null)} />}
     </div>
   );
 }
