@@ -4,6 +4,7 @@ import App from './App';
 import './taskViewEnhancer';
 import './startMenuListEnhancer';
 import './index.css';
+import './login-responsive-polish.css';
 import './scoreboard-modal-fix.css';
 import './scoreboard-final-fix.css';
 import './scoreboard-theme-animation.css';
