@@ -16,6 +16,40 @@
 .scoreboard-app .scoreboard-tabs.two-tabs, .scoreboard-app .scoreboard-tabs { min-width: 300px !important; height: 50px !important; padding: 5px !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 .scoreboard-app .scoreboard-tabs button { font-size: 12px !important; }
 
+/* Personal view: split into 2 columns */
+.scoreboard-app .compact-split-panel .table-title {
+  border-bottom: 1px solid var(--score-border, #273244) !important;
+}
+.scoreboard-app .compact-split-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+  align-items: start !important;
+}
+.scoreboard-app .compact-split-grid .compact-table-wrap:first-child {
+  border-right: 1px solid var(--score-border, #273244) !important;
+}
+.scoreboard-app .compact-score-table {
+  min-width: 0 !important;
+  table-layout: fixed !important;
+}
+.scoreboard-app .compact-score-table th:nth-child(1),
+.scoreboard-app .compact-score-table td:nth-child(1) { width: 54px !important; }
+.scoreboard-app .compact-score-table th:nth-child(2),
+.scoreboard-app .compact-score-table td:nth-child(2) { width: auto !important; }
+.scoreboard-app .compact-score-table th:nth-child(3),
+.scoreboard-app .compact-score-table td:nth-child(3) { width: 86px !important; text-align: center !important; }
+.scoreboard-app .compact-score-table th:nth-child(4),
+.scoreboard-app .compact-score-table td:nth-child(4) { width: 72px !important; text-align: center !important; }
+.scoreboard-app .compact-score-table th:nth-child(5),
+.scoreboard-app .compact-score-table td:nth-child(5) { width: 90px !important; text-align: center !important; }
+.scoreboard-app .compact-score-table .student-name-button {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
 /* Accent based modal colors */
 .scoreboard-app .score-edit-header h2 b,
 .scoreboard-app .matrix-head.day-head,
@@ -38,9 +72,7 @@
   transform: translateY(-1px) !important;
 }
 
-.scoreboard-app .day-tabs button.active:empty::after {
-  content: "T2";
-}
+.scoreboard-app .day-tabs button.active:empty::after { content: "T2"; }
 
 .scoreboard-app .score-add-button,
 .scoreboard-app .score-edit-footer button,
@@ -122,6 +154,7 @@
 .win-root.theme-light .scoreboard-app .save-score-button,
 .win-root.theme-light .scoreboard-app .score-add-button { color: #ffffff !important; }
 .win-root.theme-light .scoreboard-app .footer-final-total { color: #0f172a !important; }
+.win-root.theme-light .scoreboard-app .compact-split-grid .compact-table-wrap:first-child { border-right-color: #dbe3ee !important; }
 .win-root.theme-light .scoreboard-app .rules-directory,
 .win-root.theme-light .scoreboard-app .score-edit-left,
 .win-root.theme-light .scoreboard-app .day-event-list { scrollbar-color: color-mix(in srgb, var(--desktop-accent, #3b82f6) 70%, #94a3b8) #f1f5f9 !important; }
@@ -196,3 +229,8 @@
 @keyframes a3FadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes a3PopIn { from { opacity: 0; transform: translateY(6px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes a3BarGrow { from { transform: scaleY(.2); opacity: .45; } to { transform: scaleY(1); opacity: 1; } }
+
+@media (max-width: 1180px) {
+  .scoreboard-app .compact-split-grid { grid-template-columns: 1fr !important; }
+  .scoreboard-app .compact-split-grid .compact-table-wrap:first-child { border-right: 0 !important; border-bottom: 1px solid var(--score-border, #273244) !important; }
+}
