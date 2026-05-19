@@ -16,96 +16,77 @@ function niceStep(rawStep: number) {
 }
 
 function buildScale(values: number[]) {
-  const rawMin = Math.min(0, ...values);
   const rawMax = Math.max(0, ...values);
-  const allNonNegative = values.every((value) => value >= 0);
-  const allNonPositive = values.every((value) => value <= 0);
-  const range = Math.max(20, rawMax - rawMin || Math.abs(rawMax) || Math.abs(rawMin));
-  const step = niceStep(range / 5);
-
-  let minY = allNonNegative ? 0 : Math.floor(rawMin / step) * step;
-  let maxY = allNonPositive ? 0 : Math.ceil(rawMax / step) * step;
-
-  if (minY === maxY) {
-    if (minY === 0) maxY = step;
-    else {
-      minY -= step;
-      maxY += step;
-    }
-  }
-
+  const minimumMax = 50;
+  const targetMax = Math.max(minimumMax, rawMax);
+  const step = niceStep(targetMax / 5);
+  const maxY = Math.max(step, Math.ceil(targetMax / step) * step);
   const ticks: number[] = [];
-  for (let value = maxY; value >= minY; value -= step) ticks.push(Number(value.toFixed(10)));
 
-  if (!ticks.includes(0)) {
-    ticks.push(0);
-    ticks.sort((a, b) => b - a);
+  for (let value = maxY; value >= 0; value -= step) {
+    ticks.push(Number(value.toFixed(10)));
   }
 
-  return { minY, maxY, ticks };
-}
-
-function percentFor(value: number, minY: number, maxY: number) {
-  return ((maxY - value) / (maxY - minY)) * 100;
+  if (!ticks.includes(0)) ticks.push(0);
+  return { maxY, ticks };
 }
 
 function formatAverage(value: number) {
   return Number(value).toFixed(1);
 }
 
+function percentFor(value: number, maxY: number) {
+  return Math.max(0, Math.min(100, (value / maxY) * 100));
+}
+
 export function GroupStatsChart({ summaries }: GroupStatsChartProps) {
   const groupStats = getGroupStats(summaries);
   const values = groupStats.map((item) => item.average);
-  const { minY, maxY, ticks } = buildScale(values);
-  const zeroTop = percentFor(0, minY, maxY);
+  const { maxY, ticks } = buildScale(values);
 
   return (
-    <section className="score-panel chart-panel">
+    <section className="score-panel chart-panel group-stats-v2-panel">
       <div className="section-heading">
         <span>📈</span>
         <strong>Thống kê tổ</strong>
       </div>
 
-      <div className="group-chart-modern">
-        <div className="chart-axis-labels" aria-hidden="true">
+      <div className="group-stats-v2-chart">
+        <div className="group-stats-v2-axis" aria-hidden="true">
           {ticks.map((tick) => (
-            <span key={tick} style={{ top: `${percentFor(tick, minY, maxY)}%` }}>
+            <span key={tick} style={{ top: `${100 - percentFor(tick, maxY)}%` }}>
               {tick}
             </span>
           ))}
         </div>
 
-        <div className="chart-grid-lines" aria-hidden="true">
-          {ticks.map((tick) => (
-            <i key={tick} className={tick === 0 ? "zero" : ""} style={{ top: `${percentFor(tick, minY, maxY)}%` }} />
-          ))}
-        </div>
+        <div className="group-stats-v2-plot">
+          <div className="group-stats-v2-grid" aria-hidden="true">
+            {ticks.map((tick) => (
+              <i key={tick} className={tick === 0 ? "zero" : ""} style={{ top: `${100 - percentFor(tick, maxY)}%` }} />
+            ))}
+          </div>
 
-        <div className="chart-columns-area">
-          {groupStats.map((item) => {
-            const value = item.average;
-            const valueTop = percentFor(value, minY, maxY);
-            const isPositive = value >= 0;
-            const height = Math.max(8, Math.abs(valueTop - zeroTop));
+          <div className="group-stats-v2-columns">
+            {groupStats.map((item) => {
+              const height = percentFor(item.average, maxY);
 
-            return (
-              <div className="chart-modern-column" key={item.group}>
-                <div className="chart-modern-track">
-                  <div
-                    className={`chart-modern-bar group-${item.group} ${isPositive ? "positive" : "negative"}`}
-                    style={{ top: isPositive ? `${valueTop}%` : `${zeroTop}%`, height: `${height}%` }}
-                  >
-                    <span className="chart-value">{formatAverage(value)}</span>
+              return (
+                <div className="group-stats-v2-column" key={item.group}>
+                  <div className="group-stats-v2-track">
+                    <div className={`group-stats-v2-bar group-${item.group}`} style={{ height: `${height}%` }}>
+                      <span>{formatAverage(item.average)}</span>
+                    </div>
                   </div>
-                </div>
 
-                <strong>{item.label}</strong>
-                <small>
-                  TB {formatAverage(item.average)} · Tổng {item.total} · {item.members.length} HS
-                </small>
-              </div>
-            );
-          })}
+                  <strong>{item.label}</strong>
+                  <small>
+                    TB {formatAverage(item.average)} · Tổng {item.total} · {item.members.length} HS
+                  </small>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>
