@@ -1,0 +1,322 @@
+/* Honors board + group chart polish. Keep PC and mobile in the same visual language. */
+.scoreboard-app .ranking-panel {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.scoreboard-app .ranking-panel::before {
+  content: "";
+  position: absolute;
+  inset: -40% -10% auto -10%;
+  height: 180px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(251, 191, 36, .22), transparent 55%),
+    radial-gradient(circle at 14% 18%, rgba(148, 163, 184, .16), transparent 42%),
+    radial-gradient(circle at 86% 18%, rgba(249, 115, 22, .13), transparent 42%);
+  filter: blur(2px);
+}
+
+.scoreboard-app .ranking-panel .section-heading {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.scoreboard-app .podium-grid {
+  position: relative !important;
+  z-index: 1 !important;
+  min-height: 188px !important;
+  align-items: end !important;
+  padding: 20px 20px 24px !important;
+}
+
+.scoreboard-app .podium-card {
+  position: relative !important;
+  isolation: isolate !important;
+  min-height: 154px !important;
+  padding: 18px 12px 14px !important;
+  border: 1px solid rgba(148, 163, 184, .14) !important;
+  border-bottom-width: 4px !important;
+  border-radius: 22px 22px 2px 2px !important;
+  overflow: visible !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(255, 255, 255, .015)),
+    radial-gradient(circle at 50% 8%, rgba(255, 255, 255, .08), transparent 38%),
+    rgba(15, 23, 42, .44) !important;
+  box-shadow: 0 18px 38px rgba(0, 0, 0, .2), inset 0 1px 0 rgba(255,255,255,.06) !important;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease !important;
+}
+
+.scoreboard-app .podium-card:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: 0 24px 54px rgba(0, 0, 0, .28), inset 0 1px 0 rgba(255,255,255,.08) !important;
+}
+
+.scoreboard-app .podium-card::before {
+  content: "";
+  position: absolute;
+  inset: 10px 12px 0;
+  z-index: -1;
+  border-radius: 20px 20px 0 0;
+  opacity: .48;
+  background: linear-gradient(180deg, var(--podium-glow, rgba(251,191,36,.22)), transparent 72%);
+}
+
+.scoreboard-app .podium-card::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: -4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--podium-color, #fbbf24);
+  box-shadow: 0 0 22px var(--podium-glow, rgba(251,191,36,.5));
+}
+
+.scoreboard-app .podium-card.rank-1 {
+  min-height: 184px !important;
+  --podium-color: #fbbf24;
+  --podium-glow: rgba(251, 191, 36, .48);
+  border-bottom-color: #fbbf24 !important;
+}
+
+.scoreboard-app .podium-card.rank-2 {
+  min-height: 164px !important;
+  --podium-color: #cbd5e1;
+  --podium-glow: rgba(203, 213, 225, .38);
+  border-bottom-color: #cbd5e1 !important;
+}
+
+.scoreboard-app .podium-card.rank-3 {
+  min-height: 148px !important;
+  --podium-color: #f97316;
+  --podium-glow: rgba(249, 115, 22, .38);
+  border-bottom-color: #f97316 !important;
+}
+
+.scoreboard-app .podium-rank {
+  height: 24px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  color: var(--podium-color, #fbbf24) !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  text-shadow: 0 0 14px var(--podium-glow, rgba(251,191,36,.4)) !important;
+}
+
+.scoreboard-app .podium-rank svg {
+  filter: drop-shadow(0 0 8px var(--podium-glow, rgba(251,191,36,.45))) !important;
+}
+
+.scoreboard-app .podium-avatar {
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 18px !important;
+  border-color: var(--podium-color, #fbbf24) !important;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255,255,255,.12), transparent 30%),
+    linear-gradient(135deg, rgba(15,23,42,.95), rgba(30,41,59,.84)) !important;
+  box-shadow: 0 16px 30px rgba(0,0,0,.32), 0 0 28px var(--podium-glow, rgba(251,191,36,.3)) !important;
+}
+
+.scoreboard-app .podium-card strong {
+  width: 100% !important;
+  margin-top: 4px !important;
+  color: #f8fafc !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.scoreboard-app .podium-card .score-positive,
+.scoreboard-app .podium-card .score-negative {
+  font-size: 14px !important;
+  font-weight: 950 !important;
+  color: var(--podium-color, #fbbf24) !important;
+}
+
+.theme-light .scoreboard-app .podium-card,
+.win-root.theme-light .scoreboard-app .podium-card,
+:root.light .scoreboard-app .podium-card {
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, .1) !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.9), rgba(241,245,249,.72)),
+    radial-gradient(circle at 50% 8%, rgba(15,23,42,.06), transparent 38%) !important;
+  box-shadow: 0 18px 38px rgba(15, 23, 42, .12), inset 0 1px 0 rgba(255,255,255,.9) !important;
+}
+
+.theme-light .scoreboard-app .podium-card strong,
+.win-root.theme-light .scoreboard-app .podium-card strong,
+:root.light .scoreboard-app .podium-card strong {
+  color: #0f172a !important;
+}
+
+.theme-light .scoreboard-app .podium-avatar,
+.win-root.theme-light .scoreboard-app .podium-avatar,
+:root.light .scoreboard-app .podium-avatar {
+  background: linear-gradient(135deg, #0f172a, #1e293b) !important;
+}
+
+@media (max-width: 760px) {
+  .scoreboard-app .ranking-panel {
+    padding-bottom: 14px !important;
+  }
+
+  .scoreboard-app .podium-grid {
+    min-height: 168px !important;
+    gap: 8px !important;
+    padding: 16px 10px 20px !important;
+  }
+
+  .scoreboard-app .podium-card {
+    min-height: 132px !important;
+    padding: 12px 5px 10px !important;
+    border-radius: 18px 18px 1px 1px !important;
+  }
+
+  .scoreboard-app .podium-card.rank-1 {
+    min-height: 154px !important;
+  }
+
+  .scoreboard-app .podium-card.rank-2 {
+    min-height: 142px !important;
+  }
+
+  .scoreboard-app .podium-card.rank-3 {
+    min-height: 132px !important;
+  }
+
+  .scoreboard-app .podium-rank {
+    font-size: 10px !important;
+    height: 20px !important;
+  }
+
+  .scoreboard-app .podium-rank svg {
+    width: 15px !important;
+    height: 15px !important;
+  }
+
+  .scoreboard-app .podium-avatar {
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 14px !important;
+    font-size: 18px !important;
+  }
+
+  .scoreboard-app .podium-card strong {
+    max-width: 84px !important;
+    font-size: 10.5px !important;
+    margin-top: 3px !important;
+  }
+
+  .scoreboard-app .podium-card .score-positive,
+  .scoreboard-app .podium-card .score-negative {
+    font-size: 12px !important;
+  }
+
+  .scoreboard-app .chart-panel {
+    padding: 14px 12px 16px !important;
+    overflow: hidden !important;
+  }
+
+  .scoreboard-app .group-chart-modern {
+    min-height: 214px !important;
+    height: 214px !important;
+    display: grid !important;
+    grid-template-columns: 32px minmax(0, 1fr) !important;
+    gap: 5px !important;
+    padding: 4px 0 0 !important;
+    margin: 0 auto !important;
+    overflow: hidden !important;
+  }
+
+  .scoreboard-app .chart-axis-labels {
+    grid-column: 1 !important;
+    width: 32px !important;
+    height: 148px !important;
+    margin-top: 7px !important;
+    position: relative !important;
+  }
+
+  .scoreboard-app .chart-axis-labels span {
+    right: 4px !important;
+    font-size: 9px !important;
+  }
+
+  .scoreboard-app .chart-grid-lines {
+    left: 36px !important;
+    right: 0 !important;
+    top: 11px !important;
+    height: 148px !important;
+  }
+
+  .scoreboard-app .chart-columns-area {
+    grid-column: 2 !important;
+    position: relative !important;
+    width: 100% !important;
+    height: 202px !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 0 !important;
+    align-items: start !important;
+    justify-items: stretch !important;
+  }
+
+  .scoreboard-app .chart-modern-column {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-rows: 148px 20px 30px !important;
+    align-items: start !important;
+    justify-items: center !important;
+    gap: 3px !important;
+    text-align: center !important;
+  }
+
+  .scoreboard-app .chart-modern-track {
+    width: 48px !important;
+    height: 148px !important;
+    position: relative !important;
+    margin: 0 auto !important;
+  }
+
+  .scoreboard-app .chart-modern-bar {
+    width: 48px !important;
+    border-radius: 10px 10px 2px 2px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    min-height: 10px !important;
+    max-height: 148px !important;
+    padding-top: 0 !important;
+    display: grid !important;
+    place-items: center !important;
+  }
+
+  .scoreboard-app .chart-value {
+    min-width: 0 !important;
+    height: auto !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    font-size: 11px !important;
+    text-shadow: 0 1px 8px rgba(0,0,0,.38) !important;
+  }
+
+  .scoreboard-app .chart-modern-column strong {
+    margin: 2px 0 0 !important;
+    font-size: 12px !important;
+    line-height: 1 !important;
+  }
+
+  .scoreboard-app .chart-modern-column small {
+    max-width: 56px !important;
+    font-size: 8px !important;
+    line-height: 1.1 !important;
+  }
+}
