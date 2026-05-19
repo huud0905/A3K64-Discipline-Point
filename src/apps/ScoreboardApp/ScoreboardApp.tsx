@@ -2,6 +2,7 @@ import { Camera, Download, RefreshCcw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { WeekSelector } from "./components/WeekSelector";
 import { FilterSelect } from "./components/FilterSelect";
+import { GroupId, GroupMultiSelect } from "./components/GroupMultiSelect";
 import { ScoreEditModal } from "./components/ScoreEditModal";
 import { StudentTable } from "./components/StudentTable";
 import { OverviewGroupsPage } from "./pages/OverviewGroupsPage";
@@ -11,7 +12,6 @@ import { createScoreEventInGas, createWeekInGas, deleteScoreEventInGas, fetchSco
 
 type ScoreboardTab = "overview" | "scoring";
 type ViewMode = "overview" | "students";
-type GroupFilter = "all" | "1" | "2" | "3" | "4";
 type StatusFilter = "all" | "Tốt" | "Khá" | "Đạt" | "Chưa đạt";
 type SortMode = "score-desc" | "name-az";
 type DataSource = "loading" | "gas" | "local" | "error";
@@ -51,12 +51,16 @@ function compareByGivenName(a: { name: string }, b: { name: string }) {
   return given || a.name.localeCompare(b.name, "vi", { sensitivity: "base" });
 }
 
+function matchesGroups(group: number, selectedGroups: GroupId[]) {
+  return selectedGroups.length === 0 || selectedGroups.includes(String(group) as GroupId);
+}
+
 export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   const [activeTab, setActiveTab] = useState<ScoreboardTab>("overview");
   const [weeks, setWeeks] = useState<number[]>(readLocalWeeks);
   const [week, setWeek] = useState(1);
   const [viewMode, setViewMode] = useState<ViewMode>("overview");
-  const [groupFilter, setGroupFilter] = useState<GroupFilter>("all");
+  const [groupFilter, setGroupFilter] = useState<GroupId[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("score-desc");
   const [students, setStudents] = useState<Student[]>([]);
@@ -100,17 +104,17 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   useEffect(() => { if (dataSource !== "loading") localStorage.setItem(WEEK_STORAGE_KEY, JSON.stringify(weeks)); }, [dataSource, weeks]);
 
   const isOverviewMode = viewMode === "overview";
-  const shownGroupFilter = isOverviewMode ? "all" : groupFilter;
-  const shownStatusFilter = isOverviewMode ? "all" : statusFilter;
-  const shownSortMode = isOverviewMode ? "score-desc" : sortMode;
+  const isScoringTab = activeTab === "scoring";
+  const shownStatusFilter = isOverviewMode || isScoringTab ? "all" : statusFilter;
+  const shownSortMode = isOverviewMode || isScoringTab ? "score-desc" : sortMode;
 
   const rawSummaries = useMemo(() => summarizeStudents(students, events, week), [events, students, week]);
+  const groupFilteredRawSummaries = useMemo(() => rawSummaries.filter((student) => matchesGroups(student.group, groupFilter)), [groupFilter, rawSummaries]);
 
-  const filteredSummaries = useMemo(() => rawSummaries.filter((student) => {
-    const matchGroup = shownGroupFilter === "all" || String(student.group) === shownGroupFilter;
+  const filteredSummaries = useMemo(() => groupFilteredRawSummaries.filter((student) => {
     const matchStatus = shownStatusFilter === "all" || student.status === shownStatusFilter;
-    return matchGroup && matchStatus;
-  }), [rawSummaries, shownGroupFilter, shownStatusFilter]);
+    return matchStatus;
+  }), [groupFilteredRawSummaries, shownStatusFilter]);
 
   const summaries = useMemo(() => {
     return [...filteredSummaries].sort((a, b) => {
@@ -120,21 +124,16 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   }, [filteredSummaries, shownSortMode]);
 
   const scoringSummaries = useMemo(() => {
-    const byId = new Map(rawSummaries.map((student) => [student.id, student]));
+    const byId = new Map(groupFilteredRawSummaries.map((student) => [student.id, student]));
     return students
       .map((student) => byId.get(student.id))
-      .filter((student): student is NonNullable<typeof student> => Boolean(student))
-      .filter((student) => {
-        const matchGroup = shownGroupFilter === "all" || String(student.group) === shownGroupFilter;
-        const matchStatus = shownStatusFilter === "all" || student.status === shownStatusFilter;
-        return matchGroup && matchStatus;
-      });
-  }, [rawSummaries, shownGroupFilter, shownStatusFilter, students]);
+      .filter((student): student is NonNullable<typeof student> => Boolean(student));
+  }, [groupFilteredRawSummaries, students]);
 
-  const groupStats = useMemo(() => getGroupStats(rawSummaries), [rawSummaries]);
-  const totalScore = rawSummaries.reduce((sum, student) => sum + student.total, 0);
-  const goodCount = rawSummaries.filter((student) => student.status === "Tốt" || student.status === "Khá").length;
-  const warningCount = rawSummaries.filter((student) => student.status === "Chưa đạt").length;
+  const groupStats = useMemo(() => getGroupStats(groupFilteredRawSummaries), [groupFilteredRawSummaries]);
+  const totalScore = groupFilteredRawSummaries.reduce((sum, student) => sum + student.total, 0);
+  const goodCount = groupFilteredRawSummaries.filter((student) => student.status === "Tốt" || student.status === "Khá").length;
+  const warningCount = groupFilteredRawSummaries.filter((student) => student.status === "Chưa đạt").length;
   const topGroup = [...groupStats].sort((a, b) => b.average - a.average || b.total - a.total)[0];
   const editingStudent = rawSummaries.find((student) => student.id === editingStudentId) || null;
 
@@ -197,21 +196,21 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
     if (viewMode === "students") {
       return <StudentTable title="Danh sách cá nhân" students={summaries} compact onOpenStudent={openStudent} />;
     }
-    return <OverviewGroupsPage summaries={rawSummaries} week={week} onOpenStudent={openStudent} />;
+    return <OverviewGroupsPage summaries={groupFilteredRawSummaries} week={week} onOpenStudent={openStudent} />;
   };
 
   return (
     <div className="scoreboard-app">
       <aside className="scoreboard-left-tools">
         <div className="left-tools-title"><span>Bảng điểm A3K64</span><strong>Bộ lọc</strong><small>Điều khiển bảng điểm</small></div>
-        <WeekSelector week={week} weeks={weeks} onWeekChange={setWeek} viewMode={viewMode} onViewModeChange={setViewMode} canCreateWeek={canCreateWeek && !isCreatingWeek} onCreateWeek={createNewWeek} />
+        <WeekSelector week={week} weeks={weeks} onWeekChange={setWeek} viewMode={viewMode} onViewModeChange={setViewMode} viewModeDisabled={isScoringTab} canCreateWeek={canCreateWeek && !isCreatingWeek} onCreateWeek={createNewWeek} />
         {syncMessage && <div className="score-sync-warning">{syncMessage}</div>}
 
-        <label className="score-filter"><span>Tổ</span><FilterSelect<GroupFilter> value={shownGroupFilter} options={[{ value: "all", label: "Tất cả tổ" }, { value: "1", label: "Tổ 1" }, { value: "2", label: "Tổ 2" }, { value: "3", label: "Tổ 3" }, { value: "4", label: "Tổ 4" }]} onChange={setGroupFilter} disabled={isOverviewMode} title={isOverviewMode ? "Tổng quan luôn hiển thị đủ 4 tổ" : undefined} /></label>
-        <label className="score-filter"><span>Xếp loại</span><FilterSelect<StatusFilter> value={shownStatusFilter} options={[{ value: "all", label: "Tất cả xếp loại" }, { value: "Tốt", label: "Tốt" }, { value: "Khá", label: "Khá" }, { value: "Đạt", label: "Đạt" }, { value: "Chưa đạt", label: "Chưa đạt" }]} onChange={setStatusFilter} disabled={isOverviewMode} title={isOverviewMode ? "Chỉ mở khi xem Cá nhân" : undefined} /></label>
-        <label className="score-filter"><span>Sắp xếp</span><FilterSelect<SortMode> value={shownSortMode} options={[{ value: "score-desc", label: "Điểm cao đến thấp" }, { value: "name-az", label: "Theo tên học sinh A-Z" }]} onChange={setSortMode} disabled={isOverviewMode} title={isOverviewMode ? "Chỉ mở khi xem Cá nhân" : undefined} /></label>
+        <label className="score-filter"><span>Tổ</span><GroupMultiSelect value={groupFilter} onChange={setGroupFilter} /></label>
+        <label className="score-filter"><span>Xếp loại</span><FilterSelect<StatusFilter> value={shownStatusFilter} options={[{ value: "all", label: "Tất cả xếp loại" }, { value: "Tốt", label: "Tốt" }, { value: "Khá", label: "Khá" }, { value: "Đạt", label: "Đạt" }, { value: "Chưa đạt", label: "Chưa đạt" }]} onChange={setStatusFilter} disabled={isOverviewMode || isScoringTab} title={isOverviewMode ? "Chỉ mở khi xem Cá nhân" : isScoringTab ? "Bảng chấm không dùng lọc xếp loại" : undefined} /></label>
+        <label className="score-filter"><span>Sắp xếp</span><FilterSelect<SortMode> value={shownSortMode} options={[{ value: "score-desc", label: "Điểm cao đến thấp" }, { value: "name-az", label: "Theo tên học sinh A-Z" }]} onChange={setSortMode} disabled={isOverviewMode || isScoringTab} title={isOverviewMode ? "Chỉ mở khi xem Cá nhân" : isScoringTab ? "Bảng chấm giữ thứ tự danh sách" : undefined} /></label>
 
-        <div className="left-mini-section"><div className="left-mini-title">Tóm tắt tuần</div><div className="mini-stat"><span>Tổng điểm</span><strong className={totalScore >= 0 ? "score-positive" : "score-negative"}>{totalScore > 0 ? `+${totalScore}` : totalScore}</strong></div><div className="mini-stat"><span>Ổn định</span><strong>{goodCount}/{rawSummaries.length}</strong></div><div className="mini-stat"><span>Cần chú ý</span><strong>{warningCount}</strong></div><div className="mini-stat"><span>Tổ dẫn đầu</span><strong>{topGroup?.label || "Chưa có"}</strong></div></div>
+        <div className="left-mini-section"><div className="left-mini-title">Tóm tắt tuần</div><div className="mini-stat"><span>Tổng điểm</span><strong className={totalScore >= 0 ? "score-positive" : "score-negative"}>{totalScore > 0 ? `+${totalScore}` : totalScore}</strong></div><div className="mini-stat"><span>Ổn định</span><strong>{goodCount}/{groupFilteredRawSummaries.length}</strong></div><div className="mini-stat"><span>Cần chú ý</span><strong>{warningCount}</strong></div><div className="mini-stat"><span>Tổ dẫn đầu</span><strong>{topGroup?.label || "Chưa có"}</strong></div></div>
       </aside>
 
       <section className="scoreboard-main">
