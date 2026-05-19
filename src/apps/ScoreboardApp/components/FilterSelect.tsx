@@ -19,6 +19,8 @@ type FilterSelectProps<T extends string | number> = {
   menuMaxHeight?: number | "none";
 };
 
+type FloatingStyle = CSSProperties & Record<`--${string}`, string | number>;
+
 export function FilterSelect<T extends string | number>({
   value,
   options,
@@ -31,31 +33,35 @@ export function FilterSelect<T extends string | number>({
   menuMaxHeight,
 }: FilterSelectProps<T>) {
   const [open, setOpen] = useState(false);
-  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
+  const [menuStyle, setMenuStyle] = useState<FloatingStyle>({});
   const ref = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const current = options.find((option) => option.value === value) || options[0];
 
   const updateFloatingPosition = () => {
     if (!portal || !buttonRef.current) return;
+
     const rect = buttonRef.current.getBoundingClientRect();
-    const base: CSSProperties = {
+    const maxHeight = menuMaxHeight === "none"
+      ? "none"
+      : `${menuMaxHeight ?? Math.max(180, placement === "top" ? rect.top - 24 : window.innerHeight - rect.bottom - 24)}px`;
+
+    const nextStyle: FloatingStyle = {
       position: "fixed",
       left: rect.left,
+      top: placement === "bottom" ? rect.bottom + 8 : "auto",
+      bottom: placement === "top" ? Math.max(8, window.innerHeight - rect.top + 8) : "auto",
       minWidth: rect.width,
       width: rect.width,
       zIndex: 99999,
+      "--filter-menu-left": `${rect.left}px`,
+      "--filter-menu-top": placement === "bottom" ? `${rect.bottom + 8}px` : "auto",
+      "--filter-menu-bottom": placement === "top" ? `${Math.max(8, window.innerHeight - rect.top + 8)}px` : "auto",
+      "--filter-menu-width": `${rect.width}px`,
+      "--filter-menu-max-height": maxHeight,
     };
 
-    if (placement === "top") {
-      base.bottom = Math.max(8, window.innerHeight - rect.top + 8);
-      if (menuMaxHeight !== "none") base.maxHeight = menuMaxHeight ?? Math.max(180, rect.top - 24);
-    } else {
-      base.top = Math.min(window.innerHeight - 8, rect.bottom + 8);
-      if (menuMaxHeight !== "none") base.maxHeight = menuMaxHeight ?? Math.max(180, window.innerHeight - rect.bottom - 24);
-    }
-
-    setMenuStyle(base);
+    setMenuStyle(nextStyle);
   };
 
   useLayoutEffect(() => {
