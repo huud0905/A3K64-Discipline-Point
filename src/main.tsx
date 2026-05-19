@@ -6,6 +6,7 @@ import './startMenuListEnhancer';
 import './mobileAppShell';
 import './scoreboardMobilePolish';
 import './scoreboardMobileFinalFix';
+import './scoreboardMobileOcdFix';
 import './index.css';
 import './login-responsive-polish.css';
 import './desktopBrandPanelWide.css';
