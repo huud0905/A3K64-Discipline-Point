@@ -21,6 +21,7 @@ import './scoreboardMobileStudentDetailCardsPatch';
 import './scoreboardMultiGroupFilter.css';
 import './scoreboardGroupStatsChartV2.css';
 import './scoreboardSoftLightTheme.css';
+import './scoreboardScoreEditorLayoutPolish.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
