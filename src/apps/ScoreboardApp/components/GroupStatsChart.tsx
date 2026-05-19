@@ -18,22 +18,27 @@ function niceStep(rawStep: number) {
 function buildScale(values: number[]) {
   const rawMin = Math.min(0, ...values);
   const rawMax = Math.max(0, ...values);
-  const range = Math.max(100, rawMax - rawMin);
-  const step = niceStep(range / 6);
+  const allNonNegative = values.every((value) => value >= 0);
+  const allNonPositive = values.every((value) => value <= 0);
+  const range = Math.max(20, rawMax - rawMin);
+  const step = niceStep(range / 5);
 
-  let minY = Math.floor(rawMin / step) * step;
-  let maxY = Math.ceil(rawMax / step) * step;
+  let minY = allNonNegative ? 0 : Math.floor(rawMin / step) * step;
+  let maxY = allNonPositive ? 0 : Math.ceil(rawMax / step) * step;
 
   if (minY === maxY) {
-    minY -= step;
-    maxY += step;
+    if (minY === 0) maxY = step;
+    else {
+      minY -= step;
+      maxY += step;
+    }
   }
 
-  if (maxY === 0) maxY = step;
-  if (minY === 0) minY = -step;
+  if (allNonNegative && maxY <= rawMax) maxY += step;
+  if (allNonPositive && minY >= rawMin) minY -= step;
 
   const ticks: number[] = [];
-  for (let value = maxY; value >= minY; value -= step) ticks.push(value);
+  for (let value = maxY; value >= minY; value -= step) ticks.push(Number(value.toFixed(10)));
 
   if (!ticks.includes(0)) {
     ticks.push(0);
@@ -45,6 +50,10 @@ function buildScale(values: number[]) {
 
 function percentFor(value: number, minY: number, maxY: number) {
   return ((maxY - value) / (maxY - minY)) * 100;
+}
+
+function formatAverage(value: number) {
+  return Number(value).toFixed(1);
 }
 
 export function GroupStatsChart({ summaries }: GroupStatsChartProps) {
@@ -89,13 +98,13 @@ export function GroupStatsChart({ summaries }: GroupStatsChartProps) {
                     className={`chart-modern-bar group-${item.group} ${isPositive ? "positive" : "negative"}`}
                     style={{ top: isPositive ? `${valueTop}%` : `${zeroTop}%`, height: `${height}%` }}
                   >
-                    <span className="chart-value">{value > 0 ? `+${value}` : value}</span>
+                    <span className="chart-value">{formatAverage(value)}</span>
                   </div>
                 </div>
 
                 <strong>{item.label}</strong>
                 <small>
-                  TB {item.average} · Tổng {item.total} · {item.members.length} HS
+                  TB {formatAverage(item.average)} · Tổng {item.total} · {item.members.length} HS
                 </small>
               </div>
             );
