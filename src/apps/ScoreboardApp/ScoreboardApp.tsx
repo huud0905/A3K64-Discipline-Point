@@ -1,4 +1,4 @@
-import { Camera, Download, RefreshCcw, Sparkles } from "lucide-react";
+import { Camera, Download, RefreshCcw, Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { WeekSelector } from "./components/WeekSelector";
 import { FilterSelect } from "./components/FilterSelect";
@@ -69,6 +69,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   const [syncMessage, setSyncMessage] = useState("");
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [isCreatingWeek, setIsCreatingWeek] = useState(false);
+  const [createWeekConfirmOpen, setCreateWeekConfirmOpen] = useState(false);
 
   const loadScoreboardData = useCallback(async () => {
     setDataSource("loading");
@@ -98,6 +99,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   }, [week]);
 
   const canCreateWeek = WEEK_CREATORS.includes(String(userRole || "lop_truong"));
+  const nextWeek = Math.max(0, ...weeks) + 1;
 
   useEffect(() => { void loadScoreboardData(); }, []);
   useEffect(() => { if (dataSource !== "loading") localStorage.setItem(STORAGE_KEY, JSON.stringify(events)); }, [dataSource, events]);
@@ -166,7 +168,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
 
   const createNewWeek = async () => {
     if (!canCreateWeek || isCreatingWeek) return;
-    const nextWeek = Math.max(0, ...weeks) + 1;
+    setCreateWeekConfirmOpen(false);
     setIsCreatingWeek(true);
     try {
       if (dataSource === "gas") {
@@ -183,6 +185,11 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
     } finally {
       setIsCreatingWeek(false);
     }
+  };
+
+  const requestCreateWeek = () => {
+    if (!canCreateWeek || isCreatingWeek) return;
+    setCreateWeekConfirmOpen(true);
   };
 
   const resetLocalData = () => {
@@ -206,7 +213,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
     <div className="scoreboard-app">
       <aside className="scoreboard-left-tools">
         <div className="left-tools-title"><span>Bảng điểm A3K64</span><strong>Bộ lọc</strong><small>Điều khiển bảng điểm</small></div>
-        <WeekSelector week={week} weeks={weeks} onWeekChange={setWeek} viewMode={viewMode} onViewModeChange={setViewMode} viewModeDisabled={isScoringTab} canCreateWeek={canCreateWeek && !isCreatingWeek} onCreateWeek={createNewWeek} />
+        <WeekSelector week={week} weeks={weeks} onWeekChange={setWeek} viewMode={viewMode} onViewModeChange={setViewMode} viewModeDisabled={isScoringTab} canCreateWeek={canCreateWeek && !isCreatingWeek} onCreateWeek={requestCreateWeek} />
         {syncMessage && <div className="score-sync-warning">{syncMessage}</div>}
 
         <label className="score-filter"><span>Tổ</span><GroupMultiSelect value={groupFilter} onChange={setGroupFilter} /></label>
@@ -223,6 +230,21 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
       </section>
 
       {editingStudent && <ScoreEditModal student={editingStudent} allStudents={rawSummaries} week={week} events={events} onAddScore={addScore} onDeleteScore={deleteScore} onClose={() => setEditingStudentId(null)} />}
+
+      {createWeekConfirmOpen && (
+        <div className="create-week-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="create-week-modal-title">
+          <div className="create-week-modal-card">
+            <button type="button" className="create-week-modal-close" onClick={() => setCreateWeekConfirmOpen(false)} disabled={isCreatingWeek} title="Đóng"><X size={18} /></button>
+            <div className="create-week-modal-icon">+</div>
+            <h2 id="create-week-modal-title">Tạo tuần {nextWeek}?</h2>
+            <p>Hệ thống sẽ nhân bản sheet <b>TUẦN 0</b> và đổi tiêu đề thành <b>LỚP 11A3 - TUẦN {nextWeek}</b>.</p>
+            <div className="create-week-modal-actions">
+              <button type="button" className="create-week-cancel" onClick={() => setCreateWeekConfirmOpen(false)} disabled={isCreatingWeek}>Huỷ</button>
+              <button type="button" className="create-week-confirm" onClick={() => void createNewWeek()} disabled={isCreatingWeek}>{isCreatingWeek ? "Đang tạo..." : "Tạo tuần"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
