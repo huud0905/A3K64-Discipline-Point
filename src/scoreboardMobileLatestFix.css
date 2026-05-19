@@ -118,7 +118,16 @@
   }
 
   .student-table-panel .compact-table-wrap + .compact-table-wrap {
-    margin-top: 8px !important;
+    margin-top: 0 !important;
+  }
+
+  .compact-split-grid .compact-table-wrap + .compact-table-wrap thead {
+    display: none !important;
+  }
+
+  .compact-split-grid .compact-table-wrap + .compact-table-wrap table,
+  .compact-split-grid .compact-table-wrap + .compact-table-wrap tbody tr:first-child td {
+    border-top: 0 !important;
   }
 
   .score-table.compact-score-table {
@@ -127,42 +136,80 @@
   }
 
   .compact-score-table th:nth-child(1),
-  .compact-score-table td:nth-child(1) { width: 30px !important; }
+  .compact-score-table td:nth-child(1) {
+    display: none !important;
+    width: 0 !important;
+    padding: 0 !important;
+  }
+
   .compact-score-table th:nth-child(2),
-  .compact-score-table td:nth-child(2) { width: auto !important; }
+  .compact-score-table td:nth-child(2) {
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
   .compact-score-table th:nth-child(3),
-  .compact-score-table td:nth-child(3) { width: 56px !important; text-align: center !important; }
+  .compact-score-table td:nth-child(3) {
+    width: 42px !important;
+    text-align: center !important;
+  }
+
   .compact-score-table th:nth-child(4),
-  .compact-score-table td:nth-child(4) { width: 48px !important; text-align: center !important; }
+  .compact-score-table td:nth-child(4) {
+    width: 34px !important;
+    text-align: center !important;
+  }
+
   .compact-score-table th:nth-child(5),
-  .compact-score-table td:nth-child(5) { width: 64px !important; text-align: center !important; }
+  .compact-score-table td:nth-child(5) {
+    width: 48px !important;
+    text-align: center !important;
+  }
 
   .compact-score-table th {
-    font-size: 9px !important;
-    padding: 7px 3px !important;
-    white-space: normal !important;
-    line-height: 1.05 !important;
+    font-size: 8.5px !important;
+    padding: 7px 2px !important;
+    white-space: nowrap !important;
+    line-height: 1 !important;
+  }
+
+  .compact-score-table th:nth-child(2) {
+    text-align: left !important;
+    padding-left: 10px !important;
   }
 
   .compact-score-table td {
-    font-size: 11px !important;
-    padding: 8px 3px !important;
+    font-size: 10.5px !important;
+    padding: 8px 2px !important;
+  }
+
+  .compact-score-table td:nth-child(2) {
+    padding-left: 10px !important;
+    padding-right: 6px !important;
   }
 
   .compact-score-table .student-name-button {
     width: 100% !important;
-    max-width: none !important;
+    max-width: calc(100vw - 178px) !important;
     display: block !important;
     text-align: left !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     font-size: 12px !important;
+    line-height: 1.2 !important;
+  }
+
+  .compact-score-table .score-positive,
+  .compact-score-table .score-negative,
+  .compact-score-table .rank-text {
+    font-size: 10.5px !important;
+    white-space: nowrap !important;
   }
 
   .compact-score-table .status-pill {
-    min-width: 46px !important;
-    padding: 4px 6px !important;
-    font-size: 9px !important;
+    min-width: 38px !important;
+    padding: 3px 5px !important;
+    font-size: 8.2px !important;
   }
 }
