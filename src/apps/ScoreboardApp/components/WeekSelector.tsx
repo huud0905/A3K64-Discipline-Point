@@ -42,11 +42,7 @@ export function WeekSelector({
             className="create-week-button"
             onClick={() => {
               if (!canCreateWeek) return;
-              const maxWeek = weeks.length ? Math.max(...weeks) : week;
-              const nextWeek = maxWeek + 1;
-              if (window.confirm(`Bạn có chắc chắn muốn tạo TUẦN ${nextWeek} không?\n\nHệ thống sẽ nhân bản sheet TUẦN 0 và đổi tiêu đề thành LỚP 11A3- TUẦN ${nextWeek}.`)) {
-                onCreateWeek?.();
-              }
+              onCreateWeek?.();
             }}
             disabled={!canCreateWeek}
             title={canCreateWeek ? "Tạo tuần mới" : "Chỉ tổ trưởng, lớp trưởng, bí thư hoặc GVCN được tạo tuần mới"}
