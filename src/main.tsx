@@ -27,6 +27,7 @@ import './scoreboardModalFinalOcdPatch.css';
 import './scoreboardModalStackAndFooterFix.css';
 import './scoreboardFilterSelectHardFix.css';
 import './createWeekModal.css';
+import './scoreboardLiveNotifications.css';
 import './scoreboardModalInputCleanup';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
