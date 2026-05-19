@@ -13,7 +13,7 @@ import { createScoreEventInGas, createWeekInGas, deleteScoreEventInGas, fetchSco
 type ScoreboardTab = "overview" | "scoring";
 type ViewMode = "overview" | "students";
 type StatusFilter = "all" | "Tốt" | "Khá" | "Đạt" | "Chưa đạt";
-type SortMode = "score-desc" | "name-az";
+type SortMode = "score-desc" | "score-asc" | "name-az" | "name-za";
 type DataSource = "loading" | "gas" | "local" | "error";
 
 type ScoreboardAppProps = { userRole?: string | null };
@@ -118,8 +118,11 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
 
   const summaries = useMemo(() => {
     return [...filteredSummaries].sort((a, b) => {
-      if (shownSortMode === "name-az") return compareByGivenName(a, b);
-      return b.total - a.total || compareByGivenName(a, b);
+      const nameCompare = compareByGivenName(a, b);
+      if (shownSortMode === "name-az") return nameCompare;
+      if (shownSortMode === "name-za") return -nameCompare;
+      if (shownSortMode === "score-asc") return a.total - b.total || nameCompare;
+      return b.total - a.total || nameCompare;
     });
   }, [filteredSummaries, shownSortMode]);
 
@@ -208,7 +211,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
 
         <label className="score-filter"><span>Tổ</span><GroupMultiSelect value={groupFilter} onChange={setGroupFilter} /></label>
         <label className="score-filter"><span>Xếp loại</span><FilterSelect<StatusFilter> value={shownStatusFilter} options={[{ value: "all", label: "Tất cả xếp loại" }, { value: "Tốt", label: "Tốt" }, { value: "Khá", label: "Khá" }, { value: "Đạt", label: "Đạt" }, { value: "Chưa đạt", label: "Chưa đạt" }]} onChange={setStatusFilter} disabled={isOverviewMode || isScoringTab} title={isOverviewMode ? "Chỉ mở khi xem Cá nhân" : isScoringTab ? "Bảng chấm không dùng lọc xếp loại" : undefined} /></label>
-        <label className="score-filter"><span>Sắp xếp</span><FilterSelect<SortMode> value={shownSortMode} options={[{ value: "score-desc", label: "Điểm cao đến thấp" }, { value: "name-az", label: "Theo tên học sinh A-Z" }]} onChange={setSortMode} disabled={isOverviewMode || isScoringTab} title={isOverviewMode ? "Chỉ mở khi xem Cá nhân" : isScoringTab ? "Bảng chấm giữ thứ tự danh sách" : undefined} /></label>
+        <label className="score-filter"><span>Sắp xếp</span><FilterSelect<SortMode> value={shownSortMode} options={[{ value: "score-desc", label: "Điểm cao đến thấp" }, { value: "score-asc", label: "Điểm thấp đến cao" }, { value: "name-az", label: "Theo tên học sinh A-Z" }, { value: "name-za", label: "Theo tên học sinh Z-A" }]} onChange={setSortMode} disabled={isOverviewMode || isScoringTab} title={isOverviewMode ? "Chỉ mở khi xem Cá nhân" : isScoringTab ? "Bảng chấm giữ thứ tự danh sách" : undefined} /></label>
 
         <div className="left-mini-section"><div className="left-mini-title">Tóm tắt tuần</div><div className="mini-stat"><span>Tổng điểm</span><strong className={totalScore >= 0 ? "score-positive" : "score-negative"}>{totalScore > 0 ? `+${totalScore}` : totalScore}</strong></div><div className="mini-stat"><span>Ổn định</span><strong>{goodCount}/{groupFilteredRawSummaries.length}</strong></div><div className="mini-stat"><span>Cần chú ý</span><strong>{warningCount}</strong></div><div className="mini-stat"><span>Tổ dẫn đầu</span><strong>{topGroup?.label || "Chưa có"}</strong></div></div>
       </aside>
