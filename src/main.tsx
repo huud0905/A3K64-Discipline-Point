@@ -26,6 +26,7 @@ import './scoreboardScoringModalInteractionPolish.css';
 import './scoreboardModalFinalOcdPatch.css';
 import './scoreboardModalStackAndFooterFix.css';
 import './scoreboardFilterSelectHardFix.css';
+import './createWeekModal.css';
 import './scoreboardModalInputCleanup';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
