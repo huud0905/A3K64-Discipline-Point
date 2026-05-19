@@ -1,6 +1,11 @@
 const STYLE_ID = 'a3k64-mobile-student-detail-cards';
 const MARK_ATTR = 'data-a3k64-mobile-detail-cards';
 
+const tableSignatures = new WeakMap<HTMLTableElement, string>();
+let patchTimer: number | null = null;
+let rafId = 0;
+let isPatching = false;
+
 const CSS = `
 @media (min-width: 761px) {
   .mobile-student-detail-list { display: none !important; }
@@ -163,10 +168,6 @@ const CSS = `
     gap: 10px !important;
   }
 
-  .mobile-student-detail-metric {
-    min-width: 0 !important;
-  }
-
   .mobile-student-detail-metric .metric-label {
     display: block !important;
     margin-bottom: 6px !important;
@@ -191,13 +192,8 @@ const CSS = `
     color: #0f172a !important;
   }
 
-  .mobile-student-detail-metric .metric-value.score-positive {
-    color: #00f5c4 !important;
-  }
-
-  .mobile-student-detail-metric .metric-value.score-negative {
-    color: #fb7185 !important;
-  }
+  .mobile-student-detail-metric .metric-value.score-positive { color: #00f5c4 !important; }
+  .mobile-student-detail-metric .metric-value.score-negative { color: #fb7185 !important; }
 
   .mobile-student-detail-footer .status-pill {
     min-width: 52px !important;
@@ -217,15 +213,12 @@ const CSS = `
     box-shadow: 0 8px 20px rgba(59,130,246,.3) !important;
   }
 
-  .mobile-student-detail-edit:active {
-    transform: scale(.98) !important;
-  }
+  .mobile-student-detail-edit:active { transform: scale(.98) !important; }
 }
 `;
 
 function installCss() {
-  const old = document.getElementById(STYLE_ID);
-  if (old) old.remove();
+  if (document.getElementById(STYLE_ID)) return;
   const style = document.createElement('style');
   style.id = STYLE_ID;
   style.textContent = CSS;
@@ -241,10 +234,6 @@ function isEmptyValue(value: string) {
   return !cleaned || cleaned === '-' || cleaned === '0' || cleaned === '+0' || cleaned === '-0';
 }
 
-function cleanHtml(html: string) {
-  return html.trim();
-}
-
 function buildCard(row: HTMLTableRowElement) {
   const cells = Array.from(row.cells);
   if (cells.length < 9) return null;
@@ -254,11 +243,10 @@ function buildCard(row: HTMLTableRowElement) {
   const editButton = cells[8].querySelector('button') as HTMLButtonElement | null;
   const name = textOrEmpty(nameButton || cells[1]);
   const subtitle = textOrEmpty(cells[1].querySelector('.student-role'));
-
-  const plusHtml = cleanHtml(cells[2].querySelector('.event-stack')?.innerHTML || cells[2].innerHTML);
+  const plusHtml = (cells[2].querySelector('.event-stack')?.innerHTML || cells[2].innerHTML).trim();
   const plusText = textOrEmpty(cells[2]);
   const plusScore = textOrEmpty(cells[3]);
-  const minusHtml = cleanHtml(cells[4].querySelector('.event-stack')?.innerHTML || cells[4].innerHTML);
+  const minusHtml = (cells[4].querySelector('.event-stack')?.innerHTML || cells[4].innerHTML).trim();
   const minusText = textOrEmpty(cells[4]);
   const minusScore = textOrEmpty(cells[5]);
   const total = textOrEmpty(cells[6]);
@@ -269,61 +257,31 @@ function buildCard(row: HTMLTableRowElement) {
 
   const header = document.createElement('div');
   header.className = 'mobile-student-detail-header';
-  header.innerHTML = `
-    <div>
-      <h3 class="mobile-student-detail-name"></h3>
-      <div class="mobile-student-detail-subtitle"></div>
-    </div>
-    <div class="mobile-student-detail-rank"></div>
-  `;
+  header.innerHTML = '<div><h3 class="mobile-student-detail-name"></h3><div class="mobile-student-detail-subtitle"></div></div><div class="mobile-student-detail-rank"></div>';
   (header.querySelector('.mobile-student-detail-name') as HTMLElement).textContent = name;
   (header.querySelector('.mobile-student-detail-subtitle') as HTMLElement).textContent = subtitle;
   (header.querySelector('.mobile-student-detail-rank') as HTMLElement).textContent = rank;
   card.appendChild(header);
 
   if (!isEmptyValue(plusText) || !isEmptyValue(plusScore)) {
-    const plusSection = document.createElement('section');
-    plusSection.className = 'mobile-student-detail-section';
-    plusSection.innerHTML = `
-      <span class="mobile-student-detail-label">Nội dung (+)</span>
-      <div class="mobile-student-detail-content">${plusHtml || '-'}</div>
-      <div class="mobile-student-detail-points">
-        <span class="metric-label">Điểm (+)</span>
-        <span class="metric-value score-positive">${plusScore || '0'}</span>
-      </div>
-    `;
-    card.appendChild(plusSection);
+    const section = document.createElement('section');
+    section.className = 'mobile-student-detail-section';
+    section.innerHTML = `<span class="mobile-student-detail-label">Nội dung (+)</span><div class="mobile-student-detail-content">${plusHtml || '-'}</div><div class="mobile-student-detail-points"><span class="metric-label">Điểm (+)</span><span class="metric-value score-positive">${plusScore || '0'}</span></div>`;
+    card.appendChild(section);
   }
 
   if (!isEmptyValue(minusText) || !isEmptyValue(minusScore)) {
-    const minusSection = document.createElement('section');
-    minusSection.className = 'mobile-student-detail-section';
-    minusSection.innerHTML = `
-      <span class="mobile-student-detail-label">Nội dung (-)</span>
-      <div class="mobile-student-detail-content">${minusHtml || '-'}</div>
-      <div class="mobile-student-detail-points">
-        <span class="metric-label">Điểm (-)</span>
-        <span class="metric-value score-negative">${minusScore || '0'}</span>
-      </div>
-    `;
-    card.appendChild(minusSection);
+    const section = document.createElement('section');
+    section.className = 'mobile-student-detail-section';
+    section.innerHTML = `<span class="mobile-student-detail-label">Nội dung (-)</span><div class="mobile-student-detail-content">${minusHtml || '-'}</div><div class="mobile-student-detail-points"><span class="metric-label">Điểm (-)</span><span class="metric-value score-negative">${minusScore || '0'}</span></div>`;
+    card.appendChild(section);
   }
 
   const footer = document.createElement('div');
   footer.className = 'mobile-student-detail-footer';
-
   const metrics = document.createElement('div');
   metrics.className = 'mobile-student-detail-metrics';
-  metrics.innerHTML = `
-    <div class="mobile-student-detail-metric">
-      <span class="metric-label">Tổng điểm</span>
-      <span class="metric-value ${String(total).trim().startsWith('-') ? 'score-negative' : 'score-positive'}">${total || '0'}</span>
-    </div>
-    <div class="mobile-student-detail-metric">
-      <span class="metric-label">Xếp loại</span>
-      <span class="metric-value"></span>
-    </div>
-  `;
+  metrics.innerHTML = `<div class="mobile-student-detail-metric"><span class="metric-label">Tổng điểm</span><span class="metric-value ${String(total).trim().startsWith('-') ? 'score-negative' : 'score-positive'}">${total || '0'}</span></div><div class="mobile-student-detail-metric"><span class="metric-label">Xếp loại</span><span class="metric-value"></span></div>`;
   const statusWrap = metrics.querySelectorAll('.metric-value')[1] as HTMLElement;
   if (statusEl) statusWrap.appendChild(statusEl.cloneNode(true));
   else statusWrap.textContent = textOrEmpty(cells[7]);
@@ -333,48 +291,81 @@ function buildCard(row: HTMLTableRowElement) {
   actionButton.type = 'button';
   actionButton.className = 'mobile-student-detail-edit';
   actionButton.setAttribute('aria-label', `Chỉnh sửa ${name}`);
-  actionButton.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>`;
+  actionButton.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
   actionButton.addEventListener('click', () => {
     if (editButton) editButton.click();
     else if (nameButton) nameButton.click();
   });
   footer.appendChild(actionButton);
-
   card.appendChild(footer);
   return card;
 }
 
+function tableSignature(table: HTMLTableElement) {
+  return `${window.innerWidth}|${table.querySelectorAll('tbody tr').length}|${table.textContent || ''}`;
+}
+
 function patchTables() {
-  if (window.innerWidth > 760) return;
-  const tables = Array.from(document.querySelectorAll<HTMLTableElement>('.student-table-panel .score-detail-table'));
-  tables.forEach((table) => {
-    const wrap = table.parentElement;
-    if (!wrap) return;
+  if (window.innerWidth > 760 || isPatching) return;
+  isPatching = true;
+  try {
+    const tables = Array.from(document.querySelectorAll<HTMLTableElement>('.student-table-panel .score-detail-table'));
+    tables.forEach((table) => {
+      const wrap = table.parentElement;
+      if (!wrap) return;
+      const signature = tableSignature(table);
 
-    let mobileList = wrap.parentElement?.querySelector(`.mobile-student-detail-list[${MARK_ATTR}="true"]`) as HTMLElement | null;
-    if (!mobileList) {
-      mobileList = document.createElement('div');
-      mobileList.className = 'mobile-student-detail-list';
-      mobileList.setAttribute(MARK_ATTR, 'true');
-      wrap.insertAdjacentElement('afterend', mobileList);
-    }
+      let mobileList = wrap.parentElement?.querySelector(`.mobile-student-detail-list[${MARK_ATTR}="true"]`) as HTMLElement | null;
+      if (!mobileList) {
+        mobileList = document.createElement('div');
+        mobileList.className = 'mobile-student-detail-list';
+        mobileList.setAttribute(MARK_ATTR, 'true');
+        wrap.insertAdjacentElement('afterend', mobileList);
+      } else if (tableSignatures.get(table) === signature && mobileList.childElementCount > 0) {
+        return;
+      }
 
-    mobileList.innerHTML = '';
-    const rows = Array.from(table.querySelectorAll<HTMLTableRowElement>('tbody tr'));
-    rows.forEach((row) => {
-      const card = buildCard(row);
-      if (card) mobileList!.appendChild(card);
+      tableSignatures.set(table, signature);
+      const fragment = document.createDocumentFragment();
+      Array.from(table.querySelectorAll<HTMLTableRowElement>('tbody tr')).forEach((row) => {
+        const card = buildCard(row);
+        if (card) fragment.appendChild(card);
+      });
+      mobileList.replaceChildren(fragment);
     });
-  });
+  } finally {
+    isPatching = false;
+  }
+}
+
+function schedulePatch(delay = 80) {
+  if (window.innerWidth > 760) return;
+  if (patchTimer !== null) window.clearTimeout(patchTimer);
+  patchTimer = window.setTimeout(() => {
+    patchTimer = null;
+    if (rafId) window.cancelAnimationFrame(rafId);
+    rafId = window.requestAnimationFrame(() => {
+      rafId = 0;
+      patchTables();
+    });
+  }, delay);
+}
+
+function isOwnPatchMutation(mutation: MutationRecord) {
+  const target = mutation.target instanceof Element ? mutation.target : mutation.target.parentElement;
+  return Boolean(target?.closest?.('.mobile-student-detail-list') || (target as HTMLElement | null)?.id === STYLE_ID);
 }
 
 function install() {
   installCss();
-  const rerender = () => window.requestAnimationFrame(patchTables);
-  rerender();
-  const observer = new MutationObserver(rerender);
-  observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
-  window.addEventListener('resize', rerender);
+  schedulePatch(0);
+  const observer = new MutationObserver((mutations) => {
+    if (isPatching) return;
+    if (mutations.length && mutations.every(isOwnPatchMutation)) return;
+    schedulePatch();
+  });
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  window.addEventListener('resize', () => schedulePatch(120));
 }
 
 if (typeof window !== 'undefined') install();
