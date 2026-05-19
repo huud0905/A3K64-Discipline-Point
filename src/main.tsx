@@ -25,8 +25,8 @@ import './scoreboardScoreEditorLayoutPolish.css';
 import './scoreboardScoringModalInteractionPolish.css';
 import './scoreboardModalFinalOcdPatch.css';
 import './scoreboardModalStackAndFooterFix.css';
+import './scoreboardFilterSelectHardFix.css';
 import './scoreboardModalInputCleanup';
-import './scoreboardFilterSelectClickFallback';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
