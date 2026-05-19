@@ -17,32 +17,36 @@ function niceStep(rawStep: number) {
 
 function buildScale(values: number[]) {
   const rawMax = Math.max(0, ...values);
-  const minimumMax = 50;
-  const targetMax = Math.max(minimumMax, rawMax);
-  const step = niceStep(targetMax / 5);
-  const maxY = Math.max(step, Math.ceil(targetMax / step) * step);
+  const rawMin = Math.min(0, ...values);
+  const rawRange = rawMax - rawMin;
+  const targetRange = Math.max(50, rawRange || Math.max(Math.abs(rawMax), Math.abs(rawMin), 50));
+  const step = niceStep(targetRange / 5);
+  const maxY = rawMax > 0 ? Math.ceil(rawMax / step) * step : 0;
+  const minY = rawMin < 0 ? Math.floor(rawMin / step) * step : 0;
   const ticks: number[] = [];
 
-  for (let value = maxY; value >= 0; value -= step) {
+  for (let value = maxY; value >= minY; value -= step) {
     ticks.push(Number(value.toFixed(10)));
   }
 
   if (!ticks.includes(0)) ticks.push(0);
-  return { maxY, ticks };
+  return { minY, maxY: maxY === minY ? maxY + step : maxY, ticks: ticks.sort((a, b) => b - a) };
 }
 
 function formatAverage(value: number) {
   return Number(value).toFixed(1);
 }
 
-function percentFor(value: number, maxY: number) {
-  return Math.max(0, Math.min(100, (value / maxY) * 100));
+function positionFor(value: number, minY: number, maxY: number) {
+  const range = maxY - minY || 1;
+  return Math.max(0, Math.min(100, ((maxY - value) / range) * 100));
 }
 
 export function GroupStatsChart({ summaries }: GroupStatsChartProps) {
   const groupStats = getGroupStats(summaries);
   const values = groupStats.map((item) => item.average);
-  const { maxY, ticks } = buildScale(values);
+  const { minY, maxY, ticks } = buildScale(values);
+  const zeroTop = positionFor(0, minY, maxY);
 
   return (
     <section className="score-panel chart-panel group-stats-v2-panel">
@@ -54,7 +58,7 @@ export function GroupStatsChart({ summaries }: GroupStatsChartProps) {
       <div className="group-stats-v2-chart">
         <div className="group-stats-v2-axis" aria-hidden="true">
           {ticks.map((tick) => (
-            <span key={tick} style={{ top: `${100 - percentFor(tick, maxY)}%` }}>
+            <span key={tick} style={{ top: `${positionFor(tick, minY, maxY)}%` }}>
               {tick}
             </span>
           ))}
@@ -63,18 +67,24 @@ export function GroupStatsChart({ summaries }: GroupStatsChartProps) {
         <div className="group-stats-v2-plot">
           <div className="group-stats-v2-grid" aria-hidden="true">
             {ticks.map((tick) => (
-              <i key={tick} className={tick === 0 ? "zero" : ""} style={{ top: `${100 - percentFor(tick, maxY)}%` }} />
+              <i key={tick} className={tick === 0 ? "zero" : ""} style={{ top: `${positionFor(tick, minY, maxY)}%` }} />
             ))}
           </div>
 
           <div className="group-stats-v2-columns">
             {groupStats.map((item) => {
-              const height = percentFor(item.average, maxY);
+              const valueTop = positionFor(item.average, minY, maxY);
+              const isNegative = item.average < 0;
+              const height = Math.max(4, Math.abs(zeroTop - valueTop));
+              const top = isNegative ? zeroTop : valueTop;
 
               return (
                 <div className="group-stats-v2-column" key={item.group}>
                   <div className="group-stats-v2-track">
-                    <div className={`group-stats-v2-bar group-${item.group}`} style={{ height: `${height}%` }}>
+                    <div
+                      className={`group-stats-v2-bar group-${item.group} ${isNegative ? "negative" : "positive"}`}
+                      style={{ top: `${top}%`, height: `${height}%` }}
+                    >
                       <span>{formatAverage(item.average)}</span>
                     </div>
                   </div>
