@@ -6,6 +6,7 @@ import { getGroupStats, StudentScoreSummary } from "../data/mockScoreData";
 
 type OverviewGroupsPageProps = {
   summaries: StudentScoreSummary[];
+  podiumSummaries?: StudentScoreSummary[];
   week: number;
   onOpenStudent: (studentId: string) => void;
 };
@@ -45,7 +46,7 @@ function moveItem(order: number[], group: number, targetIndex: number) {
   return next;
 }
 
-export function OverviewGroupsPage({ summaries, week, onOpenStudent }: OverviewGroupsPageProps) {
+export function OverviewGroupsPage({ summaries, podiumSummaries, week, onOpenStudent }: OverviewGroupsPageProps) {
   const gridRef = useRef<HTMLElement | null>(null);
   const groupStats = getGroupStats(summaries);
   const [order, setOrder] = useState<number[]>(readOrder);
@@ -96,7 +97,7 @@ export function OverviewGroupsPage({ summaries, week, onOpenStudent }: OverviewG
   return (
     <div className="score-page overview-compact-page">
       <section className="overview-feature-grid">
-        <RankingPodium students={summaries} onOpenStudent={onOpenStudent} />
+        <RankingPodium students={podiumSummaries || summaries} onOpenStudent={onOpenStudent} />
         <GroupStatsChart summaries={summaries} />
       </section>
 
