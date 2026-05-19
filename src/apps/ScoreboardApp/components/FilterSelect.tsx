@@ -96,6 +96,7 @@ export function FilterSelect<T extends string | number>({
   };
 
   const handleButtonPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    if (portal) return;
     event.preventDefault();
     event.stopPropagation();
     toggleOpen();
@@ -163,17 +164,52 @@ export function FilterSelect<T extends string | number>({
     </div>
   ) : null;
 
+  const nativePortalSelect = portal ? (
+    <select
+      aria-label={title || current?.label || "Chọn"}
+      className="filter-select-native-overlay"
+      disabled={disabled}
+      value={String(value)}
+      onPointerDown={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+      onChange={(event) => {
+        const selected = options.find((option) => String(option.value) === event.target.value);
+        if (selected) onChange(selected.value);
+      }}
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        opacity: 0,
+        zIndex: 20,
+        cursor: disabled ? "not-allowed" : "pointer",
+      }}
+    >
+      {options.map((option) => (
+        <option key={String(option.value)} value={String(option.value)}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  ) : null;
+
   return (
-    <div className={`filter-select ${open ? "open" : ""}`} ref={ref}>
+    <div className={`filter-select ${open ? "open" : ""}`} ref={ref} style={{ position: "relative" }}>
       <button
         ref={buttonRef}
         type="button"
         className="filter-select-button"
         disabled={disabled}
         title={title}
+        tabIndex={portal ? -1 : 0}
         onPointerDown={handleButtonPointerDown}
+        onClick={() => {
+          if (!portal) toggleOpen();
+        }}
         onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
+          if (!portal && (event.key === "Enter" || event.key === " ")) {
             event.preventDefault();
             toggleOpen();
           }
@@ -183,7 +219,9 @@ export function FilterSelect<T extends string | number>({
         <ChevronDown size={16} />
       </button>
 
-      {portal ? (menu ? createPortal(menu, document.body) : null) : menu}
+      {nativePortalSelect}
+      {!portal && menu}
+      {portal && open ? createPortal(menu, document.body) : null}
     </div>
   );
 }
