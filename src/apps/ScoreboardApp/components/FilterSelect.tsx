@@ -21,6 +21,15 @@ type FilterSelectProps<T extends string | number> = {
 
 type FloatingStyle = CSSProperties & Record<`--${string}`, string | number>;
 
+function isLightThemeActive() {
+  if (typeof document === "undefined") return false;
+  return Boolean(
+    document.documentElement.classList.contains("light") ||
+    document.body.classList.contains("light") ||
+    document.querySelector(".theme-light, .win-root.theme-light, .light")
+  );
+}
+
 export function FilterSelect<T extends string | number>({
   value,
   options,
@@ -34,6 +43,7 @@ export function FilterSelect<T extends string | number>({
 }: FilterSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState<FloatingStyle>({});
+  const [lightPortal, setLightPortal] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const current = options.find((option) => option.value === value) || options[0];
@@ -65,7 +75,10 @@ export function FilterSelect<T extends string | number>({
   };
 
   useLayoutEffect(() => {
-    if (open) updateFloatingPosition();
+    if (open) {
+      setLightPortal(isLightThemeActive());
+      updateFloatingPosition();
+    }
   }, [open, placement, portal, menuMaxHeight]);
 
   useEffect(() => {
@@ -100,7 +113,10 @@ export function FilterSelect<T extends string | number>({
   }, []);
 
   const menu = open && !disabled ? (
-    <div className={`filter-select-menu ${portal ? "portal-menu" : ""} ${placement === "top" ? "menu-top" : ""} ${menuClassName}`} style={portal ? menuStyle : undefined}>
+    <div
+      className={`filter-select-menu ${portal ? "portal-menu" : ""} ${portal && lightPortal ? "light-portal-menu" : ""} ${placement === "top" ? "menu-top" : ""} ${menuClassName}`}
+      style={portal ? menuStyle : undefined}
+    >
       {options.map((option) => (
         <button
           key={String(option.value)}
