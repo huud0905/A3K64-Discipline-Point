@@ -199,7 +199,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
     if (viewMode === "students") {
       return <StudentTable title="Danh sách cá nhân" students={summaries} compact onOpenStudent={openStudent} />;
     }
-    return <OverviewGroupsPage summaries={groupFilteredRawSummaries} week={week} onOpenStudent={openStudent} />;
+    return <OverviewGroupsPage summaries={groupFilteredRawSummaries} podiumSummaries={rawSummaries} week={week} onOpenStudent={openStudent} />;
   };
 
   return (
