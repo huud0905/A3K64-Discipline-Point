@@ -20,7 +20,7 @@ function buildScale(values: number[]) {
   const rawMax = Math.max(0, ...values);
   const allNonNegative = values.every((value) => value >= 0);
   const allNonPositive = values.every((value) => value <= 0);
-  const range = Math.max(20, rawMax - rawMin);
+  const range = Math.max(20, rawMax - rawMin || Math.abs(rawMax) || Math.abs(rawMin));
   const step = niceStep(range / 5);
 
   let minY = allNonNegative ? 0 : Math.floor(rawMin / step) * step;
@@ -33,9 +33,6 @@ function buildScale(values: number[]) {
       maxY += step;
     }
   }
-
-  if (allNonNegative && maxY <= rawMax) maxY += step;
-  if (allNonPositive && minY >= rawMin) minY -= step;
 
   const ticks: number[] = [];
   for (let value = maxY; value >= minY; value -= step) ticks.push(Number(value.toFixed(10)));
