@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { CSSProperties, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { CSSProperties, PointerEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 export type FilterSelectOption<T extends string | number> = {
@@ -67,16 +67,9 @@ export function FilterSelect<T extends string | number>({
     const bottomSpace = Math.max(0, viewportBottom - rect.bottom - gap);
     const topSpace = Math.max(0, rect.top - safeTop - gap);
     const needsClamp = menuMaxHeight !== "none";
-    const maxHeightNumber = needsClamp
-      ? Math.max(120, placement === "top" ? topSpace : bottomSpace)
-      : estimatedHeight;
-    const maxHeight = menuMaxHeight === "none"
-      ? "none"
-      : `${Math.min(typeof menuMaxHeight === "number" ? menuMaxHeight : maxHeightNumber, maxHeightNumber)}px`;
-
-    const floatingTop = placement === "top"
-      ? Math.max(safeTop, rect.top - estimatedHeight - gap)
-      : Math.min(rect.bottom + gap, viewportBottom - Math.min(estimatedHeight, maxHeightNumber));
+    const maxHeightNumber = needsClamp ? Math.max(120, placement === "top" ? topSpace : bottomSpace) : estimatedHeight;
+    const maxHeight = menuMaxHeight === "none" ? "none" : `${Math.min(typeof menuMaxHeight === "number" ? menuMaxHeight : maxHeightNumber, maxHeightNumber)}px`;
+    const floatingTop = placement === "top" ? Math.max(safeTop, rect.top - estimatedHeight - gap) : Math.min(rect.bottom + gap, viewportBottom - Math.min(estimatedHeight, maxHeightNumber));
 
     const nextStyle: FloatingStyle = {
       position: "fixed",
@@ -94,6 +87,18 @@ export function FilterSelect<T extends string | number>({
     };
 
     setMenuStyle(nextStyle);
+  };
+
+  const toggleOpen = () => {
+    if (disabled) return;
+    setLightPortal(isLightThemeActive());
+    setOpen((state) => !state);
+  };
+
+  const handleButtonPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleOpen();
   };
 
   useLayoutEffect(() => {
@@ -115,7 +120,7 @@ export function FilterSelect<T extends string | number>({
   }, [open, placement, portal, menuMaxHeight, options.length, menuClassName]);
 
   useEffect(() => {
-    const close = (event: MouseEvent) => {
+    const close = (event: MouseEvent | PointerEvent) => {
       const target = event.target as Node;
       if (!ref.current?.contains(target) && !(target instanceof Element && target.closest(".filter-select-menu.portal-menu"))) {
         setOpen(false);
@@ -126,10 +131,10 @@ export function FilterSelect<T extends string | number>({
       if (event.key === "Escape") setOpen(false);
     };
 
-    window.addEventListener("mousedown", close);
+    window.addEventListener("pointerdown", close as EventListener);
     window.addEventListener("keydown", closeOnEsc);
     return () => {
-      window.removeEventListener("mousedown", close);
+      window.removeEventListener("pointerdown", close as EventListener);
       window.removeEventListener("keydown", closeOnEsc);
     };
   }, []);
@@ -144,6 +149,9 @@ export function FilterSelect<T extends string | number>({
           key={String(option.value)}
           type="button"
           className={`filter-select-option ${option.value === value ? "active" : ""}`}
+          onPointerDown={(event) => {
+            event.stopPropagation();
+          }}
           onClick={() => {
             onChange(option.value);
             setOpen(false);
@@ -163,7 +171,13 @@ export function FilterSelect<T extends string | number>({
         className="filter-select-button"
         disabled={disabled}
         title={title}
-        onClick={() => setOpen((state) => !state)}
+        onPointerDown={handleButtonPointerDown}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleOpen();
+          }
+        }}
       >
         <span>{current?.label || "Chọn"}</span>
         <ChevronDown size={16} />
