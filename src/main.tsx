@@ -17,6 +17,7 @@ import './scoreboard-final-polish.css';
 import './scoreboardHonorsAndChartPolish.css';
 import './scoreboardMobileLatestFix.css';
 import './scoreboardMobileEmergencyPatch';
+import './scoreboardMobileStudentDetailCardsPatch';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
