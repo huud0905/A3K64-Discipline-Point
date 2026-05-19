@@ -15,6 +15,7 @@ import './scoreboard-final-fix.css';
 import './scoreboard-theme-animation.css';
 import './scoreboard-final-polish.css';
 import './scoreboardHonorsAndChartPolish.css';
+import './scoreboardMobileLatestFix.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
