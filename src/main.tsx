@@ -18,6 +18,7 @@ import './scoreboardHonorsAndChartPolish.css';
 import './scoreboardMobileLatestFix.css';
 import './scoreboardMobileEmergencyPatch';
 import './scoreboardMobileStudentDetailCardsPatch';
+import './scoreboardMultiGroupFilter.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
