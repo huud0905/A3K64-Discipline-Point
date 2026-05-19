@@ -9,6 +9,7 @@ type WeekSelectorProps = {
   onWeekChange: (week: number) => void;
   viewMode?: ViewMode;
   onViewModeChange?: (mode: ViewMode) => void;
+  viewModeDisabled?: boolean;
   canCreateWeek?: boolean;
   onCreateWeek?: () => void;
 };
@@ -19,6 +20,7 @@ export function WeekSelector({
   onWeekChange,
   viewMode = "overview",
   onViewModeChange,
+  viewModeDisabled = false,
   canCreateWeek = false,
   onCreateWeek,
 }: WeekSelectorProps) {
@@ -67,6 +69,8 @@ export function WeekSelector({
               { value: "students", label: "Cá nhân" },
             ]}
             onChange={onViewModeChange}
+            disabled={viewModeDisabled}
+            title={viewModeDisabled ? "Bảng chấm không dùng chế độ xem" : undefined}
           />
         </label>
       )}
