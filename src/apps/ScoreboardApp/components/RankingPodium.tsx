@@ -12,8 +12,24 @@ function getStudentInitial(name: string, avatarInitial?: string) {
   return (parts[parts.length - 1]?.[0] || name[0] || "?").toUpperCase();
 }
 
+function givenNameOf(fullName: string) {
+  const parts = fullName.trim().split(/\s+/);
+  return parts[parts.length - 1] || fullName;
+}
+
+function compareByScoreThenName(a: StudentScoreSummary, b: StudentScoreSummary) {
+  const scoreCompare = b.total - a.total;
+  if (scoreCompare) return scoreCompare;
+  const givenCompare = givenNameOf(a.name).localeCompare(givenNameOf(b.name), "vi", { sensitivity: "base" });
+  return givenCompare || a.name.localeCompare(b.name, "vi", { sensitivity: "base" });
+}
+
+function displayRank(index: number) {
+  return index + 1;
+}
+
 export function RankingPodium({ students, onOpenStudent }: RankingPodiumProps) {
-  const top = students.slice(0, 3);
+  const top = [...students].sort(compareByScoreThenName).slice(0, 3);
   const order = [top[1], top[0], top[2]].filter(Boolean);
 
   return (
@@ -25,20 +41,21 @@ export function RankingPodium({ students, onOpenStudent }: RankingPodiumProps) {
 
       <div className="podium-grid">
         {order.map((student) => {
-          const isFirst = student.rank === 1;
-          const Icon = isFirst ? Crown : student.rank === 2 ? Medal : Trophy;
+          const rank = displayRank(top.findIndex((item) => item.id === student.id));
+          const isFirst = rank === 1;
+          const Icon = isFirst ? Crown : rank === 2 ? Medal : Trophy;
 
           return (
             <button
               type="button"
               key={student.id}
-              className={`podium-card rank-${student.rank}`}
+              className={`podium-card rank-${rank}`}
               onClick={() => onOpenStudent?.(student.id)}
               title="Mở hồ sơ học sinh"
             >
               <div className="podium-rank">
                 <Icon size={18} />
-                <span>#{student.rank}</span>
+                <span>#{rank}</span>
               </div>
 
               <div className="podium-avatar" aria-label={student.name}>
