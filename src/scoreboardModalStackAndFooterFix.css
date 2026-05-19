@@ -1,0 +1,135 @@
+/* Last loaded patch: put day switcher exactly above day content and keep modal above taskbar. */
+.score-edit-backdrop {
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding-top: 2px !important;
+  padding-bottom: 96px !important;
+  box-sizing: border-box !important;
+}
+
+.scoreboard-app .score-edit-modal.modern-score-editor,
+.score-edit-modal.modern-score-editor {
+  margin-top: 0 !important;
+  height: calc(100vh - 124px) !important;
+  max-height: calc(100vh - 124px) !important;
+  transform: none !important;
+  overflow: hidden !important;
+}
+
+.scoreboard-app .modern-score-editor .score-edit-body,
+.score-edit-modal.modern-score-editor .score-edit-body {
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.scoreboard-app .modern-score-editor .score-edit-left,
+.score-edit-modal.modern-score-editor .score-edit-left {
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.scoreboard-app .modern-score-editor .score-edit-columns,
+.score-edit-modal.modern-score-editor .score-edit-columns {
+  min-height: 0 !important;
+  overflow: hidden !important;
+  align-items: stretch !important;
+}
+
+/* After JS moves .score-day-switch-row into .day-record-panel, it becomes a clean stack above day content. */
+.scoreboard-app .modern-score-editor .day-record-panel,
+.score-edit-modal.modern-score-editor .day-record-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  gap: 12px !important;
+}
+
+.scoreboard-app .modern-score-editor .day-record-panel > .score-day-switch-row,
+.score-edit-modal.modern-score-editor .day-record-panel > .score-day-switch-row {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.scoreboard-app .modern-score-editor .day-record-panel > .score-day-switch-row .day-tabs,
+.score-edit-modal.modern-score-editor .day-record-panel > .score-day-switch-row .day-tabs {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  overflow: visible !important;
+  padding: 0 !important;
+}
+
+.scoreboard-app .modern-score-editor .day-record-panel > .score-day-switch-row .day-tabs button,
+.score-edit-modal.modern-score-editor .day-record-panel > .score-day-switch-row .day-tabs button {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.scoreboard-app .modern-score-editor .day-record-panel > .score-day-switch-row .inline-day-head,
+.score-edit-modal.modern-score-editor .day-record-panel > .score-day-switch-row .inline-day-head {
+  width: 100% !important;
+  min-height: 58px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.scoreboard-app .modern-score-editor .day-record-panel > .day-event-list,
+.score-edit-modal.modern-score-editor .day-record-panel > .day-event-list {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  border-radius: 16px !important;
+}
+
+.scoreboard-app .modern-score-editor .score-edit-footer,
+.score-edit-modal.modern-score-editor .score-edit-footer {
+  flex: 0 0 auto !important;
+  position: relative !important;
+  bottom: auto !important;
+  z-index: 5 !important;
+}
+
+/* Special score input: no default 0 feeling, no browser-yellow/dark mismatch, still accepts any integer. */
+.scoreboard-app .modern-score-editor .special-score-form input[type='number'],
+.score-edit-modal.modern-score-editor .special-score-form input[type='number'] {
+  appearance: textfield !important;
+  -moz-appearance: textfield !important;
+  text-align: left !important;
+}
+
+.scoreboard-app .modern-score-editor .special-score-form input[type='number']::-webkit-inner-spin-button,
+.scoreboard-app .modern-score-editor .special-score-form input[type='number']::-webkit-outer-spin-button,
+.score-edit-modal.modern-score-editor .special-score-form input[type='number']::-webkit-inner-spin-button,
+.score-edit-modal.modern-score-editor .special-score-form input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+@media (max-width: 760px) {
+  .score-edit-backdrop {
+    padding-top: 0 !important;
+    padding-bottom: 82px !important;
+  }
+
+  .scoreboard-app .score-edit-modal.modern-score-editor,
+  .score-edit-modal.modern-score-editor {
+    height: calc(100vh - 98px) !important;
+    max-height: calc(100vh - 98px) !important;
+  }
+
+  .scoreboard-app .modern-score-editor .day-record-panel > .score-day-switch-row .day-tabs,
+  .score-edit-modal.modern-score-editor .day-record-panel > .score-day-switch-row .day-tabs {
+    display: flex !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+}
