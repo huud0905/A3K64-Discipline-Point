@@ -30,6 +30,13 @@ function isLightThemeActive() {
   );
 }
 
+function estimateMenuHeight(optionCount: number, menuClassName: string, menuMaxHeight: number | "none" | undefined) {
+  if (typeof menuMaxHeight === "number") return menuMaxHeight;
+  const isTwoColumn = menuClassName.includes("subject-floating-menu");
+  const rows = isTwoColumn ? Math.ceil(optionCount / 2) : optionCount;
+  return rows * 38 + 14;
+}
+
 export function FilterSelect<T extends string | number>({
   value,
   options,
@@ -52,21 +59,36 @@ export function FilterSelect<T extends string | number>({
     if (!portal || !buttonRef.current) return;
 
     const rect = buttonRef.current.getBoundingClientRect();
+    const gap = 8;
+    const safeTop = 8;
+    const safeBottom = 88;
+    const viewportBottom = window.innerHeight - safeBottom;
+    const estimatedHeight = estimateMenuHeight(options.length, menuClassName, menuMaxHeight);
+    const bottomSpace = Math.max(0, viewportBottom - rect.bottom - gap);
+    const topSpace = Math.max(0, rect.top - safeTop - gap);
+    const needsClamp = menuMaxHeight !== "none";
+    const maxHeightNumber = needsClamp
+      ? Math.max(120, placement === "top" ? topSpace : bottomSpace)
+      : estimatedHeight;
     const maxHeight = menuMaxHeight === "none"
       ? "none"
-      : `${menuMaxHeight ?? Math.max(180, placement === "top" ? rect.top - 24 : window.innerHeight - rect.bottom - 24)}px`;
+      : `${Math.min(typeof menuMaxHeight === "number" ? menuMaxHeight : maxHeightNumber, maxHeightNumber)}px`;
+
+    const floatingTop = placement === "top"
+      ? Math.max(safeTop, rect.top - estimatedHeight - gap)
+      : Math.min(rect.bottom + gap, viewportBottom - Math.min(estimatedHeight, maxHeightNumber));
 
     const nextStyle: FloatingStyle = {
       position: "fixed",
       left: rect.left,
-      top: placement === "bottom" ? rect.bottom + 8 : "auto",
-      bottom: placement === "top" ? Math.max(8, window.innerHeight - rect.top + 8) : "auto",
+      top: floatingTop,
+      bottom: "auto",
       minWidth: rect.width,
       width: rect.width,
       zIndex: 99999,
       "--filter-menu-left": `${rect.left}px`,
-      "--filter-menu-top": placement === "bottom" ? `${rect.bottom + 8}px` : "auto",
-      "--filter-menu-bottom": placement === "top" ? `${Math.max(8, window.innerHeight - rect.top + 8)}px` : "auto",
+      "--filter-menu-top": `${floatingTop}px`,
+      "--filter-menu-bottom": "auto",
       "--filter-menu-width": `${rect.width}px`,
       "--filter-menu-max-height": maxHeight,
     };
@@ -79,7 +101,7 @@ export function FilterSelect<T extends string | number>({
       setLightPortal(isLightThemeActive());
       updateFloatingPosition();
     }
-  }, [open, placement, portal, menuMaxHeight]);
+  }, [open, placement, portal, menuMaxHeight, options.length, menuClassName]);
 
   useEffect(() => {
     if (!open) return;
@@ -90,7 +112,7 @@ export function FilterSelect<T extends string | number>({
       window.removeEventListener("resize", sync);
       window.removeEventListener("scroll", sync, true);
     };
-  }, [open, placement, portal, menuMaxHeight]);
+  }, [open, placement, portal, menuMaxHeight, options.length, menuClassName]);
 
   useEffect(() => {
     const close = (event: MouseEvent) => {
