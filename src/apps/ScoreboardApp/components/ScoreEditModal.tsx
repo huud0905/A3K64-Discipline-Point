@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { RotateCcw, X, Zap } from "lucide-react";
+import { KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { FilterSelect } from "./FilterSelect";
 import { categoryLabel, formatScore, ScoreCategory, ScoreEvent, StudentScoreSummary } from "../data/mockScoreData";
 
@@ -101,7 +101,7 @@ function eventDay(event: ScoreEvent) {
   return parseDay(event.title) ?? new Date(event.createdAt).getDay();
 }
 function shortTitle(title: string) {
-  return title.length > 26 ? `${title.slice(0, 26)}...` : title;
+  return title.length > 30 ? `${title.slice(0, 30)}...` : title;
 }
 function statusTone(status: string) {
   const s = status.toLowerCase();
@@ -139,6 +139,19 @@ function ruleTooltip(rule: QuickRule) {
 function cleanTitleFromEvent(title: string) {
   return title.replace(/^Thứ\s*[2-7]:\s*/i, "").replace(/^Chủ nhật:\s*/i, "");
 }
+function normalizeSearchText(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/đ/g, "d").trim();
+}
+function ruleMatchesSearch(rule: QuickRule, search: string) {
+  const tokens = normalizeSearchText(search).split(/\s+/).filter(Boolean);
+  if (!tokens.length) return true;
+  const haystack = normalizeSearchText(`${rule.title} ${categoryLabel(rule.category)} ${rule.note || ""} ${rule.type} ${Math.abs(rule.points)}`);
+  return tokens.every((token) => haystack.includes(token));
+}
+function summarizeTitles(list: ScoreEvent[]) {
+  if (!list.length) return "-";
+  return list.map((event) => shortTitle(cleanTitleFromEvent(event.title))).join(" • ");
+}
 
 export function ScoreEditModal({ student, allStudents = [], week, events, onSaveChanges, onAddScore, onDeleteScore, onClose }: ScoreEditModalProps) {
   const [activeDay, setActiveDay] = useState(2);
@@ -149,6 +162,9 @@ export function ScoreEditModal({ student, allStudents = [], week, events, onSave
   const [specialPoint, setSpecialPoint] = useState(0);
   const [violationCount, setViolationCount] = useState(1);
   const [selectedRuleKey, setSelectedRuleKey] = useState("");
+  const [ruleSearch, setRuleSearch] = useState("");
+  const [ruleDropdownOpen, setRuleDropdownOpen] = useState(false);
+  const ruleSearchRef = useRef<HTMLDivElement | null>(null);
   const [rules, setRules] = useState<QuickRule[]>(cachedRules || (globalThis as RuleCacheGlobal).__A3K64_SCORE_RULES || []);
   const [pinnedRuleKeys, setPinnedRuleKeys] = useState<string[]>(readPinnedRuleKeys);
   const [rulesStatus, setRulesStatus] = useState(rules.length ? "" : "Đang đọc VI_PHAM...");
@@ -173,6 +189,14 @@ export function ScoreEditModal({ student, allStudents = [], week, events, onSave
   useEffect(() => {
     localStorage.setItem(PINNED_RULES_KEY, JSON.stringify(pinnedRuleKeys));
   }, [pinnedRuleKeys]);
+
+  useEffect(() => {
+    const closeRuleSearch = (event: MouseEvent) => {
+      if (!ruleSearchRef.current?.contains(event.target as Node)) setRuleDropdownOpen(false);
+    };
+    window.addEventListener("mousedown", closeRuleSearch);
+    return () => window.removeEventListener("mousedown", closeRuleSearch);
+  }, []);
 
   useEffect(() => {
     const globalRules = (globalThis as RuleCacheGlobal).__A3K64_SCORE_RULES;
@@ -210,7 +234,25 @@ export function ScoreEditModal({ student, allStudents = [], week, events, onSave
     const pinned = new Set(pinnedRuleKeys);
     return [...rules].sort((a, b) => Number(pinned.has(ruleKey(b))) - Number(pinned.has(ruleKey(a))) || Number(b.points) - Number(a.points));
   }, [pinnedRuleKeys, rules]);
+  const filteredRuleSuggestions = useMemo(() => orderedRules.filter((rule) => ruleMatchesSearch(rule, ruleSearch)).slice(0, 12), [orderedRules, ruleSearch]);
   const selectedRule = orderedRules.find((rule) => ruleKey(rule) === selectedRuleKey) || null;
+
+  const jumpToDay = (day: number) => {
+    setActiveDay(day);
+    setSection("review");
+  };
+
+  const dayCellProps = (day: number) => ({
+    role: "button",
+    tabIndex: 0,
+    onClick: () => jumpToDay(day),
+    onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        jumpToDay(day);
+      }
+    },
+  });
 
   const resolveTargetIds = () => {
     if (bulkScope === "group") return groupMembers.map((item) => item.id);
@@ -250,13 +292,26 @@ export function ScoreEditModal({ student, allStudents = [], week, events, onSave
     setSection("review");
   };
 
-  const handleRuleSelect = (value: string) => {
-    setSelectedRuleKey(value);
-    const rule = orderedRules.find((item) => ruleKey(item) === value);
-    if (!rule) return;
+  const chooseRule = (rule: QuickRule) => {
+    setSelectedRuleKey(ruleKey(rule));
+    setRuleSearch(rule.title);
+    setRuleDropdownOpen(false);
     setCategory(rule.category);
     setSpecialTitle(rule.title);
     setSpecialPoint(rule.points);
+  };
+  const handleRuleSearchChange = (value: string) => {
+    setRuleSearch(value);
+    setRuleDropdownOpen(true);
+    const exact = orderedRules.find((rule) => normalizeSearchText(rule.title) === normalizeSearchText(value));
+    setSelectedRuleKey(exact ? ruleKey(exact) : "");
+  };
+  const handleRuleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" && filteredRuleSuggestions[0]) {
+      event.preventDefault();
+      chooseRule(filteredRuleSuggestions[0]);
+    }
+    if (event.key === "Escape") setRuleDropdownOpen(false);
   };
   const handleSelectedRuleAdd = () => {
     if (!selectedRule) return;
@@ -268,10 +323,7 @@ export function ScoreEditModal({ student, allStudents = [], week, events, onSave
     stageScore({ title: specialTitle, points, category });
   };
   const handleQuickRule = (rule: QuickRule) => {
-    setSelectedRuleKey(ruleKey(rule));
-    setCategory(rule.category);
-    setSpecialTitle(rule.title);
-    setSpecialPoint(rule.points);
+    chooseRule(rule);
     stageScore({ title: rule.title, points: rule.points, category: rule.category });
   };
   const removeEvent = (eventId: string) => {
@@ -339,49 +391,66 @@ export function ScoreEditModal({ student, allStudents = [], week, events, onSave
               <div className="week-matrix">
                 <div className="matrix-cell matrix-head">Nội dung</div>
                 {days.map((day) => (
-                  <div className="matrix-cell matrix-head day-head" key={day.key}>{day.label}</div>
+                  <div className="matrix-cell matrix-head day-head matrix-day-jump" key={day.key} {...dayCellProps(day.key)}>{day.label}</div>
                 ))}
                 <div className="matrix-cell matrix-label">Điểm (+)</div>
                 {days.map((day) => {
                   const data = summaryForDay(day.key);
-                  return <div className="matrix-cell" key={`plus-${day.key}`}>{data.plusTotal ? formatScore(data.plusTotal) : "-"}</div>;
+                  return <div className="matrix-cell matrix-day-jump" key={`plus-${day.key}`} {...dayCellProps(day.key)}>{data.plusTotal ? formatScore(data.plusTotal) : "-"}</div>;
                 })}
                 <div className="matrix-cell matrix-label">Điểm (-)</div>
                 {days.map((day) => {
                   const data = summaryForDay(day.key);
-                  return <div className="matrix-cell" key={`minus-${day.key}`}>{data.minusTotal ? data.minusTotal : "-"}</div>;
+                  return <div className="matrix-cell matrix-day-jump" key={`minus-${day.key}`} {...dayCellProps(day.key)}>{data.minusTotal ? data.minusTotal : "-"}</div>;
                 })}
                 <div className="matrix-cell matrix-label">Nội dung (+)</div>
                 {days.map((day) => {
                   const data = summaryForDay(day.key);
-                  return <div className="matrix-cell matrix-content" key={`plus-title-${day.key}`}>{data.plus.length ? data.plus.map((event) => <span key={event.id}>• {shortTitle(cleanTitleFromEvent(event.title))}</span>) : "-"}</div>;
+                  const title = summarizeTitles(data.plus);
+                  return <div className="matrix-cell matrix-content matrix-day-jump" key={`plus-title-${day.key}`} title={title} {...dayCellProps(day.key)}><span>{title}</span></div>;
                 })}
                 <div className="matrix-cell matrix-label">Nội dung (-)</div>
                 {days.map((day) => {
                   const data = summaryForDay(day.key);
-                  return <div className="matrix-cell matrix-content" key={`minus-title-${day.key}`}>{data.minus.length ? data.minus.map((event) => <span key={event.id}>• {shortTitle(cleanTitleFromEvent(event.title))}</span>) : "-"}</div>;
+                  const title = summarizeTitles(data.minus);
+                  return <div className="matrix-cell matrix-content matrix-day-jump" key={`minus-title-${day.key}`} title={title} {...dayCellProps(day.key)}><span>{title}</span></div>;
                 })}
               </div>
             </div>
 
-            <div className="day-tabs">{days.map((day) => <button type="button" key={day.key} className={activeDay === day.key ? "active" : ""} onClick={() => setActiveDay(day.key)} disabled={isSaving}>{day.label}</button>)}</div>
+            <div className="score-day-switch-row">
+              <div className="day-tabs">{days.map((day) => <button type="button" key={day.key} className={activeDay === day.key ? "active" : ""} onClick={() => jumpToDay(day.key)} disabled={isSaving}>{day.label}</button>)}</div>
+              <div className="day-record-head inline-day-head"><strong>Ngày {days.find((day) => day.key === activeDay)?.label}</strong><span>Chỉ ghi vào Google Sheets khi bấm Save all changes.</span></div>
+            </div>
             <div className="score-mobile-mode-tabs"><button type="button" className={section === "add" ? "active" : ""} onClick={() => setSection("add")}>Chấm điểm</button><button type="button" className={section === "review" ? "active" : ""} onClick={() => setSection("review")}>Xem lại / xoá</button></div>
 
             <div className="score-edit-columns">
               <div className={`score-add-panel ${section !== "add" ? "mobile-hidden-section" : ""}`}>
-                <div className="score-inline-actions">
-                  <button type="button" className="small-action disabled">Nháp: {hasChanges ? `${draftAdditions.length} thêm · ${deletedEventIds.length} xoá` : "chưa có thay đổi"}</button>
-                  <button type="button" className="small-action disabled"><RotateCcw size={14} /> Hoàn tác</button>
-                  <button type="button" className="small-action"><Zap size={14} /> Mẫu nhanh</button>
-                </div>
-
                 <div className="score-custom-form rule-select-form">
                   <div className="form-row rule-pick-row">
                     <div className="category-picker subject-picker"><FilterSelect<string> value={subject} options={subjects.map((item) => ({ value: item, label: item }))} onChange={setSubject} /></div>
-                    <select className="rule-select-input" value={selectedRuleKey} onChange={(event) => handleRuleSelect(event.target.value)} disabled={isSaving}>
-                      <option value="">Tìm nội quy</option>
-                      {orderedRules.map((rule, index) => <option key={`${ruleKey(rule)}-${index}`} value={ruleKey(rule)}>{rule.title} {formatScore(rule.points)}</option>)}
-                    </select>
+                    <div className="rule-search-box" ref={ruleSearchRef}>
+                      <input
+                        className="rule-search-input"
+                        value={ruleSearch}
+                        onChange={(event) => handleRuleSearchChange(event.target.value)}
+                        onFocus={() => setRuleDropdownOpen(true)}
+                        onKeyDown={handleRuleSearchKeyDown}
+                        placeholder="Tìm nội quy"
+                        disabled={isSaving}
+                      />
+                      <span className="rule-search-arrow">▾</span>
+                      {ruleDropdownOpen && !isSaving && (
+                        <div className="rule-suggestion-menu">
+                          {filteredRuleSuggestions.length ? filteredRuleSuggestions.map((rule, index) => (
+                            <button type="button" key={`${ruleKey(rule)}-${index}`} className={rule.points >= 0 ? "plus" : "minus"} onClick={() => chooseRule(rule)}>
+                              <strong>{rule.title}</strong>
+                              <span>{rule.points >= 0 ? "Cộng" : "Trừ"}: {Math.abs(rule.points)}đ</span>
+                            </button>
+                          )) : <div className="rule-suggestion-empty">Không tìm thấy nội quy phù hợp.</div>}
+                        </div>
+                      )}
+                    </div>
                     <div className="count-box"><span>Lần</span><input type="number" min={1} step={1} value={violationCount} onChange={(e) => setViolationCount(Math.max(1, Math.trunc(Number(e.target.value) || 1)))} disabled={isSaving} /></div>
                   </div>
                   <button type="button" className="score-add-button" onClick={handleSelectedRuleAdd} disabled={isSaving || !selectedRule}>Thêm mới (Enter)</button>
@@ -414,7 +483,6 @@ export function ScoreEditModal({ student, allStudents = [], week, events, onSave
               </div>
 
               <div className={`day-record-panel ${section !== "review" ? "mobile-hidden-section" : ""}`}>
-                <div className="day-record-head"><strong>Ngày {days.find((day) => day.key === activeDay)?.label}</strong><span>Chỉ ghi vào Google Sheets khi bấm Save all changes.</span></div>
                 <div className="day-event-list">{activeDayEvents.length === 0 ? <div className="empty-day-record">Chưa có nội dung cho ngày này.</div> : activeDayEvents.map((event) => <div key={event.id} className={`day-event ${event.points >= 0 ? "plus" : "minus"} ${event.id.startsWith("draft-") ? "draft" : ""}`}><span>{cleanTitleFromEvent(event.title)}</span><strong>{formatScore(event.points)}</strong><button type="button" onClick={() => removeEvent(event.id)} disabled={isSaving} title="Xoá dòng này"><X size={14} /></button></div>)}</div>
               </div>
             </div>
