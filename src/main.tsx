@@ -24,6 +24,7 @@ import './scoreboardSoftLightTheme.css';
 import './scoreboardScoreEditorLayoutPolish.css';
 import './scoreboardScoringModalInteractionPolish.css';
 import './scoreboardModalFinalOcdPatch.css';
+import './scoreboardModalStackAndFooterFix.css';
 import './scoreboardModalInputCleanup';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
