@@ -7,23 +7,9 @@ type SessionUser = {
   displayName?: string | null;
   hoten?: string | null;
   name?: string | null;
-  role?: string | null;
 };
 
-type SavedSession = {
-  user?: SessionUser;
-  expiresAt?: number;
-};
-
-type TaskbarSettings = {
-  searchMode?: "icon" | "box";
-  taskView?: boolean;
-  widgets?: boolean;
-  resume?: boolean;
-  alignment?: "left" | "center";
-  autoHide?: boolean;
-  badges?: boolean;
-};
+type SavedSession = { user?: SessionUser; expiresAt?: number };
 
 type PersonalizationPayload = {
   version: 2;
@@ -31,7 +17,7 @@ type PersonalizationPayload = {
   accentKey?: AccentKey;
   accentColor?: string;
   customAccent?: string;
-  taskbarSettings?: TaskbarSettings;
+  taskbarSettings?: unknown;
   pinnedApps?: string[];
   recentAccents?: string[];
   desktopTransparency?: "on" | "off";
@@ -40,17 +26,12 @@ type PersonalizationPayload = {
   updatedAt?: string;
 };
 
-type GasResponse = {
-  ok?: boolean;
-  error?: string;
-  data?: any;
-  [key: string]: any;
-};
+type GasResponse = { ok?: boolean; error?: string; data?: any; [key: string]: any };
 
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const SESSION_KEY = "a3k64-login-session-v1";
-const PERSONALIZATION_VERSION = 2;
-const JSONP_TIMEOUT_MS = 15000;
+const QUIET_UNTIL_KEY = "a3k64-personalization-quiet-until";
+const JSONP_TIMEOUT_MS = 9000;
 
 const ACCENT_COLORS: Record<string, string> = {
   blue: "#2563eb",
@@ -87,65 +68,71 @@ const PERSONALIZATION_KEYS = new Set([
   "accent-borders",
 ]);
 
-let activeAccount = "";
-let suppressLocalCapture = false;
-let saveTimer = 0;
-let lastSavedJson = "";
 let booted = false;
+let activeAccount = "";
+let saveTimer = 0;
+let suppressCapture = false;
+let lastSavedJson = "";
+let remoteDisabled = false;
 
-function safeJsonParse<T>(value: string | null, fallback: T): T {
+function safeJson<T>(value: string | null, fallback: T): T {
   try {
-    if (!value) return fallback;
-    return JSON.parse(value) as T;
+    return value ? (JSON.parse(value) as T) : fallback;
   } catch {
     return fallback;
   }
 }
 
-function asText(value: unknown, fallback = "") {
-  if (value === null || value === undefined) return fallback;
-  return String(value).trim();
+function text(value: unknown) {
+  return String(value ?? "").trim();
 }
 
-function normalizeTheme(value: string | null): ThemeMode | undefined {
-  const raw = asText(value).toLowerCase();
-  if (raw === "dark" || raw === "light" || raw === "auto") return raw;
-  return undefined;
-}
-
-function normalizeAccentKey(value: string | null): AccentKey | undefined {
-  const raw = asText(value).toLowerCase();
-  if (["blue", "violet", "pink", "green", "amber", "red", "custom"].includes(raw)) return raw as AccentKey;
-  return undefined;
-}
-
-function isHex(value: string | null) {
+function isHex(value: string | null | undefined) {
   return !!value && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim());
 }
 
+function normTheme(value: string | null): ThemeMode | undefined {
+  const raw = text(value).toLowerCase();
+  return raw === "dark" || raw === "light" || raw === "auto" ? raw : undefined;
+}
+
+function normAccent(value: string | null): AccentKey | undefined {
+  const raw = text(value).toLowerCase();
+  return ["blue", "violet", "pink", "green", "amber", "red", "custom"].includes(raw) ? (raw as AccentKey) : undefined;
+}
+
+function quietForAWhile() {
+  remoteDisabled = true;
+  localStorage.setItem(QUIET_UNTIL_KEY, String(Date.now() + 10 * 60 * 1000));
+}
+
+function isQuiet() {
+  const until = Number(localStorage.getItem(QUIET_UNTIL_KEY) || 0);
+  if (until > Date.now()) return true;
+  if (until) localStorage.removeItem(QUIET_UNTIL_KEY);
+  return false;
+}
+
 function readSession(): SavedSession | null {
-  const session = safeJsonParse<SavedSession | null>(localStorage.getItem(SESSION_KEY), null);
+  const session = safeJson<SavedSession | null>(localStorage.getItem(SESSION_KEY), null);
   if (!session?.user || !session.expiresAt || session.expiresAt < Date.now()) return null;
   return session;
 }
 
 function accountId(user?: SessionUser | null) {
-  const email = asText(user?.email).toLowerCase();
-  if (email) return email;
-  return asText(user?.uid).toLowerCase();
+  return text(user?.email || user?.uid).toLowerCase();
 }
 
-function displayNameOf(user?: SessionUser | null) {
-  return asText(user?.displayName || user?.hoten || user?.name || user?.email || user?.uid);
+function displayName(user?: SessionUser | null) {
+  return text(user?.displayName || user?.hoten || user?.name || user?.email || user?.uid);
 }
 
-function collectLoginAppearanceOnly(): Partial<PersonalizationPayload> {
-  const theme = normalizeTheme(localStorage.getItem("login-theme")) || normalizeTheme(localStorage.getItem("theme-mode"));
-  const accentKey = normalizeAccentKey(localStorage.getItem("login-accent")) || normalizeAccentKey(localStorage.getItem("accent"));
+function loginLook(): Partial<PersonalizationPayload> {
+  const theme = normTheme(localStorage.getItem("login-theme")) || normTheme(localStorage.getItem("theme-mode"));
+  const accentKey = normAccent(localStorage.getItem("login-accent")) || normAccent(localStorage.getItem("accent"));
   const customAccent = localStorage.getItem("login-custom-accent") || localStorage.getItem("desktop-custom-accent") || undefined;
-  const namedColor = accentKey && accentKey !== "custom" ? ACCENT_COLORS[accentKey] : undefined;
-  const accentColor = [localStorage.getItem("login-accent-color"), customAccent || null, localStorage.getItem("desktop-accent"), namedColor || null].find((item) => isHex(item)) || undefined;
-
+  const named = accentKey && accentKey !== "custom" ? ACCENT_COLORS[accentKey] : undefined;
+  const accentColor = [localStorage.getItem("login-accent-color"), customAccent, localStorage.getItem("desktop-accent"), named].find(isHex);
   return {
     ...(theme ? { theme } : {}),
     ...(accentKey ? { accentKey } : {}),
@@ -154,18 +141,13 @@ function collectLoginAppearanceOnly(): Partial<PersonalizationPayload> {
   };
 }
 
-function collectPersonalization(): PersonalizationPayload {
-  const loginAppearance = collectLoginAppearanceOnly();
-  const taskbarSettings = safeJsonParse<TaskbarSettings | undefined>(localStorage.getItem("taskbar-settings"), undefined);
-  const pinnedApps = safeJsonParse<string[] | undefined>(localStorage.getItem("pinned-apps"), undefined);
-  const recentAccents = safeJsonParse<string[] | undefined>(localStorage.getItem("recent-accents"), undefined);
-
+function collectPrefs(): PersonalizationPayload {
   return {
-    version: PERSONALIZATION_VERSION,
-    ...loginAppearance,
-    ...(taskbarSettings ? { taskbarSettings } : {}),
-    ...(Array.isArray(pinnedApps) ? { pinnedApps } : {}),
-    ...(Array.isArray(recentAccents) ? { recentAccents } : {}),
+    version: 2,
+    ...loginLook(),
+    taskbarSettings: safeJson(localStorage.getItem("taskbar-settings"), undefined),
+    pinnedApps: safeJson(localStorage.getItem("pinned-apps"), []),
+    recentAccents: safeJson(localStorage.getItem("recent-accents"), []),
     desktopTransparency: localStorage.getItem("desktop-transparency") === "off" ? "off" : "on",
     accentTaskbar: localStorage.getItem("accent-taskbar") === "on" ? "on" : "off",
     accentBorders: localStorage.getItem("accent-borders") === "on" ? "on" : "off",
@@ -178,9 +160,9 @@ function setLocal(key: string, value: unknown) {
   localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value));
 }
 
-function applyPersonalization(prefs?: Partial<PersonalizationPayload> | null) {
+function applyPrefs(prefs?: Partial<PersonalizationPayload> | null) {
   if (!prefs) return;
-  suppressLocalCapture = true;
+  suppressCapture = true;
   try {
     if (prefs.theme) {
       setLocal("desktop-theme", prefs.theme);
@@ -189,21 +171,18 @@ function applyPersonalization(prefs?: Partial<PersonalizationPayload> | null) {
       setLocal("theme-mode", prefs.theme);
       setLocal("theme", prefs.theme);
     }
-
     if (prefs.accentKey) {
       setLocal("login-accent", prefs.accentKey);
       setLocal("accent", prefs.accentKey);
     }
-
     const color = prefs.accentColor || prefs.customAccent || (prefs.accentKey ? ACCENT_COLORS[prefs.accentKey] : "");
-    if (color && isHex(color)) {
+    if (isHex(color)) {
       setLocal("desktop-accent", color);
       setLocal("desktop-accent-color", color);
       setLocal("login-accent-color", color);
       setLocal("login-custom-accent", color);
       setLocal("accent-color", color);
     }
-
     if (prefs.taskbarSettings) setLocal("taskbar-settings", prefs.taskbarSettings);
     if (Array.isArray(prefs.pinnedApps)) setLocal("pinned-apps", prefs.pinnedApps);
     if (Array.isArray(prefs.recentAccents)) setLocal("recent-accents", prefs.recentAccents);
@@ -211,140 +190,105 @@ function applyPersonalization(prefs?: Partial<PersonalizationPayload> | null) {
     if (prefs.accentTaskbar) setLocal("accent-taskbar", prefs.accentTaskbar);
     if (prefs.accentBorders) setLocal("accent-borders", prefs.accentBorders);
   } finally {
-    suppressLocalCapture = false;
+    suppressCapture = false;
   }
-
   window.dispatchEvent(new Event("desktop-theme-change"));
   window.dispatchEvent(new Event("login-theme-change"));
   window.dispatchEvent(new Event("accent-change"));
   window.dispatchEvent(new Event("login-accent-change"));
   window.dispatchEvent(new Event("appearance-change"));
-  window.dispatchEvent(new CustomEvent("taskbar-settings-change", { detail: prefs.taskbarSettings || {} }));
   window.dispatchEvent(new Event("personalization-sync-applied"));
 }
 
 function gasJsonp(action: string, payload?: unknown): Promise<GasResponse | null> {
-  if (!GAS_URL || typeof document === "undefined") return Promise.resolve(null);
-
-  return new Promise((resolve, reject) => {
+  if (!GAS_URL || typeof document === "undefined" || remoteDisabled || isQuiet()) return Promise.resolve(null);
+  return new Promise((resolve) => {
     const callbackName = `__a3k64Personalization_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const script = document.createElement("script");
     const url = new URL(GAS_URL);
     let timeoutId = 0;
-
+    let done = false;
+    const finish = (value: GasResponse | null) => {
+      if (done) return;
+      done = true;
+      window.clearTimeout(timeoutId);
+      delete (window as typeof window & Record<string, unknown>)[callbackName];
+      script.remove();
+      resolve(value);
+    };
     url.searchParams.set("action", action);
     url.searchParams.set("callback", callbackName);
     url.searchParams.set("t", String(Date.now()));
     if (payload !== undefined) url.searchParams.set("payload", JSON.stringify(payload));
-
-    const cleanup = () => {
-      window.clearTimeout(timeoutId);
-      delete (window as typeof window & Record<string, unknown>)[callbackName];
-      script.remove();
-    };
-
-    (window as typeof window & Record<string, unknown>)[callbackName] = (json: GasResponse) => {
-      cleanup();
-      if (json?.ok === false) reject(new Error(asText(json.error, "Google Apps Script trả về lỗi.")));
-      else if (json?.data?.ok === false) reject(new Error(asText(json.data.error, "Google Apps Script trả về lỗi.")));
-      else resolve(json);
-    };
-
+    (window as typeof window & Record<string, unknown>)[callbackName] = (json: GasResponse) => finish(json);
     script.onerror = () => {
-      cleanup();
-      reject(new Error("Không tải được JSONP PERSONALIZATION từ Google Apps Script."));
+      quietForAWhile();
+      finish(null);
     };
     timeoutId = window.setTimeout(() => {
-      cleanup();
-      reject(new Error("Google Apps Script PERSONALIZATION phản hồi quá lâu."));
+      quietForAWhile();
+      finish(null);
     }, JSONP_TIMEOUT_MS);
     script.src = url.toString();
     document.head.appendChild(script);
   });
 }
 
-async function fetchRemotePersonalization(user: SessionUser): Promise<Partial<PersonalizationPayload> | null> {
-  const response = await gasJsonp("getPersonalization", {
-    username: accountId(user),
-    email: user.email,
-    uid: user.uid,
-  });
-  const data = response?.data || response;
+async function fetchRemotePrefs(user: SessionUser) {
+  const res = await gasJsonp("getPersonalization", { username: accountId(user), email: user.email, uid: user.uid });
+  const data = res?.data || res;
   return (data?.personalization || data?.prefs || data?.preferences || null) as Partial<PersonalizationPayload> | null;
 }
 
-async function saveRemotePersonalization(user: SessionUser, personalization: PersonalizationPayload | Partial<PersonalizationPayload>) {
-  const response = await gasJsonp("savePersonalization", {
-    username: accountId(user),
-    email: user.email,
-    uid: user.uid,
-    displayName: displayNameOf(user),
-    personalization,
-  });
-  const data = response?.data || response;
-  if (data?.ok === false) throw new Error(asText(data.error, "Không lưu được cá nhân hoá."));
+async function saveRemotePrefs(user: SessionUser, personalization: Partial<PersonalizationPayload>) {
+  const res = await gasJsonp("savePersonalization", { username: accountId(user), email: user.email, uid: user.uid, displayName: displayName(user), personalization });
+  return res !== null;
 }
 
 function scheduleSave() {
-  if (!activeAccount || suppressLocalCapture) return;
+  if (!activeAccount || suppressCapture || remoteDisabled || isQuiet()) return;
   window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(async () => {
     const session = readSession();
     if (!session?.user || accountId(session.user) !== activeAccount) return;
-    const prefs = collectPersonalization();
+    const prefs = collectPrefs();
     const json = JSON.stringify(prefs);
     if (json === lastSavedJson) return;
     lastSavedJson = json;
-    try {
-      await saveRemotePersonalization(session.user, prefs);
-    } catch (error) {
-      console.warn("Không đồng bộ được cá nhân hoá:", error);
-    }
-  }, 650);
+    const ok = await saveRemotePrefs(session.user, prefs);
+    if (!ok) quietForAWhile();
+  }, 750);
 }
 
 async function syncForSession(user: SessionUser, options?: { loginAppearanceOnly?: boolean }) {
   const account = accountId(user);
-  if (!account) return;
+  if (!account || remoteDisabled || isQuiet()) return;
   activeAccount = account;
-
-  try {
-    const currentLoginAppearance = collectLoginAppearanceOnly();
-    const remotePrefs = await fetchRemotePersonalization(user);
-    const merged: PersonalizationPayload = {
-      version: PERSONALIZATION_VERSION,
-      ...(remotePrefs || {}),
-      ...(options?.loginAppearanceOnly ? currentLoginAppearance : {}),
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (options?.loginAppearanceOnly || !remotePrefs) {
-      await saveRemotePersonalization(user, merged);
-    }
-
-    lastSavedJson = JSON.stringify(merged);
-    applyPersonalization(merged);
-  } catch (error) {
-    console.warn("Không tải/lưu cá nhân hoá từ PERSONALIZATION:", error);
-  }
+  const remotePrefs = await fetchRemotePrefs(user);
+  if (remoteDisabled || isQuiet()) return;
+  const merged: PersonalizationPayload = {
+    version: 2,
+    ...(remotePrefs || {}),
+    ...(options?.loginAppearanceOnly ? loginLook() : {}),
+    updatedAt: new Date().toISOString(),
+  };
+  if (options?.loginAppearanceOnly || !remotePrefs) await saveRemotePrefs(user, merged);
+  lastSavedJson = JSON.stringify(merged);
+  applyPrefs(merged);
 }
 
-function installLocalStorageHook() {
+function installStorageHook() {
   const originalSetItem = Storage.prototype.setItem;
   const originalRemoveItem = Storage.prototype.removeItem;
-
   Storage.prototype.setItem = function patchedSetItem(key: string, value: string) {
     originalSetItem.call(this, key, value);
-
     if (key === SESSION_KEY) {
       const session = readSession();
       if (session?.user) void syncForSession(session.user, { loginAppearanceOnly: true });
       return;
     }
-
     if (PERSONALIZATION_KEYS.has(key)) scheduleSave();
   };
-
   Storage.prototype.removeItem = function patchedRemoveItem(key: string) {
     originalRemoveItem.call(this, key);
     if (key === SESSION_KEY) activeAccount = "";
@@ -355,21 +299,15 @@ function installLocalStorageHook() {
 function boot() {
   if (booted || typeof window === "undefined") return;
   booted = true;
-  installLocalStorageHook();
-
+  if (isQuiet()) remoteDisabled = true;
+  installStorageHook();
   const session = readSession();
   if (session?.user) void syncForSession(session.user, { loginAppearanceOnly: false });
-
   window.addEventListener("taskbar-settings-change", scheduleSave);
   window.addEventListener("accent-change", scheduleSave);
   window.addEventListener("desktop-theme-change", scheduleSave);
   window.addEventListener("login-theme-change", scheduleSave);
   window.addEventListener("appearance-change", scheduleSave);
-  window.addEventListener("beforeunload", () => {
-    if (!activeAccount) return;
-    const session = readSession();
-    if (session?.user) void saveRemotePersonalization(session.user, collectPersonalization());
-  });
 }
 
 boot();
