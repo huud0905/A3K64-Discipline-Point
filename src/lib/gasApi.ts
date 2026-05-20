@@ -230,28 +230,72 @@ function hideProcessing() {
   document.getElementById("a3k64-processing-mask")?.remove();
 }
 
+function gasJsonp(action: string, payload?: unknown): Promise<RawGasResponse | null> {
+  if (!GAS_URL || typeof document === "undefined") return Promise.resolve(null);
+
+  return new Promise((resolve, reject) => {
+    const callbackName = `__a3k64GasCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const script = document.createElement("script");
+    const url = new URL(GAS_URL);
+
+    url.searchParams.set("action", action);
+    url.searchParams.set("callback", callbackName);
+    url.searchParams.set("t", String(Date.now()));
+    if (payload !== undefined) url.searchParams.set("payload", JSON.stringify(payload));
+
+    const cleanup = () => {
+      delete (window as typeof window & Record<string, unknown>)[callbackName];
+      script.remove();
+    };
+
+    (window as typeof window & Record<string, unknown>)[callbackName] = (json: RawGasResponse) => {
+      cleanup();
+      if (json?.ok === false) reject(new Error(asText(json.error, "Google Apps Script trả về lỗi.")));
+      else if (json?.data?.ok === false) reject(new Error(asText(json.data.error, "Google Apps Script trả về lỗi.")));
+      else resolve(json);
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error("Không tải được JSONP từ Google Apps Script."));
+    };
+    script.src = url.toString();
+    document.head.appendChild(script);
+  });
+}
+
 async function gasGet(action: string) {
   if (!GAS_URL) return null;
   const url = new URL(GAS_URL);
   url.searchParams.set("action", action);
   url.searchParams.set("t", String(Date.now()));
-  const response = await fetch(url.toString(), { method: "GET", redirect: "follow" });
-  if (!response.ok) throw new Error(`GAS GET ${action} failed: ${response.status}`);
-  return parseResponse<RawGasResponse>(response);
+  try {
+    const response = await fetch(url.toString(), { method: "GET", redirect: "follow" });
+    if (!response.ok) throw new Error(`GAS GET ${action} failed: ${response.status}`);
+    return parseResponse<RawGasResponse>(response);
+  } catch (error) {
+    console.warn(`GAS GET ${action} bị chặn bởi CORS, chuyển sang JSONP.`, error);
+    return gasJsonp(action);
+  }
 }
 
 async function gasPost(action: string, payload: unknown, processingMessage?: string) {
   if (!GAS_URL) return null;
   if (processingMessage) showProcessing(processingMessage);
   try {
-    const response = await fetch(GAS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action, payload }),
-      redirect: "follow",
-    });
-    if (!response.ok) throw new Error(`GAS POST ${action} failed: ${response.status}`);
-    return await parseResponse<RawGasResponse>(response);
+    try {
+      const response = await fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action, payload }),
+        redirect: "follow",
+      });
+      if (!response.ok) throw new Error(`GAS POST ${action} failed: ${response.status}`);
+      return await parseResponse<RawGasResponse>(response);
+    } catch (error) {
+      console.warn(`GAS POST ${action} bị chặn bởi CORS, chuyển sang JSONP.`, error);
+      return await gasJsonp(action, payload);
+    }
   } finally {
     if (processingMessage) hideProcessing();
   }
