@@ -9,7 +9,30 @@ type StudentTableProps = {
   onOpenStudent?: (studentId: string) => void;
   onEditStudent?: (studentId: string) => void;
   canEditStudent?: (student: StudentScoreSummary) => boolean;
+  highlightStudentName?: string;
 };
+
+function normalizeVietnameseName(value?: string | null) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function isCurrentStudent(student: StudentScoreSummary, highlightStudentName?: string) {
+  if (!highlightStudentName) return false;
+  return normalizeVietnameseName(student.name) === normalizeVietnameseName(highlightStudentName);
+}
+
+function rowClass(student: StudentScoreSummary, editable: boolean, highlightStudentName?: string) {
+  return [!editable ? "readonly-student-row" : "", isCurrentStudent(student, highlightStudentName) ? "current-user-row" : ""]
+    .filter(Boolean)
+    .join(" ") || undefined;
+}
 
 function isHiddenSheetTotal(event: ScoreEvent) {
   return String(event.note || "").includes("__SHEET_TOTAL__");
@@ -28,11 +51,13 @@ function CompactTable({
   startIndex,
   onOpenStudent,
   canEditStudent,
+  highlightStudentName,
 }: {
   students: StudentScoreSummary[];
   startIndex: number;
   onOpenStudent?: (studentId: string) => void;
   canEditStudent?: (student: StudentScoreSummary) => boolean;
+  highlightStudentName?: string;
 }) {
   return (
     <div className="score-table-wrap compact-table-wrap">
@@ -50,7 +75,7 @@ function CompactTable({
           {students.map((student, index) => {
             const editable = canEditStudent ? canEditStudent(student) : true;
             return (
-              <tr key={student.id} className={!editable ? "readonly-student-row" : undefined}>
+              <tr key={student.id} className={rowClass(student, editable, highlightStudentName)}>
                 <td>{startIndex + index + 1}</td>
                 <td>
                   <button
@@ -78,7 +103,7 @@ function CompactTable({
   );
 }
 
-export function StudentTable({ title, students, compact = false, splitCompact = false, onOpenStudent, onEditStudent, canEditStudent }: StudentTableProps) {
+export function StudentTable({ title, students, compact = false, splitCompact = false, onOpenStudent, onEditStudent, canEditStudent, highlightStudentName }: StudentTableProps) {
   if (compact) {
     const shouldSplit = splitCompact || title === "Danh sách cá nhân";
 
@@ -91,8 +116,8 @@ export function StudentTable({ title, students, compact = false, splitCompact = 
         <section className="score-panel student-table-panel compact-split-panel">
           {title && <div className="table-title">{title}</div>}
           <div className="compact-split-grid">
-            <CompactTable students={leftStudents} startIndex={0} onOpenStudent={onOpenStudent} canEditStudent={canEditStudent} />
-            <CompactTable students={rightStudents} startIndex={midpoint} onOpenStudent={onOpenStudent} canEditStudent={canEditStudent} />
+            <CompactTable students={leftStudents} startIndex={0} onOpenStudent={onOpenStudent} canEditStudent={canEditStudent} highlightStudentName={highlightStudentName} />
+            <CompactTable students={rightStudents} startIndex={midpoint} onOpenStudent={onOpenStudent} canEditStudent={canEditStudent} highlightStudentName={highlightStudentName} />
           </div>
         </section>
       );
@@ -101,7 +126,7 @@ export function StudentTable({ title, students, compact = false, splitCompact = 
     return (
       <section className="score-panel student-table-panel">
         {title && <div className="table-title">{title}</div>}
-        <CompactTable students={students} startIndex={0} onOpenStudent={onOpenStudent} canEditStudent={canEditStudent} />
+        <CompactTable students={students} startIndex={0} onOpenStudent={onOpenStudent} canEditStudent={canEditStudent} highlightStudentName={highlightStudentName} />
       </section>
     );
   }
@@ -134,7 +159,7 @@ export function StudentTable({ title, students, compact = false, splitCompact = 
               const visibleNegative = minusEvents.reduce((sum, event) => sum + event.points, 0);
 
               return (
-                <tr key={student.id} className={!editable ? "readonly-student-row" : undefined}>
+                <tr key={student.id} className={rowClass(student, editable, highlightStudentName)}>
                   <td className="table-index">{index + 1}</td>
                   <td className="student-cell">
                     <button
