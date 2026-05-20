@@ -51,6 +51,7 @@ type GlobalRuleCache = typeof globalThis & {
 };
 
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
+const JSONP_TIMEOUT_MS = 15000;
 let activeMutations = 0;
 
 function getLastNameInitial(name: string) {
@@ -170,7 +171,8 @@ function setGlobalRules(rules: QuickScoreRule[]) {
 function normalizeWeeks(raw: unknown, events: ScoreEvent[]) {
   const fromSheet = Array.isArray(raw) ? raw.map((item) => asNumber(item, NaN)).filter(Number.isFinite) : [];
   const fromEvents = events.map((event) => event.week);
-  return Array.from(new Set([...fromSheet, ...fromEvents])).sort((a, b) => a - b);
+  const weeks = Array.from(new Set([...fromSheet, ...fromEvents])).sort((a, b) => a - b);
+  return weeks.length ? weeks : [1];
 }
 
 function normalizePayload(data: GasResponseData): GasScoreboardPayload {
@@ -180,13 +182,7 @@ function normalizePayload(data: GasResponseData): GasScoreboardPayload {
   const quickScoreReasons = normalizeRules(data.quickScoreReasons ?? data.rules);
   if (quickScoreReasons.length) setGlobalRules(quickScoreReasons);
 
-  return {
-    students,
-    events,
-    weeks,
-    quickScoreReasons,
-    updatedAt: asText(data.updatedAt) || undefined,
-  };
+  return { students, events, weeks, quickScoreReasons, updatedAt: asText(data.updatedAt) || undefined };
 }
 
 async function parseResponse<T>(response: Response): Promise<T | null> {
@@ -237,6 +233,7 @@ function gasJsonp(action: string, payload?: unknown): Promise<RawGasResponse | n
     const callbackName = `__a3k64GasCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const script = document.createElement("script");
     const url = new URL(GAS_URL);
+    let timeoutId = 0;
 
     url.searchParams.set("action", action);
     url.searchParams.set("callback", callbackName);
@@ -244,6 +241,7 @@ function gasJsonp(action: string, payload?: unknown): Promise<RawGasResponse | n
     if (payload !== undefined) url.searchParams.set("payload", JSON.stringify(payload));
 
     const cleanup = () => {
+      window.clearTimeout(timeoutId);
       delete (window as typeof window & Record<string, unknown>)[callbackName];
       script.remove();
     };
@@ -257,25 +255,45 @@ function gasJsonp(action: string, payload?: unknown): Promise<RawGasResponse | n
 
     script.onerror = () => {
       cleanup();
-      reject(new Error("Không tải được JSONP từ Google Apps Script."));
+      reject(new Error("Không tải được JSONP từ Google Apps Script. Hãy cập nhật Api.gs và deploy lại Web App."));
     };
+    timeoutId = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Google Apps Script phản hồi quá lâu. Kiểm tra deploy Web App hoặc Api.gs."));
+    }, JSONP_TIMEOUT_MS);
     script.src = url.toString();
     document.head.appendChild(script);
   });
 }
 
-async function gasGet(action: string) {
+async function gasFetchFallback(action: string, payload?: unknown) {
   if (!GAS_URL) return null;
+  const isPost = payload !== undefined;
+  if (isPost) {
+    const response = await fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action, payload }),
+      redirect: "follow",
+    });
+    if (!response.ok) throw new Error(`GAS POST ${action} failed: ${response.status}`);
+    return parseResponse<RawGasResponse>(response);
+  }
   const url = new URL(GAS_URL);
   url.searchParams.set("action", action);
   url.searchParams.set("t", String(Date.now()));
+  const response = await fetch(url.toString(), { method: "GET", redirect: "follow" });
+  if (!response.ok) throw new Error(`GAS GET ${action} failed: ${response.status}`);
+  return parseResponse<RawGasResponse>(response);
+}
+
+async function gasGet(action: string) {
+  if (!GAS_URL) return null;
   try {
-    const response = await fetch(url.toString(), { method: "GET", redirect: "follow" });
-    if (!response.ok) throw new Error(`GAS GET ${action} failed: ${response.status}`);
-    return parseResponse<RawGasResponse>(response);
-  } catch (error) {
-    console.warn(`GAS GET ${action} bị chặn bởi CORS, chuyển sang JSONP.`, error);
-    return gasJsonp(action);
+    return await gasJsonp(action);
+  } catch (jsonpError) {
+    console.warn(`GAS JSONP ${action} thất bại, thử fetch dự phòng.`, jsonpError);
+    return gasFetchFallback(action);
   }
 }
 
@@ -284,17 +302,10 @@ async function gasPost(action: string, payload: unknown, processingMessage?: str
   if (processingMessage) showProcessing(processingMessage);
   try {
     try {
-      const response = await fetch(GAS_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action, payload }),
-        redirect: "follow",
-      });
-      if (!response.ok) throw new Error(`GAS POST ${action} failed: ${response.status}`);
-      return await parseResponse<RawGasResponse>(response);
-    } catch (error) {
-      console.warn(`GAS POST ${action} bị chặn bởi CORS, chuyển sang JSONP.`, error);
       return await gasJsonp(action, payload);
+    } catch (jsonpError) {
+      console.warn(`GAS JSONP ${action} thất bại, thử POST dự phòng.`, jsonpError);
+      return await gasFetchFallback(action, payload);
     }
   } finally {
     if (processingMessage) hideProcessing();
@@ -341,7 +352,7 @@ export async function createWeekInGas(week: number) {
 export async function validateLoginWithGas(username: string, password: string): Promise<GasLoginUser | null> {
   try {
     const response = await gasPost("login", { username, password });
-    const data = response?.data;
+    const data = response?.data || response;
     if (!data?.ok || !data.user) return null;
 
     const user = data.user as Partial<GasLoginUser> & Record<string, unknown>;
@@ -352,7 +363,7 @@ export async function validateLoginWithGas(username: string, password: string): 
       photoURL: null,
       provider: asText(user.provider, "gas"),
       role: asText(user.role),
-      group: asText(user.group),
+      group: asText(user.group ?? user.to),
     };
   } catch (error) {
     console.error("Không đăng nhập được qua Google Sheets:", error);
@@ -367,7 +378,7 @@ export async function resetPasswordWithGas(fullName: string, phone: string, newE
       { fullName, phone, newEmail, newPassword },
       "Đang cập nhật tài khoản..."
     );
-    const data = response?.data;
+    const data = response?.data || response;
     if (!data?.ok) return { ok: false, message: asText(data?.error, "Không cập nhật được tài khoản.") };
     const user = data.user as Partial<GasLoginUser> & Record<string, unknown> | undefined;
     return {
@@ -381,7 +392,7 @@ export async function resetPasswordWithGas(fullName: string, phone: string, newE
             photoURL: null,
             provider: asText(user.provider, "gas"),
             role: asText(user.role, "hoc_sinh"),
-            group: asText(user.group),
+            group: asText(user.group ?? user.to),
           }
         : undefined,
     };
