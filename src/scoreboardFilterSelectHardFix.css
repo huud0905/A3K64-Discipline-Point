@@ -68,6 +68,77 @@ body > .filter-select-menu.portal-menu .filter-select-option,
   cursor: pointer !important;
 }
 
+.scoreboard-app .score-permission-banner,
+.scoreboard-app .score-permission-note {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin-top: 8px !important;
+  padding: 9px 11px !important;
+  border: 1px solid rgba(148, 163, 184, .22) !important;
+  border-radius: 14px !important;
+  color: #cbd5e1 !important;
+  background: rgba(148, 163, 184, .09) !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+.scoreboard-app .readonly-student-row {
+  opacity: .48 !important;
+  filter: grayscale(.78) !important;
+  background: rgba(148, 163, 184, .045) !important;
+}
+
+.scoreboard-app .readonly-student-row .student-name-button,
+.scoreboard-app .readonly-student-row .edit-score-button {
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+.scoreboard-app .readonly-student-row .edit-score-button {
+  background: rgba(148, 163, 184, .18) !important;
+  color: rgba(226, 232, 240, .56) !important;
+  box-shadow: none !important;
+}
+
+.scoreboard-app .scoreboard-tabs button:disabled {
+  opacity: .45 !important;
+  filter: grayscale(1) !important;
+  cursor: not-allowed !important;
+  background: rgba(148, 163, 184, .16) !important;
+  color: rgba(226, 232, 240, .55) !important;
+}
+
+.scoreboard-app.student-readonly-mode .scoreboard-tabs button:nth-child(2) {
+  opacity: .45 !important;
+  filter: grayscale(1) !important;
+  pointer-events: none !important;
+}
+
+.theme-light .scoreboard-app .score-permission-banner,
+.theme-light .scoreboard-app .score-permission-note,
+.win-root.theme-light .scoreboard-app .score-permission-banner,
+.win-root.theme-light .scoreboard-app .score-permission-note,
+:root.light .scoreboard-app .score-permission-banner,
+:root.light .scoreboard-app .score-permission-note {
+  color: #64748b !important;
+  background: #eef4fb !important;
+  border-color: #d8e3ef !important;
+}
+
+.theme-light .scoreboard-app .readonly-student-row,
+.win-root.theme-light .scoreboard-app .readonly-student-row,
+:root.light .scoreboard-app .readonly-student-row {
+  background: #eef2f7 !important;
+}
+
+.theme-light .scoreboard-app .scoreboard-tabs button:disabled,
+.win-root.theme-light .scoreboard-app .scoreboard-tabs button:disabled,
+:root.light .scoreboard-app .scoreboard-tabs button:disabled {
+  color: #94a3b8 !important;
+  background: #e5e7eb !important;
+}
+
 @media (max-width: 760px) {
   body > .filter-select-menu.portal-menu.subject-floating-menu,
   .filter-select-menu.portal-menu.subject-floating-menu {
