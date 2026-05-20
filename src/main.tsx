@@ -4,6 +4,7 @@ import App from './App';
 import './taskViewEnhancer';
 import './startMenuListEnhancer';
 import './mobileAppShell';
+import './personalizationSync';
 import './scoreboardMobilePolish';
 import './scoreboardMobileFinalFix';
 import './scoreboardMobileOcdFix';
