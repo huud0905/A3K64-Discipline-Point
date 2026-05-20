@@ -9,6 +9,7 @@ type OverviewGroupsPageProps = {
   podiumSummaries?: StudentScoreSummary[];
   week: number;
   onOpenStudent: (studentId: string) => void;
+  canEditStudent?: (student: StudentScoreSummary) => boolean;
 };
 
 const DEFAULT_ORDER = [1, 2, 3, 4];
@@ -46,7 +47,7 @@ function moveItem(order: number[], group: number, targetIndex: number) {
   return next;
 }
 
-export function OverviewGroupsPage({ summaries, podiumSummaries, week, onOpenStudent }: OverviewGroupsPageProps) {
+export function OverviewGroupsPage({ summaries, podiumSummaries, week, onOpenStudent, canEditStudent }: OverviewGroupsPageProps) {
   const gridRef = useRef<HTMLElement | null>(null);
   const groupStats = getGroupStats(summaries);
   const [order, setOrder] = useState<number[]>(readOrder);
@@ -60,13 +61,7 @@ export function OverviewGroupsPage({ summaries, podiumSummaries, week, onOpenStu
 
   const startDrag = (event: PointerEvent<HTMLDivElement>, groupNumber: number) => {
     event.currentTarget.setPointerCapture(event.pointerId);
-    setDrag({
-      group: groupNumber,
-      startX: event.clientX,
-      currentX: event.clientX,
-      deltaX: 0,
-      pointerId: event.pointerId,
-    });
+    setDrag({ group: groupNumber, startX: event.clientX, currentX: event.clientX, deltaX: 0, pointerId: event.pointerId });
   };
 
   const updateDrag = (event: PointerEvent<HTMLElement>) => {
@@ -76,7 +71,6 @@ export function OverviewGroupsPage({ summaries, podiumSummaries, week, onOpenStu
 
   const finishDrag = () => {
     if (!drag) return;
-
     const currentIndex = order.indexOf(drag.group);
     const cards = Array.from(gridRef.current?.querySelectorAll<HTMLElement>(".ordered-group-card") || []);
     const activeCard = cards.find((card) => card.dataset.group === String(drag.group));
@@ -88,7 +82,6 @@ export function OverviewGroupsPage({ summaries, podiumSummaries, week, onOpenStu
     const offset = Math.round(drag.deltaX / columnSize);
     const targetIndex = currentIndex + offset;
     const nextOrder = moveItem(order, drag.group, targetIndex);
-
     setOrder(nextOrder);
     localStorage.setItem(GROUP_ORDER_KEY, JSON.stringify(nextOrder));
     setDrag(null);
@@ -111,7 +104,6 @@ export function OverviewGroupsPage({ summaries, podiumSummaries, week, onOpenStu
       >
         {orderedGroups.map((group) => {
           const isDragging = drag?.group === group.group;
-
           return (
             <div
               className={`group-overview-card ordered-group-card ${isDragging ? "dragging" : ""}`}
@@ -119,14 +111,10 @@ export function OverviewGroupsPage({ summaries, podiumSummaries, week, onOpenStu
               data-group={group.group}
               style={isDragging ? { transform: `translate3d(${drag.deltaX}px, -14px, 0) scale(1.025)`, zIndex: 10 } : undefined}
             >
-              <div
-                className="group-overview-title draggable-group-title clean-draggable-title"
-                onPointerDown={(event) => startDrag(event, group.group)}
-                title="Giữ chuột và kéo ngang để đổi vị trí tổ"
-              >
+              <div className="group-overview-title draggable-group-title clean-draggable-title" onPointerDown={(event) => startDrag(event, group.group)} title="Giữ chuột và kéo ngang để đổi vị trí tổ">
                 Tổ {group.group}
               </div>
-              <StudentTable students={group.members} compact onOpenStudent={onOpenStudent} />
+              <StudentTable students={group.members} compact onOpenStudent={onOpenStudent} canEditStudent={canEditStudent} />
             </div>
           );
         })}
