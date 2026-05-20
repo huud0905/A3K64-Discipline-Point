@@ -10,6 +10,7 @@ type OverviewGroupsPageProps = {
   week: number;
   onOpenStudent: (studentId: string) => void;
   canEditStudent?: (student: StudentScoreSummary) => boolean;
+  highlightStudentName?: string;
 };
 
 const DEFAULT_ORDER = [1, 2, 3, 4];
@@ -47,7 +48,7 @@ function moveItem(order: number[], group: number, targetIndex: number) {
   return next;
 }
 
-export function OverviewGroupsPage({ summaries, podiumSummaries, week, onOpenStudent, canEditStudent }: OverviewGroupsPageProps) {
+export function OverviewGroupsPage({ summaries, podiumSummaries, week, onOpenStudent, canEditStudent, highlightStudentName }: OverviewGroupsPageProps) {
   const gridRef = useRef<HTMLElement | null>(null);
   const groupStats = getGroupStats(summaries);
   const [order, setOrder] = useState<number[]>(readOrder);
@@ -114,7 +115,7 @@ export function OverviewGroupsPage({ summaries, podiumSummaries, week, onOpenStu
               <div className="group-overview-title draggable-group-title clean-draggable-title" onPointerDown={(event) => startDrag(event, group.group)} title="Giữ chuột và kéo ngang để đổi vị trí tổ">
                 Tổ {group.group}
               </div>
-              <StudentTable students={group.members} compact onOpenStudent={onOpenStudent} canEditStudent={canEditStudent} />
+              <StudentTable students={group.members} compact onOpenStudent={onOpenStudent} canEditStudent={canEditStudent} highlightStudentName={highlightStudentName} />
             </div>
           );
         })}
