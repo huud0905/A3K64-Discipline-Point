@@ -70,35 +70,65 @@ body > .filter-select-menu.portal-menu .filter-select-option,
 
 .scoreboard-app .score-permission-banner,
 .scoreboard-app .score-permission-note {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  margin-top: 8px !important;
-  padding: 9px 11px !important;
-  border: 1px solid rgba(148, 163, 184, .22) !important;
-  border-radius: 14px !important;
-  color: #cbd5e1 !important;
-  background: rgba(148, 163, 184, .09) !important;
-  font-size: 12px !important;
-  font-weight: 850 !important;
+  display: none !important;
 }
 
 .scoreboard-app .readonly-student-row {
-  opacity: .48 !important;
-  filter: grayscale(.78) !important;
-  background: rgba(148, 163, 184, .045) !important;
+  opacity: 1 !important;
+  filter: none !important;
+  background: transparent !important;
 }
 
-.scoreboard-app .readonly-student-row .student-name-button,
-.scoreboard-app .readonly-student-row .edit-score-button {
-  cursor: not-allowed !important;
+.scoreboard-app .readonly-student-row .student-name-button {
+  cursor: default !important;
   pointer-events: none !important;
 }
 
 .scoreboard-app .readonly-student-row .edit-score-button {
-  background: rgba(148, 163, 184, .18) !important;
-  color: rgba(226, 232, 240, .56) !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  opacity: .38 !important;
+  filter: grayscale(1) !important;
+  background: rgba(148, 163, 184, .16) !important;
+  color: rgba(226, 232, 240, .52) !important;
   box-shadow: none !important;
+}
+
+.scoreboard-app .current-user-row {
+  position: relative !important;
+  background: linear-gradient(90deg, rgba(59, 130, 246, .14), rgba(59, 130, 246, .035)) !important;
+  box-shadow: inset 3px 0 0 var(--desktop-accent, #3b82f6) !important;
+}
+
+.scoreboard-app .current-user-row .student-name-button {
+  color: #ffffff !important;
+  text-shadow: 0 0 12px rgba(96, 165, 250, .38) !important;
+}
+
+.scoreboard-app .current-user-row td:first-child {
+  color: #dbeafe !important;
+}
+
+.scoreboard-app .current-user-row .score-positive,
+.scoreboard-app .current-user-row .total-cell.score-positive {
+  color: #34f5c6 !important;
+}
+
+.scoreboard-app .current-user-row .status-pill {
+  box-shadow: 0 0 0 1px rgba(255,255,255,.12), 0 0 18px rgba(16,185,129,.18) !important;
+}
+
+.scoreboard-app .score-page > .score-panel:first-child {
+  padding-top: 12px !important;
+}
+
+.scoreboard-app .score-page > .score-panel:first-child .table-toolbar {
+  min-height: 58px !important;
+  padding: 14px 18px !important;
+}
+
+.scoreboard-app .score-page > .score-panel:first-child .section-heading {
+  margin: 0 !important;
 }
 
 .scoreboard-app .scoreboard-tabs button:disabled {
@@ -115,21 +145,30 @@ body > .filter-select-menu.portal-menu .filter-select-option,
   pointer-events: none !important;
 }
 
-.theme-light .scoreboard-app .score-permission-banner,
-.theme-light .scoreboard-app .score-permission-note,
-.win-root.theme-light .scoreboard-app .score-permission-banner,
-.win-root.theme-light .scoreboard-app .score-permission-note,
-:root.light .scoreboard-app .score-permission-banner,
-:root.light .scoreboard-app .score-permission-note {
-  color: #64748b !important;
-  background: #eef4fb !important;
-  border-color: #d8e3ef !important;
+.theme-light .scoreboard-app .current-user-row,
+.win-root.theme-light .scoreboard-app .current-user-row,
+:root.light .scoreboard-app .current-user-row {
+  background: linear-gradient(90deg, rgba(37, 99, 235, .13), rgba(37, 99, 235, .035)) !important;
+}
+
+.theme-light .scoreboard-app .current-user-row .student-name-button,
+.win-root.theme-light .scoreboard-app .current-user-row .student-name-button,
+:root.light .scoreboard-app .current-user-row .student-name-button {
+  color: #1d4ed8 !important;
+  text-shadow: none !important;
 }
 
 .theme-light .scoreboard-app .readonly-student-row,
 .win-root.theme-light .scoreboard-app .readonly-student-row,
 :root.light .scoreboard-app .readonly-student-row {
-  background: #eef2f7 !important;
+  background: transparent !important;
+}
+
+.theme-light .scoreboard-app .readonly-student-row .edit-score-button,
+.win-root.theme-light .scoreboard-app .readonly-student-row .edit-score-button,
+:root.light .scoreboard-app .readonly-student-row .edit-score-button {
+  color: #94a3b8 !important;
+  background: #e5e7eb !important;
 }
 
 .theme-light .scoreboard-app .scoreboard-tabs button:disabled,
