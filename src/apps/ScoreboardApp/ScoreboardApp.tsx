@@ -107,6 +107,8 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   const weekRef = useRef(week);
   const initializedLiveRef = useRef(false);
   const pollingRef = useRef(false);
+  const seenSignaturesRef = useRef<Set<string>>(new Set());
+  const openedAtRef = useRef(Date.now());
 
   const showLiveToast = useCallback((toast: Omit<LiveToast, "id">) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -119,11 +121,16 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   const applyRemoteData = useCallback((remoteData: NonNullable<Awaited<ReturnType<typeof fetchScoreboardFromGas>>>, options?: { silent?: boolean; notify?: boolean }) => {
     const nextStudents = remoteData.students;
     const nextEvents = remoteData.events;
-    const previousEvents = eventsRef.current;
     const nextWeeks = remoteData.weeks.length ? remoteData.weeks : [weekRef.current || 1];
-    const previousSignatures = new Set(previousEvents.map(eventSignature));
+    const seenBefore = seenSignaturesRef.current;
+    const remoteSignatures = new Set(nextEvents.map(eventSignature));
     const newEvents = nextEvents
-      .filter((event) => !previousSignatures.has(eventSignature(event)))
+      .filter((event) => {
+        const signature = eventSignature(event);
+        if (seenBefore.has(signature)) return false;
+        const time = eventTime(event);
+        return time === 0 || time >= openedAtRef.current - 1500;
+      })
       .sort((a, b) => eventTime(b) - eventTime(a));
     const studentMap = new Map(nextStudents.map((student) => [student.id, student.name]));
     const nextWeekValue = nextWeeks.includes(weekRef.current) ? weekRef.current : nextWeeks[0] || 1;
@@ -150,6 +157,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
       });
     }
 
+    seenSignaturesRef.current = remoteSignatures;
     initializedLiveRef.current = true;
   }, [showLiveToast]);
 
@@ -167,6 +175,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
       setWeeks(localWeeks);
       setDataSource("local");
       setSyncMessage("Đang dùng dữ liệu cục bộ. Chưa cấu hình hoặc chưa đọc được Google Apps Script.");
+      seenSignaturesRef.current = new Set(localEvents.map(eventSignature));
       initializedLiveRef.current = true;
       return;
     }
@@ -241,6 +250,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
 
   const deleteScore = (eventId: string) => {
     setEvents((current) => current.filter((event) => event.id !== eventId));
+    seenSignaturesRef.current = new Set(Array.from(seenSignaturesRef.current).filter((signature) => !signature.startsWith(`${eventId}|`)));
     if (dataSource === "gas") {
       void deleteScoreEventInGas(eventId).catch(() => {
         setSyncMessage("Không xoá được trên Google Sheets. Hãy bấm làm mới để kiểm tra lại.");
@@ -252,11 +262,15 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   const addScore = (event: Omit<ScoreEvent, "id"> | Omit<ScoreEvent, "id" | "createdAt">) => {
     const eventData = event as Omit<ScoreEvent, "id"> & { createdAt?: string };
     const temporaryEvent: ScoreEvent = { ...eventData, id: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`, createdAt: eventData.createdAt || new Date().toISOString() };
+    seenSignaturesRef.current.add(eventSignature(temporaryEvent));
     setEvents((current) => [temporaryEvent, ...current]);
 
     if (dataSource === "gas") {
       void createScoreEventInGas(temporaryEvent)
-        .then((savedEvent) => setEvents((current) => current.map((item) => (item.id === temporaryEvent.id ? savedEvent : item))))
+        .then((savedEvent) => {
+          seenSignaturesRef.current.add(eventSignature(savedEvent));
+          setEvents((current) => current.map((item) => (item.id === temporaryEvent.id ? savedEvent : item)));
+        })
         .catch(() => setSyncMessage("Không lưu được lên Google Sheets. Dữ liệu đang tạm nằm trên trình duyệt."));
     }
   };
@@ -295,6 +309,7 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
     setEvents(mockScoreEvents);
     setWeeks(SCORE_WEEKS);
     setWeek(1);
+    seenSignaturesRef.current = new Set(mockScoreEvents.map(eventSignature));
   };
 
   const renderOverviewContent = () => {
