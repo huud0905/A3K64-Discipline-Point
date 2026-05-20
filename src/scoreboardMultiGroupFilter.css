@@ -1,0 +1,43 @@
+.group-multi-select .filter-select-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-multi-menu {
+  min-width: 100% !important;
+}
+
+.group-multi-option {
+  display: grid !important;
+  grid-template-columns: 22px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 8px !important;
+  text-align: left !important;
+}
+
+.group-check-box {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  display: inline-grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(148, 163, 184, .12);
+  border: 1px solid rgba(148, 163, 184, .2);
+}
+
+.group-multi-option.active .group-check-box {
+  background: var(--desktop-accent, #2563eb);
+  border-color: color-mix(in srgb, var(--desktop-accent, #2563eb) 76%, #fff);
+}
+
+@media (max-width: 760px) {
+  .group-multi-menu {
+    max-height: none !important;
+  }
+
+  .group-multi-option {
+    min-height: 42px !important;
+  }
+}

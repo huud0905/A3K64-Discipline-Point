@@ -1,0 +1,80 @@
+@media (min-width: 901px) {
+  .login-root .login-shell {
+    width: min(1240px, calc(100vw - 56px)) !important;
+    grid-template-columns: minmax(650px, 1.08fr) minmax(360px, .72fr) !important;
+  }
+
+  .login-root .login-left {
+    min-width: 650px !important;
+  }
+
+  .login-root .brand-top {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 22px !important;
+  }
+
+  .login-root .brand {
+    flex: 1 1 auto !important;
+    min-width: 260px !important;
+  }
+
+  .login-root .brand-tools {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 10px !important;
+    flex-wrap: nowrap !important;
+    min-width: max-content !important;
+  }
+
+  .login-root .brand-tools .theme-toggle,
+  .login-root .brand-tools .accent-list {
+    flex: 0 0 auto !important;
+  }
+}
+
+@media (max-width: 1180px) and (min-width: 901px) {
+  .login-root .login-shell {
+    width: min(1120px, calc(100vw - 40px)) !important;
+    grid-template-columns: minmax(560px, 1fr) minmax(340px, .78fr) !important;
+  }
+
+  .login-root .login-left {
+    min-width: 560px !important;
+  }
+
+  .login-root .brand h1 {
+    font-size: 22px !important;
+  }
+
+  .login-root .brand-tools {
+    gap: 8px !important;
+  }
+
+  .login-root .theme-toggle,
+  .login-root .accent-list {
+    gap: 5px !important;
+    padding: 5px !important;
+  }
+
+  .login-root .theme-toggle button,
+  .login-root .accent-dot {
+    width: 31px !important;
+    height: 31px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .login-root .login-shell {
+    width: 100% !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .login-root .login-left {
+    min-width: 0 !important;
+  }
+}
