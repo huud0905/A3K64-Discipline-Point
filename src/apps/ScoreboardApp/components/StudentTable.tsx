@@ -8,6 +8,7 @@ type StudentTableProps = {
   splitCompact?: boolean;
   onOpenStudent?: (studentId: string) => void;
   onEditStudent?: (studentId: string) => void;
+  canEditStudent?: (student: StudentScoreSummary) => boolean;
 };
 
 function isHiddenSheetTotal(event: ScoreEvent) {
@@ -26,10 +27,12 @@ function CompactTable({
   students,
   startIndex,
   onOpenStudent,
+  canEditStudent,
 }: {
   students: StudentScoreSummary[];
   startIndex: number;
   onOpenStudent?: (studentId: string) => void;
+  canEditStudent?: (student: StudentScoreSummary) => boolean;
 }) {
   return (
     <div className="score-table-wrap compact-table-wrap">
@@ -44,29 +47,38 @@ function CompactTable({
           </tr>
         </thead>
         <tbody>
-          {students.map((student, index) => (
-            <tr key={student.id}>
-              <td>{startIndex + index + 1}</td>
-              <td>
-                <button type="button" className="student-name-button" onClick={() => onOpenStudent?.(student.id)}>
-                  {student.name}
-                </button>
-                {student.role && <span className="student-role">{student.role}</span>}
-              </td>
-              <td className={student.total >= 0 ? "score-positive" : "score-negative"}>{formatScore(student.total)}</td>
-              <td className="rank-text">#{student.rank}</td>
-              <td>
-                <span className={`status-pill status-${statusClass(student.status)}`}>{student.status}</span>
-              </td>
-            </tr>
-          ))}
+          {students.map((student, index) => {
+            const editable = canEditStudent ? canEditStudent(student) : true;
+            return (
+              <tr key={student.id} className={!editable ? "readonly-student-row" : undefined}>
+                <td>{startIndex + index + 1}</td>
+                <td>
+                  <button
+                    type="button"
+                    className="student-name-button"
+                    onClick={() => editable && onOpenStudent?.(student.id)}
+                    disabled={!editable || !onOpenStudent}
+                    title={!editable ? "Bạn chỉ được xem, không có quyền sửa học sinh này" : undefined}
+                  >
+                    {student.name}
+                  </button>
+                  {student.role && <span className="student-role">{student.role}</span>}
+                </td>
+                <td className={student.total >= 0 ? "score-positive" : "score-negative"}>{formatScore(student.total)}</td>
+                <td className="rank-text">#{student.rank}</td>
+                <td>
+                  <span className={`status-pill status-${statusClass(student.status)}`}>{student.status}</span>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-export function StudentTable({ title, students, compact = false, splitCompact = false, onOpenStudent, onEditStudent }: StudentTableProps) {
+export function StudentTable({ title, students, compact = false, splitCompact = false, onOpenStudent, onEditStudent, canEditStudent }: StudentTableProps) {
   if (compact) {
     const shouldSplit = splitCompact || title === "Danh sách cá nhân";
 
@@ -79,8 +91,8 @@ export function StudentTable({ title, students, compact = false, splitCompact = 
         <section className="score-panel student-table-panel compact-split-panel">
           {title && <div className="table-title">{title}</div>}
           <div className="compact-split-grid">
-            <CompactTable students={leftStudents} startIndex={0} onOpenStudent={onOpenStudent} />
-            <CompactTable students={rightStudents} startIndex={midpoint} onOpenStudent={onOpenStudent} />
+            <CompactTable students={leftStudents} startIndex={0} onOpenStudent={onOpenStudent} canEditStudent={canEditStudent} />
+            <CompactTable students={rightStudents} startIndex={midpoint} onOpenStudent={onOpenStudent} canEditStudent={canEditStudent} />
           </div>
         </section>
       );
@@ -89,7 +101,7 @@ export function StudentTable({ title, students, compact = false, splitCompact = 
     return (
       <section className="score-panel student-table-panel">
         {title && <div className="table-title">{title}</div>}
-        <CompactTable students={students} startIndex={0} onOpenStudent={onOpenStudent} />
+        <CompactTable students={students} startIndex={0} onOpenStudent={onOpenStudent} canEditStudent={canEditStudent} />
       </section>
     );
   }
@@ -114,6 +126,7 @@ export function StudentTable({ title, students, compact = false, splitCompact = 
           </thead>
           <tbody>
             {students.map((student, index) => {
+              const editable = canEditStudent ? canEditStudent(student) : true;
               const visibleEvents = student.events.filter((event) => !isHiddenSheetTotal(event));
               const plusEvents = visibleEvents.filter((event) => event.points > 0);
               const minusEvents = visibleEvents.filter((event) => event.points < 0);
@@ -121,10 +134,16 @@ export function StudentTable({ title, students, compact = false, splitCompact = 
               const visibleNegative = minusEvents.reduce((sum, event) => sum + event.points, 0);
 
               return (
-                <tr key={student.id}>
+                <tr key={student.id} className={!editable ? "readonly-student-row" : undefined}>
                   <td className="table-index">{index + 1}</td>
                   <td className="student-cell">
-                    <button type="button" className="student-name-button detail-name" onClick={() => onOpenStudent?.(student.id)}>
+                    <button
+                      type="button"
+                      className="student-name-button detail-name"
+                      onClick={() => editable && onOpenStudent?.(student.id)}
+                      disabled={!editable || !onOpenStudent}
+                      title={!editable ? "Bạn chỉ được xem, không có quyền sửa học sinh này" : undefined}
+                    >
                       {student.name}
                     </button>
                     <span className="student-role">Tổ {student.group}{student.role ? ` · ${student.role}` : ""}</span>
@@ -166,7 +185,13 @@ export function StudentTable({ title, students, compact = false, splitCompact = 
                     <span className={`status-pill status-${statusClass(student.status)}`}>{student.status}</span>
                   </td>
                   <td>
-                    <button className="edit-score-button" type="button" onClick={() => onEditStudent?.(student.id)} title="Sửa điểm học sinh">
+                    <button
+                      className="edit-score-button"
+                      type="button"
+                      onClick={() => editable && onEditStudent?.(student.id)}
+                      disabled={!editable || !onEditStudent}
+                      title={editable ? "Sửa điểm học sinh" : "Bạn không có quyền sửa học sinh này"}
+                    >
                       <Pencil size={16} />
                     </button>
                   </td>
