@@ -31,6 +31,7 @@ const STORAGE_KEY = "scoreboard-local-events-v1";
 const WEEK_STORAGE_KEY = "scoreboard-local-weeks-v1";
 const WEEK_CREATORS = ["to_truong", "lop_truong", "bi_thu", "gvcn"];
 const LIVE_REFRESH_MS = 7000;
+const FRESH_EVENT_MARGIN_MS = 2500;
 
 function readLocalEvents() {
   try {
@@ -66,7 +67,7 @@ function matchesGroups(group: number, selectedGroups: GroupId[]) {
 }
 
 function eventSignature(event: ScoreEvent) {
-  return `${event.id}|${event.studentId}|${event.week}|${event.title}|${event.points}|${event.createdAt || ""}`;
+  return [event.studentId, event.week, event.title, event.points, event.type, event.category, event.note || "", event.createdBy || ""].join("|");
 }
 
 function eventTime(event: ScoreEvent) {
@@ -79,9 +80,8 @@ function isScoreboardForeground(root: HTMLDivElement | null) {
   const win = root.closest<HTMLElement>(".win-window");
   if (!win) return document.visibilityState === "visible";
   const minimized = win.classList.contains("minimized");
-  const focused = win.classList.contains("focused");
-  const hidden = win.offsetParent === null;
-  return document.visibilityState === "visible" && !minimized && !hidden && focused;
+  const hidden = win.offsetParent === null || getComputedStyle(win).display === "none" || getComputedStyle(win).visibility === "hidden";
+  return document.visibilityState === "visible" && !minimized && !hidden;
 }
 
 export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
@@ -108,14 +108,12 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
   const initializedLiveRef = useRef(false);
   const pollingRef = useRef(false);
   const seenSignaturesRef = useRef<Set<string>>(new Set());
-  const openedAtRef = useRef(Date.now());
+  const liveStartedAtRef = useRef(Date.now());
 
   const showLiveToast = useCallback((toast: Omit<LiveToast, "id">) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setLiveToasts((current) => [{ ...toast, id }, ...current].slice(0, 4));
-    window.setTimeout(() => {
-      setLiveToasts((current) => current.filter((item) => item.id !== id));
-    }, toast.kind === "foreground" ? 3600 : 5200);
+    window.setTimeout(() => setLiveToasts((current) => current.filter((item) => item.id !== id)), toast.kind === "foreground" ? 3600 : 5200);
   }, []);
 
   const applyRemoteData = useCallback((remoteData: NonNullable<Awaited<ReturnType<typeof fetchScoreboardFromGas>>>, options?: { silent?: boolean; notify?: boolean }) => {
@@ -124,12 +122,14 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
     const nextWeeks = remoteData.weeks.length ? remoteData.weeks : [weekRef.current || 1];
     const seenBefore = seenSignaturesRef.current;
     const remoteSignatures = new Set(nextEvents.map(eventSignature));
+    const now = Date.now();
     const newEvents = nextEvents
       .filter((event) => {
         const signature = eventSignature(event);
         if (seenBefore.has(signature)) return false;
         const time = eventTime(event);
-        return time === 0 || time >= openedAtRef.current - 1500;
+        if (!time) return false;
+        return time >= liveStartedAtRef.current - FRESH_EVENT_MARGIN_MS && time <= now + FRESH_EVENT_MARGIN_MS;
       })
       .sort((a, b) => eventTime(b) - eventTime(a));
     const studentMap = new Map(nextStudents.map((student) => [student.id, student.name]));
@@ -176,11 +176,13 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
       setDataSource("local");
       setSyncMessage("Đang dùng dữ liệu cục bộ. Chưa cấu hình hoặc chưa đọc được Google Apps Script.");
       seenSignaturesRef.current = new Set(localEvents.map(eventSignature));
+      liveStartedAtRef.current = Date.now();
       initializedLiveRef.current = true;
       return;
     }
 
     applyRemoteData(remoteData, { silent: false, notify: false });
+    liveStartedAtRef.current = Date.now();
   }, [applyRemoteData]);
 
   const canCreateWeek = WEEK_CREATORS.includes(String(userRole || "lop_truong"));
@@ -205,7 +207,6 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
         pollingRef.current = false;
       }
     }, LIVE_REFRESH_MS);
-
     return () => window.clearInterval(timer);
   }, [applyRemoteData, dataSource]);
 
@@ -216,41 +217,30 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
 
   const rawSummaries = useMemo(() => summarizeStudents(students, events, week), [events, students, week]);
   const groupFilteredRawSummaries = useMemo(() => rawSummaries.filter((student) => matchesGroups(student.group, groupFilter)), [groupFilter, rawSummaries]);
-
-  const filteredSummaries = useMemo(() => groupFilteredRawSummaries.filter((student) => {
-    const matchStatus = shownStatusFilter === "all" || student.status === shownStatusFilter;
-    return matchStatus;
-  }), [groupFilteredRawSummaries, shownStatusFilter]);
-
-  const summaries = useMemo(() => {
-    return [...filteredSummaries].sort((a, b) => {
-      const nameCompare = compareByGivenName(a, b);
-      if (shownSortMode === "name-az") return nameCompare;
-      if (shownSortMode === "name-za") return -nameCompare;
-      if (shownSortMode === "score-asc") return a.total - b.total || nameCompare;
-      return b.total - a.total || nameCompare;
-    });
-  }, [filteredSummaries, shownSortMode]);
-
+  const filteredSummaries = useMemo(() => groupFilteredRawSummaries.filter((student) => shownStatusFilter === "all" || student.status === shownStatusFilter), [groupFilteredRawSummaries, shownStatusFilter]);
+  const summaries = useMemo(() => [...filteredSummaries].sort((a, b) => {
+    const nameCompare = compareByGivenName(a, b);
+    if (shownSortMode === "name-az") return nameCompare;
+    if (shownSortMode === "name-za") return -nameCompare;
+    if (shownSortMode === "score-asc") return a.total - b.total || nameCompare;
+    return b.total - a.total || nameCompare;
+  }), [filteredSummaries, shownSortMode]);
   const scoringSummaries = useMemo(() => {
     const byId = new Map(groupFilteredRawSummaries.map((student) => [student.id, student]));
-    return students
-      .map((student) => byId.get(student.id))
-      .filter((student): student is NonNullable<typeof student> => Boolean(student));
+    return students.map((student) => byId.get(student.id)).filter((student): student is NonNullable<typeof student> => Boolean(student));
   }, [groupFilteredRawSummaries, students]);
-
   const groupStats = useMemo(() => getGroupStats(groupFilteredRawSummaries), [groupFilteredRawSummaries]);
   const totalScore = groupFilteredRawSummaries.reduce((sum, student) => sum + student.total, 0);
   const goodCount = groupFilteredRawSummaries.filter((student) => student.status === "Tốt" || student.status === "Khá").length;
   const warningCount = groupFilteredRawSummaries.filter((student) => student.status === "Chưa đạt").length;
   const topGroup = [...groupStats].sort((a, b) => b.average - a.average || b.total - a.total)[0];
   const editingStudent = rawSummaries.find((student) => student.id === editingStudentId) || null;
-
   const openStudent = (studentId: string) => setEditingStudentId(studentId);
 
   const deleteScore = (eventId: string) => {
     setEvents((current) => current.filter((event) => event.id !== eventId));
-    seenSignaturesRef.current = new Set(Array.from(seenSignaturesRef.current).filter((signature) => !signature.startsWith(`${eventId}|`)));
+    const event = eventsRef.current.find((item) => item.id === eventId);
+    if (event) seenSignaturesRef.current.delete(eventSignature(event));
     if (dataSource === "gas") {
       void deleteScoreEventInGas(eventId).catch(() => {
         setSyncMessage("Không xoá được trên Google Sheets. Hãy bấm làm mới để kiểm tra lại.");
@@ -264,7 +254,6 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
     const temporaryEvent: ScoreEvent = { ...eventData, id: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`, createdAt: eventData.createdAt || new Date().toISOString() };
     seenSignaturesRef.current.add(eventSignature(temporaryEvent));
     setEvents((current) => [temporaryEvent, ...current]);
-
     if (dataSource === "gas") {
       void createScoreEventInGas(temporaryEvent)
         .then((savedEvent) => {
@@ -310,12 +299,11 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
     setWeeks(SCORE_WEEKS);
     setWeek(1);
     seenSignaturesRef.current = new Set(mockScoreEvents.map(eventSignature));
+    liveStartedAtRef.current = Date.now();
   };
 
   const renderOverviewContent = () => {
-    if (viewMode === "students") {
-      return <StudentTable title="Danh sách cá nhân" students={summaries} compact onOpenStudent={openStudent} />;
-    }
+    if (viewMode === "students") return <StudentTable title="Danh sách cá nhân" students={summaries} compact onOpenStudent={openStudent} />;
     return <OverviewGroupsPage summaries={groupFilteredRawSummaries} podiumSummaries={rawSummaries} week={week} onOpenStudent={openStudent} />;
   };
 
@@ -325,51 +313,19 @@ export default function ScoreboardApp({ userRole }: ScoreboardAppProps) {
         <div className="left-tools-title"><span>Bảng điểm A3K64</span><strong>Bộ lọc</strong><small>Điều khiển bảng điểm</small></div>
         <WeekSelector week={week} weeks={weeks} onWeekChange={setWeek} viewMode={viewMode} onViewModeChange={setViewMode} viewModeDisabled={isScoringTab} canCreateWeek={canCreateWeek && !isCreatingWeek} onCreateWeek={requestCreateWeek} />
         {syncMessage && <div className="score-sync-warning">{syncMessage}</div>}
-
         <label className="score-filter"><span>Tổ</span><GroupMultiSelect value={groupFilter} onChange={setGroupFilter} /></label>
         <label className="score-filter"><span>Xếp loại</span><FilterSelect<StatusFilter> value={shownStatusFilter} options={[{ value: "all", label: "Tất cả xếp loại" }, { value: "Tốt", label: "Tốt" }, { value: "Khá", label: "Khá" }, { value: "Đạt", label: "Đạt" }, { value: "Chưa đạt", label: "Chưa đạt" }]} onChange={setStatusFilter} disabled={isOverviewMode || isScoringTab} title={isOverviewMode ? "Chỉ mở khi xem Cá nhân" : isScoringTab ? "Bảng chấm không dùng lọc xếp loại" : undefined} /></label>
         <label className="score-filter"><span>Sắp xếp</span><FilterSelect<SortMode> value={shownSortMode} options={[{ value: "score-desc", label: "Điểm cao đến thấp" }, { value: "score-asc", label: "Điểm thấp đến cao" }, { value: "name-az", label: "Theo tên học sinh A-Z" }, { value: "name-za", label: "Theo tên học sinh Z-A" }]} onChange={setSortMode} disabled={isOverviewMode || isScoringTab} title={isOverviewMode ? "Chỉ mở khi xem Cá nhân" : isScoringTab ? "Bảng chấm giữ thứ tự danh sách" : undefined} /></label>
-
         <div className="left-mini-section"><div className="left-mini-title">Tóm tắt tuần</div><div className="mini-stat"><span>Tổng điểm</span><strong className={totalScore >= 0 ? "score-positive" : "score-negative"}>{totalScore > 0 ? `+${totalScore}` : totalScore}</strong></div><div className="mini-stat"><span>Ổn định</span><strong>{goodCount}/{groupFilteredRawSummaries.length}</strong></div><div className="mini-stat"><span>Cần chú ý</span><strong>{warningCount}</strong></div><div className="mini-stat"><span>Tổ dẫn đầu</span><strong>{topGroup?.label || "Chưa có"}</strong></div></div>
       </aside>
-
       <section className="scoreboard-main">
         <header className="scoreboard-header"><div><span className="app-eyebrow">Bảng chấm điểm</span><h1>System <b>A3K64</b></h1><p>Quản lý điểm thi đua, xếp hạng học tập và nề nếp theo tuần.</p></div><nav className="scoreboard-tabs two-tabs"><button className={activeTab === "overview" ? "active" : ""} type="button" onClick={() => setActiveTab("overview")}>Tổng quan</button><button className={activeTab === "scoring" ? "active" : ""} type="button" onClick={() => setActiveTab("scoring")}>Bảng chấm</button></nav></header>
         <div className="scoreboard-actionbar"><div className="toolbar-actions"><button type="button" className="toolbar-button export"><Download size={15} />Xuất Excel</button><button type="button" className="toolbar-button camera"><Camera size={15} />Chụp ảnh</button><button type="button" className="toolbar-button auto"><Sparkles size={15} />Tự tính điểm</button><button type="button" className="toolbar-button" onClick={resetLocalData}><RefreshCcw size={15} />Làm mới dữ liệu</button></div></div>
         <main className="scoreboard-content">{activeTab === "overview" && renderOverviewContent()}{activeTab === "scoring" && <ScoringPage students={students} summaries={scoringSummaries} events={events} week={week} onAddScore={addScore} onOpenStudent={openStudent} onEditStudent={setEditingStudentId} />}</main>
       </section>
-
       {editingStudent && <ScoreEditModal student={editingStudent} allStudents={rawSummaries} week={week} events={events} onAddScore={addScore} onDeleteScore={deleteScore} onClose={() => setEditingStudentId(null)} />}
-
-      {createWeekConfirmOpen && (
-        <div className="create-week-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="create-week-modal-title">
-          <div className="create-week-modal-card">
-            <button type="button" className="create-week-modal-close" onClick={() => setCreateWeekConfirmOpen(false)} disabled={isCreatingWeek} title="Đóng"><X size={18} /></button>
-            <div className="create-week-modal-icon">+</div>
-            <h2 id="create-week-modal-title">Tạo tuần {nextWeek}?</h2>
-            <p>Hệ thống sẽ nhân bản sheet <b>TUẦN 0</b> và đổi tiêu đề thành <b>LỚP 11A3 - TUẦN {nextWeek}</b>.</p>
-            <div className="create-week-modal-actions">
-              <button type="button" className="create-week-cancel" onClick={() => setCreateWeekConfirmOpen(false)} disabled={isCreatingWeek}>Huỷ</button>
-              <button type="button" className="create-week-confirm" onClick={() => void createNewWeek()} disabled={isCreatingWeek}>{isCreatingWeek ? "Đang tạo..." : "Tạo tuần"}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {liveToasts.length > 0 && (
-        <div className="score-live-toast-layer" aria-live="polite">
-          {liveToasts.map((toast) => (
-            <div key={toast.id} className={`score-live-toast ${toast.kind} ${toast.points !== undefined && toast.points < 0 ? "minus" : "plus"}`}>
-              <div className="score-live-dot">{toast.points !== undefined && toast.points < 0 ? "−" : "+"}</div>
-              <div>
-                <strong>{toast.title}</strong>
-                <span>{toast.message}</span>
-              </div>
-              <button type="button" onClick={() => setLiveToasts((current) => current.filter((item) => item.id !== toast.id))} aria-label="Đóng thông báo">×</button>
-            </div>
-          ))}
-        </div>
-      )}
+      {createWeekConfirmOpen && <div className="create-week-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="create-week-modal-title"><div className="create-week-modal-card"><button type="button" className="create-week-modal-close" onClick={() => setCreateWeekConfirmOpen(false)} disabled={isCreatingWeek} title="Đóng"><X size={18} /></button><div className="create-week-modal-icon">+</div><h2 id="create-week-modal-title">Tạo tuần {nextWeek}?</h2><p>Hệ thống sẽ nhân bản sheet <b>TUẦN 0</b> và đổi tiêu đề thành <b>LỚP 11A3 - TUẦN {nextWeek}</b>.</p><div className="create-week-modal-actions"><button type="button" className="create-week-cancel" onClick={() => setCreateWeekConfirmOpen(false)} disabled={isCreatingWeek}>Huỷ</button><button type="button" className="create-week-confirm" onClick={() => void createNewWeek()} disabled={isCreatingWeek}>{isCreatingWeek ? "Đang tạo..." : "Tạo tuần"}</button></div></div></div>}
+      {liveToasts.length > 0 && <div className="score-live-toast-layer" aria-live="polite">{liveToasts.map((toast) => <div key={toast.id} className={`score-live-toast ${toast.kind} ${toast.points !== undefined && toast.points < 0 ? "minus" : "plus"}`}><div className="score-live-dot">{toast.points !== undefined && toast.points < 0 ? "−" : "+"}</div><div><strong>{toast.title}</strong><span>{toast.message}</span></div><button type="button" onClick={() => setLiveToasts((current) => current.filter((item) => item.id !== toast.id))} aria-label="Đóng thông báo">×</button></div>)}</div>}
     </div>
   );
 }
