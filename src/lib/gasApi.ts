@@ -42,13 +42,8 @@ type GasResponseData = Partial<GasScoreboardPayload> & {
   [key: string]: unknown;
 };
 
-type RawGasResponse = GasResponseData & {
-  data?: GasResponseData;
-};
-
-type GlobalRuleCache = typeof globalThis & {
-  __A3K64_SCORE_RULES?: QuickScoreRule[];
-};
+type RawGasResponse = GasResponseData & { data?: GasResponseData };
+type GlobalRuleCache = typeof globalThis & { __A3K64_SCORE_RULES?: QuickScoreRule[] };
 
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const JSONP_TIMEOUT_MS = 15000;
@@ -185,21 +180,11 @@ function normalizePayload(data: GasResponseData): GasScoreboardPayload {
   return { students, events, weeks, quickScoreReasons, updatedAt: asText(data.updatedAt) || undefined };
 }
 
-async function parseResponse<T>(response: Response): Promise<T | null> {
-  const text = await response.text();
-  if (!text) return null;
-  const json = JSON.parse(text) as RawGasResponse;
-  if (json.ok === false) throw new Error(json.error || "Google Apps Script trả về lỗi.");
-  if (json.data?.ok === false) throw new Error(asText(json.data.error, "Google Apps Script trả về lỗi."));
-  return json as T;
-}
-
 function ensureProcessingStyle() {
   if (typeof document === "undefined" || document.getElementById("a3k64-processing-style")) return;
   const style = document.createElement("style");
   style.id = "a3k64-processing-style";
-  style.textContent = `
-    .a3k64-processing-mask{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(2,6,23,.36);backdrop-filter:blur(2px);pointer-events:auto}.a3k64-processing-card{min-width:230px;border:1px solid #273244;border-radius:20px;display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:center;padding:18px 20px;color:#f8fafc;background:#111827;box-shadow:0 24px 80px rgba(0,0,0,.4)}.a3k64-processing-spinner{width:22px;height:22px;border:3px solid rgba(59,130,246,.25);border-top-color:#3b82f6;border-radius:999px;animation:a3k64spin .75s linear infinite}.a3k64-processing-card strong{display:block;font-size:15px}.a3k64-processing-card span{display:block;margin-top:3px;color:#94a3b8;font-size:13px}@keyframes a3k64spin{to{transform:rotate(360deg)}}`;
+  style.textContent = `.a3k64-processing-mask{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(2,6,23,.36);backdrop-filter:blur(2px);pointer-events:auto}.a3k64-processing-card{min-width:230px;border:1px solid #273244;border-radius:20px;display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:center;padding:18px 20px;color:#f8fafc;background:#111827;box-shadow:0 24px 80px rgba(0,0,0,.4)}.a3k64-processing-spinner{width:22px;height:22px;border:3px solid rgba(59,130,246,.25);border-top-color:#3b82f6;border-radius:999px;animation:a3k64spin .75s linear infinite}.a3k64-processing-card strong{display:block;font-size:15px}.a3k64-processing-card span{display:block;margin-top:3px;color:#94a3b8;font-size:13px}@keyframes a3k64spin{to{transform:rotate(360deg)}}`;
   document.head.appendChild(style);
 }
 
@@ -266,47 +251,16 @@ function gasJsonp(action: string, payload?: unknown): Promise<RawGasResponse | n
   });
 }
 
-async function gasFetchFallback(action: string, payload?: unknown) {
-  if (!GAS_URL) return null;
-  const isPost = payload !== undefined;
-  if (isPost) {
-    const response = await fetch(GAS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action, payload }),
-      redirect: "follow",
-    });
-    if (!response.ok) throw new Error(`GAS POST ${action} failed: ${response.status}`);
-    return parseResponse<RawGasResponse>(response);
-  }
-  const url = new URL(GAS_URL);
-  url.searchParams.set("action", action);
-  url.searchParams.set("t", String(Date.now()));
-  const response = await fetch(url.toString(), { method: "GET", redirect: "follow" });
-  if (!response.ok) throw new Error(`GAS GET ${action} failed: ${response.status}`);
-  return parseResponse<RawGasResponse>(response);
-}
-
 async function gasGet(action: string) {
   if (!GAS_URL) return null;
-  try {
-    return await gasJsonp(action);
-  } catch (jsonpError) {
-    console.warn(`GAS JSONP ${action} thất bại, thử fetch dự phòng.`, jsonpError);
-    return gasFetchFallback(action);
-  }
+  return gasJsonp(action);
 }
 
 async function gasPost(action: string, payload: unknown, processingMessage?: string) {
   if (!GAS_URL) return null;
   if (processingMessage) showProcessing(processingMessage);
   try {
-    try {
-      return await gasJsonp(action, payload);
-    } catch (jsonpError) {
-      console.warn(`GAS JSONP ${action} thất bại, thử POST dự phòng.`, jsonpError);
-      return await gasFetchFallback(action, payload);
-    }
+    return await gasJsonp(action, payload);
   } finally {
     if (processingMessage) hideProcessing();
   }
@@ -319,7 +273,7 @@ export async function fetchScoreboardFromGas(): Promise<GasScoreboardPayload | n
     const data = response.data || response;
     return normalizePayload({ ...data, updatedAt: data.updatedAt || response.updatedAt });
   } catch (error) {
-    console.error("Không đọc được dữ liệu Google Sheets:", error);
+    console.warn("Không đọc được dữ liệu Google Sheets qua JSONP:", error);
     return null;
   }
 }
@@ -373,11 +327,7 @@ export async function validateLoginWithGas(username: string, password: string): 
 
 export async function resetPasswordWithGas(fullName: string, phone: string, newEmail: string, newPassword: string): Promise<GasRecoveryResult> {
   try {
-    const response = await gasPost(
-      "resetPassword",
-      { fullName, phone, newEmail, newPassword },
-      "Đang cập nhật tài khoản..."
-    );
+    const response = await gasPost("resetPassword", { fullName, phone, newEmail, newPassword }, "Đang cập nhật tài khoản...");
     const data = response?.data || response;
     if (!data?.ok) return { ok: false, message: asText(data?.error, "Không cập nhật được tài khoản.") };
     const user = data.user as Partial<GasLoginUser> & Record<string, unknown> | undefined;
