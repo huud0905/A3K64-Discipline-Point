@@ -120,7 +120,7 @@ function normalizeEvents(raw: unknown): ScoreEvent[] {
     if (!studentId || !title) return;
 
     const points = asNumber(record.points ?? record["Điểm"] ?? record["score"], 0);
-    const createdAt = asText(record.createdAt ?? record["Thời gian"] ?? record["Ngày"], new Date().toISOString());
+    const createdAt = asText(record.createdAt ?? record["Thời gian"] ?? record["Ngày"] ?? record.timestamp ?? record.created_at, "");
     const note = asText(record.note ?? record["Ghi chú"]);
 
     events.push({
@@ -132,7 +132,7 @@ function normalizeEvents(raw: unknown): ScoreEvent[] {
       type: normalizeType(record.type ?? record["Loại"], points),
       category: normalizeCategory(record.category ?? record["Nhóm"] ?? record["Danh mục"]),
       note: note || undefined,
-      createdBy: asText(record.createdBy ?? record["Người nhập"], "Google Sheets"),
+      createdBy: asText(record.createdBy ?? record["Người nhập"] ?? record.actor ?? record.user, "Google Sheets"),
       createdAt,
     });
   });
