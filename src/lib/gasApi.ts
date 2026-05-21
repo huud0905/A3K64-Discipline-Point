@@ -58,7 +58,7 @@ type RawGasResponse = GasResponseData & { data?: GasResponseData };
 type GlobalRuleCache = typeof globalThis & { __A3K64_SCORE_RULES?: QuickScoreRule[] };
 
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
-const JSONP_TIMEOUT_MS = 15000;
+const JSONP_TIMEOUT_MS = 45000;
 let activeMutations = 0;
 
 function getLastNameInitial(name: string) {
@@ -254,32 +254,46 @@ function gasJsonp(action: string, payload?: unknown): Promise<RawGasResponse | n
     const callbackName = `__a3k64GasCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const script = document.createElement("script");
     const url = new URL(GAS_URL);
+    const globalCallbacks = window as typeof window & Record<string, unknown>;
     let timeoutId = 0;
+    let settled = false;
 
     url.searchParams.set("action", action);
     url.searchParams.set("callback", callbackName);
     url.searchParams.set("t", String(Date.now()));
     if (payload !== undefined) url.searchParams.set("payload", JSON.stringify(payload));
 
-    const cleanup = () => {
+    const cleanup = (keepLateNoop = false) => {
       window.clearTimeout(timeoutId);
-      delete (window as typeof window & Record<string, unknown>)[callbackName];
+      script.onerror = null;
+      if (keepLateNoop) {
+        globalCallbacks[callbackName] = () => undefined;
+        window.setTimeout(() => delete globalCallbacks[callbackName], 60000);
+      } else {
+        delete globalCallbacks[callbackName];
+      }
       script.remove();
     };
 
-    (window as typeof window & Record<string, unknown>)[callbackName] = (json: RawGasResponse) => {
-      cleanup();
+    globalCallbacks[callbackName] = (json: RawGasResponse) => {
+      if (settled) return;
+      settled = true;
+      cleanup(false);
       if (json?.ok === false) reject(new Error(asText(json.error, "Google Apps Script trả về lỗi.")));
       else if (json?.data?.ok === false) reject(new Error(asText(json.data.error, "Google Apps Script trả về lỗi.")));
       else resolve(json);
     };
 
     script.onerror = () => {
-      cleanup();
+      if (settled) return;
+      settled = true;
+      cleanup(true);
       reject(new Error("Không tải được JSONP từ Google Apps Script. Hãy cập nhật api.gs và deploy lại Web App."));
     };
     timeoutId = window.setTimeout(() => {
-      cleanup();
+      if (settled) return;
+      settled = true;
+      cleanup(true);
       reject(new Error("Google Apps Script phản hồi quá lâu. Kiểm tra deploy Web App hoặc api.gs."));
     }, JSONP_TIMEOUT_MS);
     script.src = url.toString();
