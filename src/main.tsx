@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 import './gasFetchCompat';
 import App from './App';
 import './personalizationSync';
-import './profileNativeShell';
 import './taskViewEnhancer';
 import './startMenuListEnhancer';
 import './mobileAppShell';
