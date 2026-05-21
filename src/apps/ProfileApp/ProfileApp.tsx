@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, BarChart3, Plus, RotateCw, Search, X } from 'luc
 import { fetchScoreboardFromGas } from '../../lib/gasApi';
 import { categoryLabel, formatScore, getGroupStats, mockScoreEvents, mockStudents, ScoreEvent, SCORE_WEEKS, Student, summarizeStudents } from '../ScoreboardApp/data/mockScoreData';
 import './ProfileApp.css';
+import './ProfileTabsEdge.css';
 
 type DataState = { students: Student[]; events: ScoreEvent[]; weeks: number[]; source: 'loading' | 'gas' | 'local' };
 type ProfileTab = { key: string; kind: 'student' | 'new'; id?: string; name?: string; title: string };
