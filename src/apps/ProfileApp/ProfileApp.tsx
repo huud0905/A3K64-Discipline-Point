@@ -10,11 +10,27 @@ type ProfileTab = { key: string; kind: 'student' | 'new'; id?: string; name?: st
 type ProfileAppProps = { userName?: string | null; userEmail?: string | null; requestedStudentId?: string; requestedWeek?: number };
 type TabContextMenu = { x: number; y: number; key: string } | null;
 
+type WeekRow = {
+  week: number;
+  total: number;
+  positive: number;
+  negative: number;
+  hocTap: number;
+  neNep: number;
+  phongTrao: number;
+  rank: number;
+  status: string;
+  groupAverage: number;
+  classAverage: number;
+};
+
 const SESSION_KEY = 'a3k64-login-session-v1';
 const VERTICAL_TABS_KEY = 'profile-vertical-tabs-v1';
 const DEFAULT_DATA: DataState = { students: mockStudents, events: mockScoreEvents, weeks: SCORE_WEEKS, source: 'local' };
 
-function normalize(value?: string | null) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').replace(/\s+/g, ' ').trim().toLowerCase(); }
+function normalize(value?: string | null) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').replace(/\s+/g, ' ').trim().toLowerCase();
+}
 function pad(value: number) { return String(value).padStart(2, '0'); }
 function hiddenTotal(event: ScoreEvent) { return String(event.note || '').includes('__SHEET_TOTAL__'); }
 function givenNameOf(fullName: string) { const parts = fullName.trim().split(/\s+/); return parts[parts.length - 1] || fullName; }
@@ -30,7 +46,19 @@ function currentUserStudent(students: Student[], fallbackName?: string | null, f
   } catch { return students[0]; }
 }
 function newTabKey() { return `new-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
-function nineWeekWindow(activeWeek: number) { const start = Math.max(1, activeWeek <= 9 ? 1 : activeWeek - 8); return Array.from({ length: 9 }, (_, index) => start + index); }
+function realWeeks(data: DataState) {
+  const fromSettings = data.weeks.filter((week) => Number.isFinite(week) && week > 0);
+  const fromEvents = data.events.map((event) => Number(event.week)).filter((week) => Number.isFinite(week) && week > 0);
+  return Array.from(new Set([...fromSettings, ...fromEvents])).sort((a, b) => a - b);
+}
+function defaultCompareWeeks(weeks: number[], activeWeek: number) {
+  if (!weeks.length) return [Math.max(1, activeWeek || 1)];
+  const current = weeks.includes(activeWeek) ? activeWeek : weeks[weeks.length - 1];
+  const upto = weeks.filter((week) => week <= current);
+  const latest = (upto.length ? upto : weeks).slice(-9);
+  return latest.length ? latest : weeks.slice(-9);
+}
+function sameWeeks(a: number[], b: number[]) { return a.length === b.length && a.every((week, index) => week === b[index]); }
 async function loadProfileData(): Promise<DataState> {
   const remote = await fetchScoreboardFromGas().catch(() => null);
   if (remote?.students?.length) return { students: remote.students, events: remote.events, weeks: remote.weeks.length ? remote.weeks : SCORE_WEEKS, source: 'gas' };
@@ -54,11 +82,22 @@ function ProfileChart({ rows }: { rows: { week: number; me: number; group: numbe
 
 function StudentProfile({ data, studentId, week, onWeekChange }: { data: DataState; studentId: string; week: number; onWeekChange: (week: number) => void }) {
   const [filter, setFilter] = useState('all');
-  const activeWeek = Math.max(1, week || data.weeks[0] || 1);
-  const weekWindow = useMemo(() => nineWeekWindow(activeWeek), [activeWeek]);
+  const [compareWeeks, setCompareWeeks] = useState<number[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const availableWeeks = useMemo(() => realWeeks(data), [data.weeks, data.events]);
+  const activeWeek = availableWeeks.includes(week) ? week : availableWeeks[availableWeeks.length - 1] || Math.max(1, week || 1);
+  const defaultWeeks = useMemo(() => defaultCompareWeeks(availableWeeks, activeWeek), [availableWeeks, activeWeek]);
+  const selectedWeeks = compareWeeks.filter((item) => availableWeeks.includes(item)).sort((a, b) => a - b);
+  const weeksToShow = selectedWeeks.length ? selectedWeeks : defaultWeeks;
   const summaries = useMemo(() => summarizeStudents(data.students, data.events, activeWeek), [data.students, data.events, activeWeek]);
   const student = summaries.find((item) => item.id === studentId);
+
+  useEffect(() => {
+    setCompareWeeks((current) => current.filter((item) => availableWeeks.includes(item)));
+  }, [availableWeeks.join('|')]);
+
   if (!student) return <div className="profile-empty">Không tìm thấy học sinh này trong dữ liệu hiện tại. Hãy chọn lại từ tab mới.</div>;
+
   const allEvents = data.events.filter((event) => event.studentId === student.id && !hiddenTotal(event));
   const weekEvents = allEvents.filter((event) => event.week === activeWeek);
   const groupMembers = summaries.filter((item) => item.group === student.group).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'vi'));
@@ -66,14 +105,13 @@ function StudentProfile({ data, studentId, week, onWeekChange }: { data: DataSta
   const groupAverage = getGroupStats(summaries).find((item) => item.group === student.group)?.average || 0;
   const above = groupMembers[groupRank - 2];
   const below = groupMembers[groupRank];
-  const weeklyRows = weekWindow.map((itemWeek) => {
+  const weeklyRows: WeekRow[] = weeksToShow.map((itemWeek) => {
     const weekSummaries = summarizeStudents(data.students, data.events, itemWeek);
     const current = weekSummaries.find((item) => item.id === student.id);
     const group = weekSummaries.filter((item) => item.group === student.group);
     const events = allEvents.filter((event) => event.week === itemWeek);
     return {
       week: itemWeek,
-      summary: current,
       total: current?.total || 0,
       positive: current?.positive || 0,
       negative: current?.negative || 0,
@@ -89,7 +127,14 @@ function StudentProfile({ data, studentId, week, onWeekChange }: { data: DataSta
   const chartRows = weeklyRows.map((row) => ({ week: row.week, me: row.total, group: row.groupAverage, cls: row.classAverage }));
   const history = weekEvents.filter((event) => filter === 'all' || (filter === 'plus' ? event.points > 0 : filter === 'minus' ? event.points < 0 : event.category === filter)).sort((a, b) => Date.parse(b.createdAt || '') - Date.parse(a.createdAt || ''));
   const notes = [student.total >= 50 ? 'Đang ở mức Tốt, nên duy trì phong độ hiện tại.' : student.total >= 0 ? 'Kết quả đang ổn, có thể bứt lên nhóm Tốt.' : 'Điểm đang thấp, cần ưu tiên giảm lỗi trừ điểm.', weekEvents.some((event) => event.points < 0) ? 'Tuần này có điểm trừ, nên kiểm tra lịch sử để biết nguyên nhân.' : 'Tuần này chưa có lỗi trừ điểm rõ ràng.', student.total >= groupAverage ? 'Điểm đang bằng hoặc cao hơn trung bình tổ.' : 'Điểm đang thấp hơn trung bình tổ, cần cố gắng thêm.'];
-  return <div className="profile-page"><section className="profile-hero"><div className="profile-avatar-big">{student.avatarInitial || student.name[0]}</div><div><span>Hồ sơ học sinh · Tuần {activeWeek}</span><h1>{student.name}</h1><p>Tổ {student.group} · {student.role || 'Học sinh'} · {student.status}</p></div><strong>#{student.rank}<small>Hạng lớp</small></strong></section><section className="profile-stat-grid">{[['Tổng điểm', formatScore(student.total)], ['Điểm cộng', formatScore(student.positive)], ['Điểm trừ', String(student.negative)], ['Hạng tổ', `#${groupRank}/${groupMembers.length}`], ['Học tập', formatScore(categoryTotal(weekEvents, 'HOC_TAP'))], ['Nề nếp', formatScore(categoryTotal(weekEvents, 'NE_NEP'))], ['Phong trào', formatScore(categoryTotal(weekEvents, 'PHONG_TRAO'))], ['TB tổ', String(groupAverage)]].map(([label, value]) => <article key={label}><span>{label}</span><b className={String(value).startsWith('-') ? 'negative' : 'positive'}>{value}</b></article>)}</section><section className="profile-grid"><article className="profile-card wide"><h2><BarChart3 size={18} /> Biểu đồ tiến bộ 9 tuần</h2><ProfileChart rows={chartRows} /><p className="profile-legend">Xanh: học sinh · Tím: trung bình tổ · Xám: trung bình lớp</p></article><article className="profile-card"><h2>Nhận xét tự động</h2><ul>{notes.map((note) => <li key={note}>{note}</li>)}</ul><h2>So sánh trong tổ</h2><p>Cách người trên: {above ? `${Math.max(0, above.total - student.total)} điểm` : 'Đang dẫn đầu'}</p><p>Cách người dưới: {below ? `${Math.max(0, student.total - below.total)} điểm` : 'Cuối nhóm'}</p><p>So với TB tổ: {formatScore(student.total - groupAverage)}</p></article></section><section className="profile-card profile-week-overview-card"><div className="profile-history-head"><h2>Tổng quan 9 tuần liên tục</h2><div className="profile-week-tabs">{weeklyRows.map((row) => <button key={row.week} className={row.week === activeWeek ? 'active' : ''} onClick={() => onWeekChange(row.week)}>Tuần {row.week}</button>)}</div></div><div className="profile-table-wrap"><table className="profile-week-table"><thead><tr><th>Tuần</th><th>Tổng</th><th>Cộng</th><th>Trừ</th><th>Học tập</th><th>Nề nếp</th><th>Phong trào</th><th>Hạng lớp</th><th>Xếp loại</th></tr></thead><tbody>{weeklyRows.map((row) => <tr key={row.week} className={row.week === activeWeek ? 'active-week-row' : ''} onClick={() => onWeekChange(row.week)}><td>T{row.week}</td><td className={row.total >= 0 ? 'positive' : 'negative'}>{formatScore(row.total)}</td><td className="positive">{formatScore(row.positive)}</td><td className={row.negative < 0 ? 'negative' : ''}>{row.negative}</td><td>{formatScore(row.hocTap)}</td><td>{formatScore(row.neNep)}</td><td>{formatScore(row.phongTrao)}</td><td>{row.rank ? `#${row.rank}` : '-'}</td><td>{row.status}</td></tr>)}</tbody></table></div></section><section className="profile-card"><div className="profile-history-head"><h2>Lịch sử điểm tuần {activeWeek}</h2><div>{[['all', 'Tất cả'], ['plus', 'Cộng'], ['minus', 'Trừ'], ['HOC_TAP', 'Học tập'], ['NE_NEP', 'Nề nếp'], ['PHONG_TRAO', 'Phong trào']].map(([value, label]) => <button key={value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)}>{label}</button>)}</div></div><div className="profile-table-wrap"><table><thead><tr><th>Tuần</th><th>Nội dung</th><th>Điểm</th><th>Loại</th><th>Người nhập</th><th>Thời gian</th></tr></thead><tbody>{history.length ? history.map((event) => <tr key={event.id}><td>T{event.week}</td><td>{event.title}</td><td className={event.points >= 0 ? 'positive' : 'negative'}>{formatScore(event.points)}</td><td>{categoryLabel(event.category)}</td><td>{event.createdBy || 'Google Sheets'}</td><td>{event.createdAt ? new Date(event.createdAt).toLocaleString('vi-VN') : 'Chưa rõ'}</td></tr>) : <tr><td colSpan={6}>Tuần {activeWeek} chưa có dữ liệu phù hợp.</td></tr>}</tbody></table></div></section></div>;
+  const resetCompareWeeks = () => { setCompareWeeks([]); setPickerOpen(false); };
+  const toggleWeek = (targetWeek: number) => setCompareWeeks((current) => {
+    const base = current.length ? current : defaultWeeks;
+    const next = base.includes(targetWeek) ? base.filter((item) => item !== targetWeek) : [...base, targetWeek];
+    return next.filter((item) => availableWeeks.includes(item)).sort((a, b) => a - b);
+  });
+
+  return <div className="profile-page"><section className="profile-hero"><div className="profile-avatar-big">{student.avatarInitial || student.name[0]}</div><div><span>Hồ sơ học sinh · Tuần {activeWeek}</span><h1>{student.name}</h1><p>Tổ {student.group} · {student.role || 'Học sinh'} · {student.status}</p></div><strong>#{student.rank}<small>Hạng lớp</small></strong></section><section className="profile-stat-grid">{[['Tổng điểm', formatScore(student.total)], ['Điểm cộng', formatScore(student.positive)], ['Điểm trừ', String(student.negative)], ['Hạng tổ', `#${groupRank}/${groupMembers.length}`], ['Học tập', formatScore(categoryTotal(weekEvents, 'HOC_TAP'))], ['Nề nếp', formatScore(categoryTotal(weekEvents, 'NE_NEP'))], ['Phong trào', formatScore(categoryTotal(weekEvents, 'PHONG_TRAO'))], ['TB tổ', String(groupAverage)]].map(([label, value]) => <article key={label}><span>{label}</span><b className={String(value).startsWith('-') ? 'negative' : 'positive'}>{value}</b></article>)}</section><section className="profile-grid"><article className="profile-card wide"><h2><BarChart3 size={18} /> Biểu đồ so sánh tuần</h2><ProfileChart rows={chartRows} /><p className="profile-legend">Xanh: học sinh · Tím: trung bình tổ · Xám: trung bình lớp · Tối đa mặc định 9 tuần gần nhất có thật</p></article><article className="profile-card"><h2>Nhận xét tự động</h2><ul>{notes.map((note) => <li key={note}>{note}</li>)}</ul><h2>So sánh trong tổ</h2><p>Cách người trên: {above ? `${Math.max(0, above.total - student.total)} điểm` : 'Đang dẫn đầu'}</p><p>Cách người dưới: {below ? `${Math.max(0, student.total - below.total)} điểm` : 'Cuối nhóm'}</p><p>So với TB tổ: {formatScore(student.total - groupAverage)}</p></article></section><section className="profile-card profile-week-overview-card"><div className="profile-history-head"><h2>Tổng quan tuần so sánh</h2><div className="profile-week-tabs"><button type="button" onClick={() => setPickerOpen((open) => !open)} className={pickerOpen ? 'active' : ''}>Chọn tuần so sánh</button><button type="button" onClick={resetCompareWeeks} disabled={sameWeeks(weeksToShow, defaultWeeks)}>9 tuần gần nhất</button></div></div>{pickerOpen && <div className="profile-week-picker"><div>{availableWeeks.map((itemWeek) => <button key={itemWeek} type="button" className={weeksToShow.includes(itemWeek) ? 'selected' : ''} onClick={() => toggleWeek(itemWeek)}>Tuần {itemWeek}</button>)}</div><small>Chỉ hiển thị tuần thật có trong trang tính/dữ liệu. Nếu không chọn riêng, hệ thống tự lấy tối đa 9 tuần gần nhất đến tuần đang xem.</small></div>}<div className="profile-table-wrap"><table className="profile-week-table"><thead><tr><th>Tuần</th><th>Tổng</th><th>Cộng</th><th>Trừ</th><th>Học tập</th><th>Nề nếp</th><th>Phong trào</th><th>Hạng lớp</th><th>Xếp loại</th></tr></thead><tbody>{weeklyRows.map((row) => <tr key={row.week} className={row.week === activeWeek ? 'active-week-row' : ''} onClick={() => onWeekChange(row.week)}><td>T{row.week}</td><td className={row.total >= 0 ? 'positive' : 'negative'}>{formatScore(row.total)}</td><td className="positive">{formatScore(row.positive)}</td><td className={row.negative < 0 ? 'negative' : ''}>{row.negative}</td><td>{formatScore(row.hocTap)}</td><td>{formatScore(row.neNep)}</td><td>{formatScore(row.phongTrao)}</td><td>{row.rank ? `#${row.rank}` : '-'}</td><td>{row.status}</td></tr>)}</tbody></table></div></section><section className="profile-card"><div className="profile-history-head"><h2>Lịch sử điểm tuần {activeWeek}</h2><div>{[['all', 'Tất cả'], ['plus', 'Cộng'], ['minus', 'Trừ'], ['HOC_TAP', 'Học tập'], ['NE_NEP', 'Nề nếp'], ['PHONG_TRAO', 'Phong trào']].map(([value, label]) => <button key={value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)}>{label}</button>)}</div></div><div className="profile-table-wrap"><table><thead><tr><th>Tuần</th><th>Nội dung</th><th>Điểm</th><th>Loại</th><th>Người nhập</th><th>Thời gian</th></tr></thead><tbody>{history.length ? history.map((event) => <tr key={event.id}><td>T{event.week}</td><td>{event.title}</td><td className={event.points >= 0 ? 'positive' : 'negative'}>{formatScore(event.points)}</td><td>{categoryLabel(event.category)}</td><td>{event.createdBy || 'Google Sheets'}</td><td>{event.createdAt ? new Date(event.createdAt).toLocaleString('vi-VN') : 'Chưa rõ'}</td></tr>) : <tr><td colSpan={6}>Tuần {activeWeek} chưa có dữ liệu phù hợp.</td></tr>}</tbody></table></div></section></div>;
 }
 
 function NewProfileTab({ query, setQuery, results, onOpenStudent, onRefresh }: { query: string; setQuery: (value: string) => void; results: Student[]; onOpenStudent: (id: string) => void; onRefresh: () => void }) {
