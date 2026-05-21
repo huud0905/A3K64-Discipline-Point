@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BarChart3, RefreshCcw, Search, UserRound, X } from 'lucide-react';
+import { BarChart3, Plus, Search, X } from 'lucide-react';
 import { fetchScoreboardFromGas } from '../../lib/gasApi';
 import { categoryLabel, formatScore, getGroupStats, mockScoreEvents, mockStudents, ScoreEvent, SCORE_WEEKS, Student, summarizeStudents } from '../ScoreboardApp/data/mockScoreData';
 import './ProfileApp.css';
 
 type DataState = { students: Student[]; events: ScoreEvent[]; weeks: number[]; source: 'loading' | 'gas' | 'local' };
-type ProfileTab = { id: string; name: string; title: string };
+type ProfileTab = { key: string; kind: 'student' | 'new'; id?: string; name?: string; title: string };
 type ProfileAppProps = { userName?: string | null; userEmail?: string | null; requestedStudentId?: string; requestedWeek?: number };
 
 const SESSION_KEY = 'a3k64-login-session-v1';
@@ -45,6 +45,9 @@ function currentUserStudent(students: Student[], fallbackName?: string | null, f
     return students[0];
   }
 }
+function newTabKey() {
+  return `new-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 async function loadProfileData(): Promise<DataState> {
   const remote = await fetchScoreboardFromGas().catch(() => null);
   if (remote?.students?.length) return { students: remote.students, events: remote.events, weeks: remote.weeks.length ? remote.weeks : SCORE_WEEKS, source: 'gas' };
@@ -73,7 +76,7 @@ function StudentProfile({ data, studentId, week }: { data: DataState; studentId:
   const activeWeek = data.weeks.includes(week) ? week : data.weeks[0] || 1;
   const summaries = useMemo(() => summarizeStudents(data.students, data.events, activeWeek), [data.students, data.events, activeWeek]);
   const student = summaries.find((item) => item.id === studentId);
-  if (!student) return <div className="profile-empty">Không tìm thấy học sinh này trong dữ liệu hiện tại. Hãy chọn lại từ ô tìm kiếm.</div>;
+  if (!student) return <div className="profile-empty">Không tìm thấy học sinh này trong dữ liệu hiện tại. Hãy chọn lại từ tab mới.</div>;
   const allEvents = data.events.filter((event) => event.studentId === student.id && !hiddenTotal(event));
   const weekEvents = allEvents.filter((event) => event.week === activeWeek);
   const groupMembers = summaries.filter((item) => item.group === student.group).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'vi'));
@@ -92,41 +95,81 @@ function StudentProfile({ data, studentId, week }: { data: DataState; studentId:
   return <div className="profile-page"><section className="profile-hero"><div className="profile-avatar-big">{student.avatarInitial || student.name[0]}</div><div><span>Hồ sơ học sinh · Tuần {activeWeek}</span><h1>{student.name}</h1><p>Tổ {student.group} · {student.role || 'Học sinh'} · {student.status}</p></div><strong>#{student.rank}<small>Hạng lớp</small></strong></section><section className="profile-stat-grid">{[['Tổng điểm', formatScore(student.total)], ['Điểm cộng', formatScore(student.positive)], ['Điểm trừ', String(student.negative)], ['Hạng tổ', `#${groupRank}/${groupMembers.length}`], ['Học tập', formatScore(categoryTotal(weekEvents, 'HOC_TAP'))], ['Nề nếp', formatScore(categoryTotal(weekEvents, 'NE_NEP'))], ['Phong trào', formatScore(categoryTotal(weekEvents, 'PHONG_TRAO'))], ['TB tổ', String(groupAverage)]].map(([label, value]) => <article key={label}><span>{label}</span><b className={String(value).startsWith('-') ? 'negative' : 'positive'}>{value}</b></article>)}</section><section className="profile-grid"><article className="profile-card wide"><h2><BarChart3 size={18} /> Biểu đồ tiến bộ</h2><ProfileChart rows={chartRows} /><p className="profile-legend">Xanh: học sinh · Tím: trung bình tổ · Xám: trung bình lớp</p></article><article className="profile-card"><h2>Nhận xét tự động</h2><ul>{notes.map((note) => <li key={note}>{note}</li>)}</ul><h2>So sánh trong tổ</h2><p>Cách người trên: {above ? `${Math.max(0, above.total - student.total)} điểm` : 'Đang dẫn đầu'}</p><p>Cách người dưới: {below ? `${Math.max(0, student.total - below.total)} điểm` : 'Cuối nhóm'}</p><p>So với TB tổ: {formatScore(student.total - groupAverage)}</p></article></section><section className="profile-card"><div className="profile-history-head"><h2>Lịch sử điểm</h2><div>{[['all', 'Tất cả'], ['plus', 'Cộng'], ['minus', 'Trừ'], ['HOC_TAP', 'Học tập'], ['NE_NEP', 'Nề nếp'], ['PHONG_TRAO', 'Phong trào']].map(([value, label]) => <button key={value} className={filter === value ? 'active' : ''} onClick={() => setFilter(value)}>{label}</button>)}</div></div><div className="profile-table-wrap"><table><thead><tr><th>Tuần</th><th>Nội dung</th><th>Điểm</th><th>Loại</th><th>Người nhập</th><th>Thời gian</th></tr></thead><tbody>{history.length ? history.map((event) => <tr key={event.id}><td>T{event.week}</td><td>{event.title}</td><td className={event.points >= 0 ? 'positive' : 'negative'}>{formatScore(event.points)}</td><td>{categoryLabel(event.category)}</td><td>{event.createdBy || 'Google Sheets'}</td><td>{event.createdAt ? new Date(event.createdAt).toLocaleString('vi-VN') : 'Chưa rõ'}</td></tr>) : <tr><td colSpan={6}>Chưa có dữ liệu phù hợp.</td></tr>}</tbody></table></div></section></div>;
 }
 
+function NewProfileTab({ query, setQuery, results, onOpenStudent }: { query: string; setQuery: (value: string) => void; results: Student[]; onOpenStudent: (id: string) => void }) {
+  return <div className="profile-new-page"><div className="profile-new-search-wrap"><label className="profile-new-search"><Search size={18} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm học sinh..." /></label>{query && <div className="profile-new-results">{results.length ? results.map((student) => <button key={student.id} type="button" onClick={() => { onOpenStudent(student.id); setQuery(''); }}><span>{student.name}</span><small>Tổ {student.group}</small></button>) : <div className="profile-new-empty-result">Không tìm thấy học sinh phù hợp.</div>}</div>}</div><div className="profile-new-blank" /></div>;
+}
+
 export default function ProfileApp({ userName, userEmail, requestedStudentId, requestedWeek }: ProfileAppProps) {
   const [data, setData] = useState<DataState>({ ...DEFAULT_DATA, source: 'loading' });
   const [tabs, setTabs] = useState<ProfileTab[]>([]);
-  const [activeId, setActiveId] = useState('');
+  const [activeKey, setActiveKey] = useState('');
   const [week, setWeek] = useState(requestedWeek || 1);
   const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(false);
-  const refresh = async () => { setLoading(true); try { setData(await loadProfileData()); } finally { setLoading(false); } };
+
+  const refresh = async () => { setData(await loadProfileData()); };
+  const openNewTab = () => {
+    const tab: ProfileTab = { key: newTabKey(), kind: 'new', title: 'Tab mới' };
+    setTabs((current) => [...current, tab]);
+    setActiveKey(tab.key);
+    setQuery('');
+  };
   const openStudent = (id?: string, targetWeek?: number) => {
     if (data.source === 'loading' || !data.students.length) return;
     const student = id ? findStudentByIdOrName(data.students, id) : currentUserStudent(data.students, userName, userEmail);
     if (!student) return;
-    setTabs((current) => current.some((tab) => normalize(tab.name) === normalize(student.name)) ? current.map((tab) => normalize(tab.name) === normalize(student.name) ? { id: student.id, name: student.name, title: studentTitle(data.students, student.id) } : tab) : [...current, { id: student.id, name: student.name, title: studentTitle(data.students, student.id) }]);
-    setActiveId(student.id);
+    let nextActive = '';
+    setTabs((current) => {
+      const existing = current.find((tab) => tab.kind === 'student' && normalize(tab.name) === normalize(student.name));
+      if (existing) {
+        nextActive = existing.key;
+        return current.map((tab) => tab.key === existing.key ? { ...tab, id: student.id, name: student.name, title: studentTitle(data.students, student.id) } : tab);
+      }
+      const activeTab = current.find((tab) => tab.key === activeKey);
+      const nextStudentTab: ProfileTab = { key: activeTab?.kind === 'new' ? activeTab.key : `student-${student.id}-${Date.now()}`, kind: 'student', id: student.id, name: student.name, title: studentTitle(data.students, student.id) };
+      nextActive = nextStudentTab.key;
+      return activeTab?.kind === 'new' ? current.map((tab) => tab.key === activeTab.key ? nextStudentTab : tab) : [...current, nextStudentTab];
+    });
+    setActiveKey(nextActive);
     setWeek(targetWeek || week || 1);
   };
+
   useEffect(() => { void refresh(); }, []);
   useEffect(() => {
     if (data.source === 'loading' || !data.students.length) return;
     setTabs((current) => current.map((tab) => {
+      if (tab.kind === 'new') return tab;
       const student = findStudentByIdOrName(data.students, tab.id, tab.name);
-      return student ? { id: student.id, name: student.name, title: studentTitle(data.students, student.id) } : tab;
+      return student ? { ...tab, id: student.id, name: student.name, title: studentTitle(data.students, student.id) } : tab;
     }));
-    setActiveId((current) => {
-      const activeTab = tabs.find((tab) => tab.id === current);
-      const student = findStudentByIdOrName(data.students, current, activeTab?.name);
-      return student?.id || current;
+    setActiveKey((current) => {
+      const activeTab = tabs.find((tab) => tab.key === current);
+      if (!activeTab || activeTab.kind === 'new') return current;
+      const student = findStudentByIdOrName(data.students, activeTab.id, activeTab.name);
+      return student ? current : current;
     });
   }, [data.source, data.students]);
   useEffect(() => { if (data.source !== 'loading' && data.students.length && !tabs.length) openStudent(requestedStudentId); }, [data.source, data.students.length]);
   useEffect(() => { if (data.source !== 'loading' && requestedStudentId) openStudent(requestedStudentId, requestedWeek); }, [requestedStudentId, requestedWeek, data.source]);
-  const activeCandidate = activeId || tabs[0]?.id || '';
-  const activeTab = tabs.find((tab) => tab.id === activeCandidate) || tabs[0];
-  const active = findStudentByIdOrName(data.students, activeCandidate, activeTab?.name)?.id || '';
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 't') {
+        event.preventDefault();
+        openNewTab();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [data.source, data.students, activeKey]);
+
+  const activeTab = tabs.find((tab) => tab.key === activeKey) || tabs[0];
+  const activeStudent = activeTab?.kind === 'student' ? findStudentByIdOrName(data.students, activeTab.id, activeTab.name)?.id || '' : '';
   const results = alphabetStudents(data.students).filter((student) => normalize(student.name).includes(normalize(query)) || String(student.group).includes(query.trim())).slice(0, 10);
-  const closeTab = (id: string) => setTabs((current) => { const next = current.filter((tab) => tab.id !== id); if (activeId === id) setActiveId(next[next.length - 1]?.id || ''); return next; });
-  return <div className="profile-app-shell" onContextMenu={(event) => event.preventDefault()}><aside className="profile-sidebar"><div className="profile-brand"><UserRound size={20} /><div><strong>Profile</strong><span>{data.source === 'gas' ? 'Google Sheets' : data.source === 'loading' ? 'Đang tải' : 'Dữ liệu cục bộ'}</span></div><button type="button" onClick={() => void refresh()} disabled={loading} title="Làm mới"><RefreshCcw size={15} /></button></div><label className="profile-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm học sinh..." /></label>{query && <div className="profile-results">{results.map((student) => <button key={student.id} type="button" onClick={() => { openStudent(student.id); setQuery(''); }}>{studentTitle(data.students, student.id)}<small>Tổ {student.group}</small></button>)}</div>}<p className="profile-side-title">Tab học sinh</p><div className="profile-tabs">{tabs.map((tab) => <button key={tab.id} type="button" className={tab.id === active ? 'active' : ''} onClick={() => setActiveId(tab.id)}><span>{tab.title}</span><X size={13} onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} /></button>)}</div></aside><main className="profile-main">{active ? <StudentProfile data={data} studentId={active} week={week} /> : <div className="profile-empty">Tìm hoặc chọn học sinh để xem hồ sơ.</div>}</main></div>;
+  const closeTab = (key: string) => setTabs((current) => {
+    const index = current.findIndex((tab) => tab.key === key);
+    const next = current.filter((tab) => tab.key !== key);
+    if (activeKey === key) setActiveKey(next[Math.max(0, index - 1)]?.key || next[0]?.key || '');
+    return next;
+  });
+
+  return <div className="profile-app-shell" onContextMenu={(event) => event.preventDefault()}><aside className="profile-sidebar"><p className="profile-side-title">Tab học sinh</p><div className="profile-tabs">{tabs.map((tab) => <button key={tab.key} type="button" className={`${tab.key === activeTab?.key ? 'active' : ''} ${tab.kind === 'new' ? 'new-tab' : ''}`} onClick={() => setActiveKey(tab.key)}><span>{tab.title}</span><X size={13} onClick={(event) => { event.stopPropagation(); closeTab(tab.key); }} /></button>)}</div><button type="button" className="profile-new-tab-button" onClick={openNewTab}><Plus size={16} /><span>Tab mới</span><kbd>Ctrl+T</kbd></button></aside><main className="profile-main">{activeTab?.kind === 'new' ? <NewProfileTab query={query} setQuery={setQuery} results={results} onOpenStudent={openStudent} /> : activeStudent ? <StudentProfile data={data} studentId={activeStudent} week={week} /> : <div className="profile-empty">Bấm “Tab mới” để tìm và mở hồ sơ học sinh.</div>}</main></div>;
 }
