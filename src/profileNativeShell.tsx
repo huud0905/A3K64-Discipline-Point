@@ -5,7 +5,6 @@ import { Maximize2, Minimize2, Minus, UserRound, X } from 'lucide-react';
 import ProfileApp from './apps/ProfileApp/ProfileApp';
 
 type OpenDetail = { studentId?: string; week?: number };
-
 type WindowPos = { x: number; y: number };
 
 const EVENT_NAME = 'a3k64-open-profile';
@@ -55,15 +54,14 @@ function ProfileNativeShell() {
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [maximized, setMaximized] = useState(false);
-  const [pos, setPos] = useState<WindowPos>({ x: 84, y: 58 });
+  const [pos, setPos] = useState<WindowPos>({ x: 40, y: 36 });
   const [z, setZ] = useState(80);
   const [studentId, setStudentId] = useState<string | undefined>();
   const [week, setWeek] = useState<number | undefined>();
   const dragRef = useRef<{ sx: number; sy: number; x: number; y: number } | null>(null);
 
   const bringToFront = () => {
-    const next = getTopZ();
-    setZ(next);
+    setZ(getTopZ());
   };
 
   const openProfile = (detail?: OpenDetail) => {
@@ -176,16 +174,19 @@ function ProfileNativeShell() {
 }
 
 const nativeCss = `
-.profile-native-desktop-host{display:contents}.profile-native-taskbar-host{display:contents}
-.profile-native-shortcut .profile-native-shortcut-icon{background:rgba(239,68,68,.08)!important;color:#ef4444!important;box-shadow:none!important;border:1px solid rgba(239,68,68,.08)!important}
-.profile-native-shortcut .profile-native-shortcut-icon svg{fill:none!important;stroke:currentColor!important;stroke-width:2.25!important;width:34px!important;height:34px!important}
-.profile-native-shortcut:hover .profile-native-shortcut-icon{background:rgba(239,68,68,.13)!important}
+.profile-native-desktop-host,.profile-native-taskbar-host{display:contents}
+.profile-native-shortcut{background:transparent!important;border-radius:14px!important}
+.profile-native-shortcut .profile-native-shortcut-icon{background:transparent!important;color:#ef4444!important;box-shadow:none!important;border:0!important}
+.profile-native-shortcut .profile-native-shortcut-icon svg{fill:none!important;stroke:currentColor!important;stroke-width:2.35!important;width:34px!important;height:34px!important}
+.profile-native-shortcut:hover .profile-native-shortcut-icon{background:rgba(239,68,68,.10)!important}
 .profile-native-taskbar-button{position:relative}.profile-native-taskbar-button.running-app::after{content:'';position:absolute;left:50%;bottom:3px;transform:translateX(-50%);width:5px;height:5px;border-radius:999px;background:var(--desktop-accent,#2563eb)}
-.profile-native-window{width:min(1180px,calc(100vw - 76px))!important;height:min(760px,calc(100vh - 116px))!important;min-width:760px!important;min-height:520px!important;resize:both!important;overflow:hidden!important}
-.profile-native-window .win-titlebar{height:46px!important;min-height:46px!important;max-height:46px!important}.profile-native-window .title-left{gap:9px!important}.profile-native-window .title-icon svg{stroke-width:2.2!important}
+.profile-native-window{width:min(1180px,calc(100vw - 76px))!important;height:min(760px,calc(100vh - 116px))!important;min-width:760px!important;min-height:520px!important;resize:both!important;overflow:hidden!important;max-width:none!important;max-height:none!important}
+.profile-native-window.maximized{left:10px!important;top:10px!important;right:10px!important;bottom:62px!important;width:auto!important;height:auto!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;transform:none!important;translate:none!important;resize:none!important;border-radius:18px!important}
+.profile-native-window .win-titlebar{height:46px!important;min-height:46px!important;max-height:46px!important}.profile-native-window .title-left{gap:9px!important}.profile-native-window .title-icon{background:transparent!important;border:0!important;box-shadow:none!important;color:#ef4444!important}.profile-native-window .title-icon svg{stroke-width:2.25!important}
 .profile-native-body{height:calc(100% - 46px)!important;display:block!important;overflow:hidden!important;padding:0!important}.profile-native-body::before{display:none!important}
 .profile-native-body .profile-app-shell{height:100%!important;min-height:0!important}
-@media(max-width:860px){.profile-native-window{left:auto!important;top:auto!important;width:calc(100vw - 16px)!important;height:calc(100vh - 78px)!important;min-width:0!important;min-height:0!important}}
+.profile-native-window.maximized .profile-native-body{height:calc(100% - 46px)!important}
+@media(max-width:860px){.profile-native-window{left:auto!important;top:auto!important;width:calc(100vw - 16px)!important;height:calc(100vh - 78px)!important;min-width:0!important;min-height:0!important}.profile-native-window.maximized{left:8px!important;top:8px!important;right:8px!important;bottom:70px!important;width:auto!important;height:auto!important}}
 `;
 
 const root = document.createElement('div');
