@@ -5,7 +5,7 @@ import { categoryLabel, formatScore, getGroupStats, mockScoreEvents, mockStudent
 import './ProfileApp.css';
 
 type DataState = { students: Student[]; events: ScoreEvent[]; weeks: number[]; source: 'loading' | 'gas' | 'local' };
-type ProfileTab = { id: string; title: string };
+type ProfileTab = { id: string; name: string; title: string };
 type ProfileAppProps = { userName?: string | null; userEmail?: string | null; requestedStudentId?: string; requestedWeek?: number };
 
 const SESSION_KEY = 'a3k64-login-session-v1';
@@ -16,9 +16,25 @@ function normalize(value?: string | null) {
 }
 function pad(value: number) { return String(value).padStart(2, '0'); }
 function hiddenTotal(event: ScoreEvent) { return String(event.note || '').includes('__SHEET_TOTAL__'); }
+function givenNameOf(fullName: string) {
+  const parts = fullName.trim().split(/\s+/);
+  return parts[parts.length - 1] || fullName;
+}
+function compareByGivenName(a: { name: string }, b: { name: string }) {
+  const given = givenNameOf(a.name).localeCompare(givenNameOf(b.name), 'vi', { sensitivity: 'base' });
+  return given || a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' });
+}
+function alphabetStudents(students: Student[]) {
+  return [...students].sort(compareByGivenName);
+}
 function studentTitle(students: Student[], id: string) {
-  const index = Math.max(0, students.findIndex((item) => item.id === id)) + 1;
-  return `${pad(index)} - ${students.find((item) => item.id === id)?.name || 'Học sinh'}`;
+  const sorted = alphabetStudents(students);
+  const student = students.find((item) => item.id === id) || sorted.find((item) => item.id === id);
+  const index = Math.max(0, sorted.findIndex((item) => item.id === id)) + 1;
+  return `${pad(index)} - ${student?.name || 'Học sinh'}`;
+}
+function findStudentByIdOrName(students: Student[], id?: string, name?: string) {
+  return students.find((student) => student.id === id) || students.find((student) => normalize(student.name) === normalize(name));
 }
 function currentUserStudent(students: Student[], fallbackName?: string | null, fallbackEmail?: string | null) {
   try {
@@ -56,8 +72,8 @@ function StudentProfile({ data, studentId, week }: { data: DataState; studentId:
   const [filter, setFilter] = useState('all');
   const activeWeek = data.weeks.includes(week) ? week : data.weeks[0] || 1;
   const summaries = useMemo(() => summarizeStudents(data.students, data.events, activeWeek), [data.students, data.events, activeWeek]);
-  const student = summaries.find((item) => item.id === studentId) || summaries[0];
-  if (!student) return <div className="profile-empty">Chưa có dữ liệu học sinh.</div>;
+  const student = summaries.find((item) => item.id === studentId);
+  if (!student) return <div className="profile-empty">Không tìm thấy học sinh này trong dữ liệu hiện tại. Hãy chọn lại từ ô tìm kiếm.</div>;
   const allEvents = data.events.filter((event) => event.studentId === student.id && !hiddenTotal(event));
   const weekEvents = allEvents.filter((event) => event.week === activeWeek);
   const groupMembers = summaries.filter((item) => item.group === student.group).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'vi'));
@@ -85,17 +101,32 @@ export default function ProfileApp({ userName, userEmail, requestedStudentId, re
   const [loading, setLoading] = useState(false);
   const refresh = async () => { setLoading(true); try { setData(await loadProfileData()); } finally { setLoading(false); } };
   const openStudent = (id?: string, targetWeek?: number) => {
-    const target = id || currentUserStudent(data.students, userName, userEmail)?.id;
-    if (!target) return;
-    setTabs((current) => current.some((tab) => tab.id === target) ? current.map((tab) => tab.id === target ? { ...tab, title: studentTitle(data.students, target) } : tab) : [...current, { id: target, title: studentTitle(data.students, target) }]);
-    setActiveId(target);
+    if (data.source === 'loading' || !data.students.length) return;
+    const student = id ? findStudentByIdOrName(data.students, id) : currentUserStudent(data.students, userName, userEmail);
+    if (!student) return;
+    setTabs((current) => current.some((tab) => normalize(tab.name) === normalize(student.name)) ? current.map((tab) => normalize(tab.name) === normalize(student.name) ? { id: student.id, name: student.name, title: studentTitle(data.students, student.id) } : tab) : [...current, { id: student.id, name: student.name, title: studentTitle(data.students, student.id) }]);
+    setActiveId(student.id);
     setWeek(targetWeek || week || 1);
   };
   useEffect(() => { void refresh(); }, []);
-  useEffect(() => { if (data.students.length && !tabs.length) openStudent(requestedStudentId); }, [data.students.length]);
-  useEffect(() => { if (requestedStudentId) openStudent(requestedStudentId, requestedWeek); }, [requestedStudentId, requestedWeek]);
-  const active = activeId || tabs[0]?.id || '';
-  const results = data.students.filter((student) => normalize(student.name).includes(normalize(query)) || String(student.group).includes(query.trim())).slice(0, 10);
+  useEffect(() => {
+    if (data.source === 'loading' || !data.students.length) return;
+    setTabs((current) => current.map((tab) => {
+      const student = findStudentByIdOrName(data.students, tab.id, tab.name);
+      return student ? { id: student.id, name: student.name, title: studentTitle(data.students, student.id) } : tab;
+    }));
+    setActiveId((current) => {
+      const activeTab = tabs.find((tab) => tab.id === current);
+      const student = findStudentByIdOrName(data.students, current, activeTab?.name);
+      return student?.id || current;
+    });
+  }, [data.source, data.students]);
+  useEffect(() => { if (data.source !== 'loading' && data.students.length && !tabs.length) openStudent(requestedStudentId); }, [data.source, data.students.length]);
+  useEffect(() => { if (data.source !== 'loading' && requestedStudentId) openStudent(requestedStudentId, requestedWeek); }, [requestedStudentId, requestedWeek, data.source]);
+  const activeCandidate = activeId || tabs[0]?.id || '';
+  const activeTab = tabs.find((tab) => tab.id === activeCandidate) || tabs[0];
+  const active = findStudentByIdOrName(data.students, activeCandidate, activeTab?.name)?.id || '';
+  const results = alphabetStudents(data.students).filter((student) => normalize(student.name).includes(normalize(query)) || String(student.group).includes(query.trim())).slice(0, 10);
   const closeTab = (id: string) => setTabs((current) => { const next = current.filter((tab) => tab.id !== id); if (activeId === id) setActiveId(next[next.length - 1]?.id || ''); return next; });
   return <div className="profile-app-shell" onContextMenu={(event) => event.preventDefault()}><aside className="profile-sidebar"><div className="profile-brand"><UserRound size={20} /><div><strong>Profile</strong><span>{data.source === 'gas' ? 'Google Sheets' : data.source === 'loading' ? 'Đang tải' : 'Dữ liệu cục bộ'}</span></div><button type="button" onClick={() => void refresh()} disabled={loading} title="Làm mới"><RefreshCcw size={15} /></button></div><label className="profile-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm học sinh..." /></label>{query && <div className="profile-results">{results.map((student) => <button key={student.id} type="button" onClick={() => { openStudent(student.id); setQuery(''); }}>{studentTitle(data.students, student.id)}<small>Tổ {student.group}</small></button>)}</div>}<p className="profile-side-title">Tab học sinh</p><div className="profile-tabs">{tabs.map((tab) => <button key={tab.id} type="button" className={tab.id === active ? 'active' : ''} onClick={() => setActiveId(tab.id)}><span>{tab.title}</span><X size={13} onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} /></button>)}</div></aside><main className="profile-main">{active ? <StudentProfile data={data} studentId={active} week={week} /> : <div className="profile-empty">Tìm hoặc chọn học sinh để xem hồ sơ.</div>}</main></div>;
 }
