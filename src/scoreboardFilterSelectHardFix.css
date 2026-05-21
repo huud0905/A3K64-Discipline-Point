@@ -56,26 +56,26 @@ body > .filter-select-menu.portal-menu.subject-floating-menu,
 body > .filter-select-menu.portal-menu.week-floating-menu,
 .filter-select-menu.portal-menu.week-floating-menu {
   width: auto !important;
-  min-width: 310px !important;
-  max-width: min(760px, calc(100vw - 36px)) !important;
+  min-width: 238px !important;
+  max-width: min(540px, calc(100vw - 36px)) !important;
   display: grid !important;
   grid-template-rows: repeat(9, auto) !important;
   grid-auto-flow: column !important;
-  grid-auto-columns: minmax(112px, 1fr) !important;
-  gap: 7px 10px !important;
+  grid-auto-columns: minmax(86px, 1fr) !important;
+  gap: 6px 8px !important;
   max-height: none !important;
   overflow: visible !important;
-  padding: 10px !important;
+  padding: 8px !important;
 }
 
 body > .filter-select-menu.portal-menu.week-floating-menu .filter-select-option,
 .filter-select-menu.portal-menu.week-floating-menu .filter-select-option {
   width: 100% !important;
-  min-height: 34px !important;
+  min-height: 31px !important;
   justify-content: flex-start !important;
   text-align: left !important;
-  border-radius: 10px !important;
-  padding: 8px 11px !important;
+  border-radius: 9px !important;
+  padding: 7px 10px !important;
   white-space: nowrap !important;
 }
 
@@ -215,8 +215,10 @@ body > .filter-select-menu.portal-menu .filter-select-option,
 
   body > .filter-select-menu.portal-menu.week-floating-menu,
   .filter-select-menu.portal-menu.week-floating-menu {
-    min-width: 260px !important;
-    grid-auto-columns: minmax(96px, 1fr) !important;
+    min-width: 218px !important;
+    max-width: min(420px, calc(100vw - 24px)) !important;
+    grid-auto-columns: minmax(82px, 1fr) !important;
     gap: 6px !important;
+    padding: 7px !important;
   }
 }
