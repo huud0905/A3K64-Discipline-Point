@@ -102,6 +102,11 @@ function normAccent(value: string | null): AccentKey | undefined {
   return ["blue", "violet", "pink", "green", "amber", "red", "custom"].includes(raw) ? (raw as AccentKey) : undefined;
 }
 
+function stablePrefsJson(value: Partial<PersonalizationPayload>) {
+  const { updatedAt: _updatedAt, ...stable } = value || {};
+  return JSON.stringify(stable);
+}
+
 function quietForAWhile() {
   remoteDisabled = true;
   localStorage.setItem(QUIET_UNTIL_KEY, String(Date.now() + 10 * 60 * 1000));
@@ -160,7 +165,6 @@ function collectPrefs(): PersonalizationPayload {
     desktopTransparency: localStorage.getItem("desktop-transparency") === "off" ? "off" : "on",
     accentTaskbar: localStorage.getItem("accent-taskbar") === "on" ? "on" : "off",
     accentBorders: localStorage.getItem("accent-borders") === "on" ? "on" : "off",
-    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -198,15 +202,16 @@ function applyPrefs(prefs?: Partial<PersonalizationPayload> | null) {
     if (prefs.desktopTransparency) setLocal("desktop-transparency", prefs.desktopTransparency);
     if (prefs.accentTaskbar) setLocal("accent-taskbar", prefs.accentTaskbar);
     if (prefs.accentBorders) setLocal("accent-borders", prefs.accentBorders);
+
+    window.dispatchEvent(new Event("desktop-theme-change"));
+    window.dispatchEvent(new Event("login-theme-change"));
+    window.dispatchEvent(new Event("accent-change"));
+    window.dispatchEvent(new Event("login-accent-change"));
+    window.dispatchEvent(new Event("appearance-change"));
+    window.dispatchEvent(new Event("personalization-sync-applied"));
   } finally {
     suppressCapture = false;
   }
-  window.dispatchEvent(new Event("desktop-theme-change"));
-  window.dispatchEvent(new Event("login-theme-change"));
-  window.dispatchEvent(new Event("accent-change"));
-  window.dispatchEvent(new Event("login-accent-change"));
-  window.dispatchEvent(new Event("appearance-change"));
-  window.dispatchEvent(new Event("personalization-sync-applied"));
 }
 
 function gasJsonp(action: string, payload?: unknown): Promise<GasResponse | null> {
@@ -261,7 +266,7 @@ function scheduleSave() {
     const session = readSession();
     if (!session?.user || accountId(session.user) !== activeAccount) return;
     const prefs = collectPrefs();
-    const json = JSON.stringify(prefs);
+    const json = stablePrefsJson(prefs);
     if (json === lastSavedJson) return;
     lastSavedJson = json;
     const ok = await saveRemotePrefs(session.user, prefs);
@@ -282,10 +287,9 @@ async function syncForSession(user: SessionUser, options?: { fromLogin?: boolean
     version: 2,
     ...(remotePrefs || collectPrefs()),
     ...(loginChanged ? loginLook() : {}),
-    updatedAt: new Date().toISOString(),
   };
 
-  lastSavedJson = JSON.stringify(merged);
+  lastSavedJson = stablePrefsJson(merged);
   applyPrefs(merged);
 
   if (loginChanged || !remotePrefs) {
