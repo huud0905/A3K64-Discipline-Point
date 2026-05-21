@@ -100,6 +100,9 @@ function injectProfileWeekTableCss() {
     .profile-status-radio-cell{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:0!important;min-width:0!important}
     .profile-week-table tbody tr{cursor:pointer!important}
     .profile-history-week-chips{display:none!important}
+    .profile-week-picker{width:auto!important;min-width:310px!important;max-width:min(680px,calc(100vw - 42px))!important}
+    .profile-week-picker div{display:grid!important;grid-template-rows:repeat(9,auto)!important;grid-auto-flow:column!important;grid-auto-columns:minmax(112px,1fr)!important;gap:8px!important;align-items:stretch!important}
+    .profile-week-picker button{width:100%!important;text-align:left!important;justify-content:flex-start!important;border-radius:10px!important;padding:9px 12px!important}
     .profile-history-inline-head,.profile-history-inline-cell{text-align:center!important;width:82px!important}
     .profile-history-inline-toggle{width:20px!important;height:20px!important;border:2px solid var(--profile-border)!important;border-radius:7px!important;display:inline-grid!important;place-items:center!important;padding:0!important;background:var(--profile-panel)!important;color:white!important;cursor:pointer!important;box-shadow:inset 0 0 0 2px var(--profile-panel)!important;line-height:1!important;vertical-align:middle!important}
     .profile-history-inline-toggle:hover{border-color:var(--desktop-accent,#2563eb)!important}
@@ -113,6 +116,7 @@ function injectProfileWeekTableCss() {
     .profile-page>.profile-card:last-child>.profile-table-wrap table{height:auto!important}
     .profile-table-wrap{max-height:none!important;height:auto!important}
     .profile-app-shell,.profile-app-shell *{overflow-anchor:auto!important}
+    @media(max-width:720px){.profile-week-picker{min-width:260px!important}.profile-week-picker div{grid-template-rows:repeat(9,auto)!important;grid-auto-columns:minmax(96px,1fr)!important}.profile-week-picker button{padding:8px 10px!important}}
   `;
   document.head.appendChild(style);
 }
