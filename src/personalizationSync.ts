@@ -27,6 +27,7 @@ type PersonalizationPayload = {
 };
 
 type GasResponse = { ok?: boolean; error?: string; data?: any; [key: string]: any };
+type RemotePrefsResult = { exists: boolean; prefs: Partial<PersonalizationPayload> | null };
 
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const SESSION_KEY = "a3k64-login-session-v1";
@@ -75,6 +76,7 @@ let saveTimer = 0;
 let suppressCapture = false;
 let lastSavedJson = "";
 let remoteDisabled = false;
+let initializedAccount = "";
 
 function safeJson<T>(value: string | null, fallback: T): T {
   try {
@@ -117,10 +119,6 @@ function isQuiet() {
   if (until > Date.now()) return true;
   if (until) localStorage.removeItem(QUIET_UNTIL_KEY);
   return false;
-}
-
-function loginLookWasChanged() {
-  return localStorage.getItem(LOGIN_LOOK_DIRTY_KEY) === "1";
 }
 
 function clearLoginLookChanged() {
@@ -208,6 +206,7 @@ function applyPrefs(prefs?: Partial<PersonalizationPayload> | null) {
     window.dispatchEvent(new Event("accent-change"));
     window.dispatchEvent(new Event("login-accent-change"));
     window.dispatchEvent(new Event("appearance-change"));
+    window.dispatchEvent(new Event("taskbar-settings-change"));
     window.dispatchEvent(new Event("personalization-sync-applied"));
   } finally {
     suppressCapture = false;
@@ -248,19 +247,42 @@ function gasJsonp(action: string, payload?: unknown): Promise<GasResponse | null
   });
 }
 
-async function fetchRemotePrefs(user: SessionUser) {
-  const res = await gasJsonp("getPersonalization", { username: accountId(user), email: user.email, uid: user.uid });
+function normalizeRemotePrefs(data: any): RemotePrefsResult {
+  const prefs = (data?.personalization || data?.prefs || data?.preferences || data?.settings || null) as Partial<PersonalizationPayload> | null;
+  const exists = Boolean(
+    data?.exists === true ||
+    data?.found === true ||
+    data?.hasPersonalization === true ||
+    data?.created === false ||
+    (prefs && Object.keys(prefs).some((key) => key !== "updatedAt"))
+  );
+  return { exists, prefs: exists ? prefs || {} : null };
+}
+
+async function fetchRemotePrefs(user: SessionUser): Promise<RemotePrefsResult> {
+  const account = accountId(user);
+  const res = await gasJsonp("getPersonalization", { account, username: account, email: user.email, uid: user.uid });
   const data = res?.data || res;
-  return (data?.personalization || data?.prefs || data?.preferences || null) as Partial<PersonalizationPayload> | null;
+  return normalizeRemotePrefs(data);
 }
 
 async function saveRemotePrefs(user: SessionUser, personalization: Partial<PersonalizationPayload>) {
-  const res = await gasJsonp("savePersonalization", { username: accountId(user), email: user.email, uid: user.uid, displayName: displayName(user), personalization });
+  const account = accountId(user);
+  const payload = {
+    account,
+    username: account,
+    email: user.email,
+    uid: user.uid,
+    displayName: displayName(user),
+    personalization,
+    settings: personalization,
+  };
+  const res = await gasJsonp("savePersonalization", payload);
   return res !== null;
 }
 
 function scheduleSave() {
-  if (!activeAccount || suppressCapture || remoteDisabled || isQuiet()) return;
+  if (!activeAccount || activeAccount !== initializedAccount || suppressCapture || remoteDisabled || isQuiet()) return;
   window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(async () => {
     const session = readSession();
@@ -274,28 +296,29 @@ function scheduleSave() {
   }, 750);
 }
 
-async function syncForSession(user: SessionUser, options?: { fromLogin?: boolean }) {
+async function syncForSession(user: SessionUser) {
   const account = accountId(user);
   if (!account || remoteDisabled || isQuiet()) return;
   activeAccount = account;
+  initializedAccount = "";
 
-  const loginChanged = Boolean(options?.fromLogin && loginLookWasChanged());
-  const remotePrefs = await fetchRemotePrefs(user);
+  const remote = await fetchRemotePrefs(user);
   if (remoteDisabled || isQuiet()) return;
 
-  const merged: PersonalizationPayload = {
-    version: 2,
-    ...(remotePrefs || collectPrefs()),
-    ...(loginChanged ? loginLook() : {}),
-  };
-
-  lastSavedJson = stablePrefsJson(merged);
-  applyPrefs(merged);
-
-  if (loginChanged || !remotePrefs) {
-    await saveRemotePrefs(user, merged);
+  if (remote.exists && remote.prefs) {
+    const remotePrefs = { version: 2, ...remote.prefs } as PersonalizationPayload;
+    lastSavedJson = stablePrefsJson(remotePrefs);
+    applyPrefs(remotePrefs);
+    initializedAccount = account;
     clearLoginLookChanged();
+    return;
   }
+
+  const defaults = collectPrefs();
+  lastSavedJson = stablePrefsJson(defaults);
+  initializedAccount = account;
+  await saveRemotePrefs(user, defaults);
+  clearLoginLookChanged();
 }
 
 function installStorageHook() {
@@ -305,15 +328,18 @@ function installStorageHook() {
     originalSetItem.call(this, key, value);
     if (key === SESSION_KEY) {
       const session = readSession();
-      if (session?.user) void syncForSession(session.user, { fromLogin: true });
+      if (session?.user) void syncForSession(session.user);
       return;
     }
-    if (PERSONALIZATION_KEYS.has(key)) scheduleSave();
+    if (this === localStorage && PERSONALIZATION_KEYS.has(key)) scheduleSave();
   };
   Storage.prototype.removeItem = function patchedRemoveItem(key: string) {
     originalRemoveItem.call(this, key);
-    if (key === SESSION_KEY) activeAccount = "";
-    if (PERSONALIZATION_KEYS.has(key)) scheduleSave();
+    if (key === SESSION_KEY) {
+      activeAccount = "";
+      initializedAccount = "";
+    }
+    if (this === localStorage && PERSONALIZATION_KEYS.has(key)) scheduleSave();
   };
 }
 
@@ -323,7 +349,7 @@ function boot() {
   if (isQuiet()) remoteDisabled = true;
   installStorageHook();
   const session = readSession();
-  if (session?.user) void syncForSession(session.user, { fromLogin: false });
+  if (session?.user) void syncForSession(session.user);
   window.addEventListener("taskbar-settings-change", scheduleSave);
   window.addEventListener("accent-change", scheduleSave);
   window.addEventListener("desktop-theme-change", scheduleSave);
