@@ -18,11 +18,23 @@ export type QuickScoreRule = {
   note?: string;
 };
 
+export type WeekSetting = {
+  week: number;
+  label?: string;
+  start?: string;
+  end?: string;
+  today?: string;
+  editable: boolean;
+  locked: boolean;
+  reason?: string;
+};
+
 export type GasScoreboardPayload = {
   students: Student[];
   events: ScoreEvent[];
   weeks: number[];
   quickScoreReasons?: QuickScoreRule[];
+  weekSettings?: WeekSetting[];
   updatedAt?: string;
 };
 
@@ -158,6 +170,29 @@ function normalizeRules(raw: unknown): QuickScoreRule[] {
   return rules;
 }
 
+function normalizeWeekSettings(raw: unknown): WeekSetting[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      const record = item as Record<string, unknown>;
+      const week = asNumber(record.week ?? record["tuần"] ?? record["tuan"], NaN);
+      if (!Number.isFinite(week)) return null;
+      const editable = Boolean(record.editable ?? !record.locked);
+      const locked = Boolean(record.locked ?? !editable);
+      return {
+        week,
+        label: asText(record.label, `TUẦN ${week}`),
+        start: asText(record.start),
+        end: asText(record.end),
+        today: asText(record.today),
+        editable,
+        locked,
+        reason: asText(record.reason) || undefined,
+      };
+    })
+    .filter((item): item is WeekSetting => Boolean(item));
+}
+
 function setGlobalRules(rules: QuickScoreRule[]) {
   if (typeof globalThis === "undefined") return;
   (globalThis as GlobalRuleCache).__A3K64_SCORE_RULES = rules;
@@ -175,9 +210,10 @@ function normalizePayload(data: GasResponseData): GasScoreboardPayload {
   const events = normalizeEvents(data.events);
   const weeks = normalizeWeeks(data.weeks, events);
   const quickScoreReasons = normalizeRules(data.quickScoreReasons ?? data.rules);
+  const weekSettings = normalizeWeekSettings(data.weekSettings);
   if (quickScoreReasons.length) setGlobalRules(quickScoreReasons);
 
-  return { students, events, weeks, quickScoreReasons, updatedAt: asText(data.updatedAt) || undefined };
+  return { students, events, weeks, quickScoreReasons, weekSettings, updatedAt: asText(data.updatedAt) || undefined };
 }
 
 function ensureProcessingStyle() {
@@ -266,6 +302,22 @@ async function gasPost(action: string, payload: unknown, processingMessage?: str
   }
 }
 
+function actorPayload() {
+  try {
+    const session = JSON.parse(localStorage.getItem("a3k64-login-session-v1") || "null") as { user?: Record<string, unknown> } | null;
+    const user = session?.user || {};
+    return {
+      actorEmail: asText(user.email),
+      actorUid: asText(user.uid),
+      actorName: asText(user.displayName ?? user.name ?? user.hoten),
+      actorRole: asText(user.role),
+      actorGroup: asText(user.group ?? user.to),
+    };
+  } catch {
+    return {};
+  }
+}
+
 export async function fetchScoreboardFromGas(): Promise<GasScoreboardPayload | null> {
   try {
     const response = await gasGet("getScoreboard");
@@ -279,7 +331,7 @@ export async function fetchScoreboardFromGas(): Promise<GasScoreboardPayload | n
 }
 
 export async function createScoreEventInGas(event: ScoreEvent): Promise<ScoreEvent> {
-  const response = await gasPost("addScoreEvent", event, "Đang lưu điểm vào Google Sheets...");
+  const response = await gasPost("addScoreEvent", { ...event, ...actorPayload() }, "Đang lưu điểm vào Google Sheets...");
   const data = response?.data || response;
   const scoreboard = data?.scoreboard as GasResponseData | undefined;
   if (scoreboard?.events) {
@@ -294,13 +346,13 @@ export async function createScoreEventInGas(event: ScoreEvent): Promise<ScoreEve
 }
 
 export async function deleteScoreEventInGas(eventId: string) {
-  const response = await gasPost("deleteScoreEvent", { id: eventId }, "Đang xoá điểm trong Google Sheets...");
+  const response = await gasPost("deleteScoreEvent", { id: eventId, ...actorPayload() }, "Đang xoá điểm trong Google Sheets...");
   const data = response?.data || response;
   if (data?.scoreboard) normalizePayload(data.scoreboard as GasResponseData);
 }
 
 export async function createWeekInGas(week: number) {
-  await gasPost("createWeek", { week }, "Đang tạo tuần mới...");
+  await gasPost("createWeek", { week, ...actorPayload() }, "Đang tạo tuần mới...");
 }
 
 export async function validateLoginWithGas(username: string, password: string): Promise<GasLoginUser | null> {
