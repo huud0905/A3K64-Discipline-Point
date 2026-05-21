@@ -1,17 +1,14 @@
 function clampProfileScroll() {
   const clamp = () => {
-    document
-      .querySelectorAll<HTMLElement>('.profile-main,.profile-super-main,.profile-super-window,.win-window')
-      .forEach((el) => {
-        const maxTop = Math.max(0, el.scrollHeight - el.clientHeight);
-        if (el.scrollTop > maxTop) el.scrollTop = maxTop;
-      });
+    document.querySelectorAll<HTMLElement>('.profile-main,.profile-super-main,.profile-super-window,.win-window').forEach((el) => {
+      const maxTop = Math.max(0, el.scrollHeight - el.clientHeight);
+      if (el.scrollTop > maxTop) el.scrollTop = maxTop;
+    });
   };
 
   window.requestAnimationFrame(clamp);
   window.setTimeout(() => window.requestAnimationFrame(clamp), 0);
   window.setTimeout(() => window.requestAnimationFrame(clamp), 80);
-  window.setTimeout(() => window.requestAnimationFrame(clamp), 180);
 }
 
 function installProfileWeekTableFix() {
@@ -22,7 +19,7 @@ function installProfileWeekTableFix() {
       if (!target) return;
 
       if (target.closest('.profile-week-check')) {
-        event.stopPropagation();
+        // Không stopPropagation ở đây, nếu không React sẽ không nhận onChange của checkbox.
         clampProfileScroll();
         return;
       }
@@ -57,14 +54,13 @@ function injectProfileWeekTableCss() {
     .profile-week-radio{display:none!important}
     .profile-status-radio-cell{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:0!important;min-width:0!important}
     .profile-week-table tbody tr{cursor:pointer!important}
-    .profile-week-table .profile-week-check{cursor:pointer!important}
+    .profile-week-table .profile-week-check,.profile-week-table .profile-week-check *{cursor:pointer!important}
     .profile-main{overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;scrollbar-gutter:stable!important;background:var(--profile-bg)!important}
-    .profile-page{min-height:100%!important;display:flex!important;flex-direction:column!important;align-content:stretch!important;grid-auto-rows:unset!important;padding-bottom:18px!important;background:var(--profile-bg)!important}
-    .profile-page>.profile-card:last-child{flex:1 1 360px!important;display:flex!important;flex-direction:column!important;margin-bottom:0!important;min-height:360px!important;background:var(--profile-panel)!important}
-    .profile-page>.profile-card:last-child>.profile-history-head{flex:0 0 auto!important}
-    .profile-page>.profile-card:last-child>.profile-table-wrap{flex:1 1 auto!important;min-height:0!important;max-height:none!important;background:var(--profile-panel)!important}
+    .profile-page{min-height:auto!important;display:grid!important;gap:14px!important;align-content:start!important;grid-auto-rows:max-content!important;padding-bottom:18px!important;background:var(--profile-bg)!important}
+    .profile-page>.profile-card:last-child{flex:none!important;display:block!important;margin-bottom:0!important;min-height:0!important;height:auto!important;background:var(--profile-panel)!important}
+    .profile-page>.profile-card:last-child>.profile-table-wrap{flex:none!important;min-height:0!important;height:auto!important;max-height:none!important;background:var(--profile-panel)!important}
     .profile-page>.profile-card:last-child>.profile-table-wrap table{height:auto!important}
-    .profile-table-wrap{max-height:none!important}
+    .profile-table-wrap{max-height:none!important;height:auto!important}
   `;
   document.head.appendChild(style);
 }
