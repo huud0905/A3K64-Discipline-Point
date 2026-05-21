@@ -33,7 +33,7 @@ const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const SESSION_KEY = "a3k64-login-session-v1";
 const LOGIN_LOOK_DIRTY_KEY = "a3k64-login-look-dirty-v1";
 const QUIET_UNTIL_KEY = "a3k64-personalization-quiet-until";
-const JSONP_TIMEOUT_MS = 9000;
+const JSONP_TIMEOUT_MS = 45000;
 
 const ACCENT_COLORS: Record<string, string> = {
   blue: "#2563eb",
@@ -219,13 +219,20 @@ function gasJsonp(action: string, payload?: unknown): Promise<GasResponse | null
     const callbackName = `__a3k64Personalization_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const script = document.createElement("script");
     const url = new URL(GAS_URL);
+    const globalCallbacks = window as typeof window & Record<string, unknown>;
     let timeoutId = 0;
     let done = false;
-    const finish = (value: GasResponse | null) => {
+    const finish = (value: GasResponse | null, keepLateNoop = false) => {
       if (done) return;
       done = true;
       window.clearTimeout(timeoutId);
-      delete (window as typeof window & Record<string, unknown>)[callbackName];
+      script.onerror = null;
+      if (keepLateNoop) {
+        globalCallbacks[callbackName] = () => undefined;
+        window.setTimeout(() => delete globalCallbacks[callbackName], 60000);
+      } else {
+        delete globalCallbacks[callbackName];
+      }
       script.remove();
       resolve(value);
     };
@@ -233,14 +240,14 @@ function gasJsonp(action: string, payload?: unknown): Promise<GasResponse | null
     url.searchParams.set("callback", callbackName);
     url.searchParams.set("t", String(Date.now()));
     if (payload !== undefined) url.searchParams.set("payload", JSON.stringify(payload));
-    (window as typeof window & Record<string, unknown>)[callbackName] = (json: GasResponse) => finish(json);
+    globalCallbacks[callbackName] = (json: GasResponse) => finish(json, false);
     script.onerror = () => {
       quietForAWhile();
-      finish(null);
+      finish(null, true);
     };
     timeoutId = window.setTimeout(() => {
       quietForAWhile();
-      finish(null);
+      finish(null, true);
     }, JSONP_TIMEOUT_MS);
     script.src = url.toString();
     document.head.appendChild(script);
