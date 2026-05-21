@@ -7,10 +7,6 @@ var __A3_FAST = __A3_FAST || {};
   __A3_FAST.ttlSeconds = 20;
   __A3_FAST.memory = {};
 
-  function nowMs() {
-    return Date.now ? Date.now() : new Date().getTime();
-  }
-
   function cacheKey(prefix, value) {
     return "a3k64_" + prefix + "_" + String(value || "main");
   }
@@ -32,6 +28,26 @@ var __A3_FAST = __A3_FAST || {};
   function invalidateAll() {
     clearMemory();
     clearPersistent();
+  }
+
+  function hanoiStamp() {
+    return Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "HH:mm:ss dd/MM/yyyy");
+  }
+
+  function actorIdentity(payload) {
+    payload = payload || {};
+    return txt(payload.actorEmail || payload.email || payload.username || payload.actorName || payload.createdBy || "Web");
+  }
+
+  function lastEditorText(payload) {
+    return actorIdentity(payload) + " - " + hanoiStamp();
+  }
+
+  function withLastEditor(payload) {
+    const next = Object.assign({}, payload || {});
+    next.createdBy = lastEditorText(payload || {});
+    next.lastEditor = next.createdBy;
+    return next;
   }
 
   function getCachedJson(name) {
@@ -181,6 +197,13 @@ var __A3_FAST = __A3_FAST || {};
     return result;
   };
 
+  addScoreEvent = function (payload) {
+    clearMemory();
+    const result = originalAddScoreEvent.call(this, withLastEditor(payload || {}));
+    invalidateAll();
+    return result;
+  };
+
   function wrapMutation(original) {
     return function () {
       clearMemory();
@@ -190,7 +213,6 @@ var __A3_FAST = __A3_FAST || {};
     };
   }
 
-  addScoreEvent = wrapMutation(originalAddScoreEvent);
   deleteScoreEvent = wrapMutation(originalDeleteScoreEvent);
   bulkScore = wrapMutation(originalBulkScore);
   createWeek = wrapMutation(originalCreateWeek);
