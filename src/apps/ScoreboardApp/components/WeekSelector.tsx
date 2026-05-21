@@ -36,6 +36,9 @@ export function WeekSelector({
             value={week}
             options={weeks.map((item) => ({ value: item, label: `Tuần ${item}` }))}
             onChange={onWeekChange}
+            portal
+            menuClassName="week-floating-menu"
+            menuMaxHeight="none"
           />
           <button
             type="button"
