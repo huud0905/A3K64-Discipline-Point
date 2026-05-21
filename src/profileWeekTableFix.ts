@@ -1,30 +1,57 @@
 let clampRaf = 0;
 let internalClamp = false;
 
-function getProfileContentMaxScroll(main: HTMLElement) {
-  const page = main.querySelector<HTMLElement>('.profile-page');
-  if (!page) return Math.max(0, main.scrollHeight - main.clientHeight);
+function getScrollInfo(container: HTMLElement) {
+  const isDocumentScroller = container === document.documentElement || container === document.body || container === document.scrollingElement;
+  return {
+    top: isDocumentScroller ? window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0 : container.scrollTop,
+    height: isDocumentScroller ? window.innerHeight : container.clientHeight,
+    rectTop: isDocumentScroller ? 0 : container.getBoundingClientRect().top,
+    setTop(value: number) {
+      if (isDocumentScroller) window.scrollTo({ top: value, left: window.scrollX, behavior: 'auto' });
+      else container.scrollTop = value;
+    },
+  };
+}
 
-  const pageRect = page.getBoundingClientRect();
-  const children = Array.from(page.children).filter((child): child is HTMLElement => child instanceof HTMLElement);
+function getProfileContentMaxScroll(container: HTMLElement) {
+  const page = container.querySelector<HTMLElement>('.profile-page') || document.querySelector<HTMLElement>('.profile-page');
+  if (!page) return Math.max(0, container.scrollHeight - container.clientHeight);
+
+  const children = Array.from(page.children).filter((child): child is HTMLElement => child instanceof HTMLElement && child.offsetParent !== null);
   const lastChild = children.at(-1);
-  if (!lastChild) return Math.max(0, main.scrollHeight - main.clientHeight);
+  if (!lastChild) return 0;
 
+  const info = getScrollInfo(container);
   const lastRect = lastChild.getBoundingClientRect();
   const pageStyle = window.getComputedStyle(page);
   const paddingBottom = Number.parseFloat(pageStyle.paddingBottom || '0') || 0;
-  const realContentBottom = lastRect.bottom - pageRect.top + paddingBottom;
+  const realContentBottomInViewport = lastRect.bottom + paddingBottom;
+  const realContentBottomInContainerScroll = realContentBottomInViewport - info.rectTop + info.top;
+  return Math.max(0, realContentBottomInContainerScroll - info.height);
+}
 
-  return Math.max(0, realContentBottom - main.clientHeight);
+function getProfileScrollContainers() {
+  const containers = new Set<HTMLElement>();
+  document.querySelectorAll<HTMLElement>('.profile-main,.win-body,.win-window,.win-root').forEach((item) => {
+    if (item.querySelector('.profile-page')) containers.add(item);
+  });
+  if (document.querySelector('.profile-page')) {
+    if (document.scrollingElement instanceof HTMLElement) containers.add(document.scrollingElement);
+    containers.add(document.documentElement);
+    containers.add(document.body);
+  }
+  return Array.from(containers);
 }
 
 function clampProfileScrollNow() {
   if (internalClamp) return;
   internalClamp = true;
   try {
-    document.querySelectorAll<HTMLElement>('.profile-main').forEach((main) => {
-      const maxTop = getProfileContentMaxScroll(main);
-      if (main.scrollTop > maxTop) main.scrollTop = maxTop;
+    getProfileScrollContainers().forEach((container) => {
+      const info = getScrollInfo(container);
+      const maxTop = getProfileContentMaxScroll(container);
+      if (info.top > maxTop + 2) info.setTop(maxTop);
     });
   } finally {
     internalClamp = false;
@@ -40,6 +67,7 @@ function clampProfileScroll() {
   window.setTimeout(() => window.requestAnimationFrame(clampProfileScrollNow), 0);
   window.setTimeout(() => window.requestAnimationFrame(clampProfileScrollNow), 80);
   window.setTimeout(() => window.requestAnimationFrame(clampProfileScrollNow), 180);
+  window.setTimeout(() => window.requestAnimationFrame(clampProfileScrollNow), 360);
 }
 
 function installProfileWeekTableFix() {
@@ -64,31 +92,17 @@ function installProfileWeekTableFix() {
     true,
   );
 
-  window.addEventListener(
-    'change',
-    (event) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest('.profile-week-check')) clampProfileScroll();
-    },
-    true,
-  );
+  window.addEventListener('change', (event) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('.profile-app-shell')) clampProfileScroll();
+  }, true);
 
-  window.addEventListener(
-    'scroll',
-    (event) => {
-      const target = event.target as HTMLElement | null;
-      if (!target?.classList?.contains('profile-main')) return;
-      clampProfileScroll();
-    },
-    true,
-  );
-
+  window.addEventListener('scroll', () => clampProfileScroll(), true);
   window.addEventListener('resize', clampProfileScroll);
 
-  const observer = new MutationObserver((mutations) => {
-    if (mutations.some((mutation) => mutation.target instanceof HTMLElement && mutation.target.closest?.('.profile-app-shell'))) clampProfileScroll();
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
+  window.setInterval(() => {
+    if (document.querySelector('.profile-page')) clampProfileScrollNow();
+  }, 300);
 }
 
 function injectProfileWeekTableCss() {
@@ -103,9 +117,9 @@ function injectProfileWeekTableCss() {
     .profile-week-table tbody tr{cursor:pointer!important}
     .profile-week-table .profile-week-check,.profile-week-table .profile-week-check *{cursor:pointer!important}
     .profile-main{overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;scrollbar-gutter:stable!important;background:var(--profile-bg)!important}
-    .profile-page{min-height:0!important;height:auto!important;display:grid!important;gap:14px!important;align-content:start!important;grid-auto-rows:max-content!important;padding-bottom:18px!important;margin-bottom:0!important;background:var(--profile-bg)!important}
-    .profile-page>.profile-card:last-child{flex:none!important;display:block!important;margin-bottom:0!important;min-height:0!important;height:auto!important;background:var(--profile-panel)!important}
-    .profile-page>.profile-card:last-child>.profile-table-wrap{flex:none!important;min-height:0!important;height:auto!important;max-height:none!important;background:var(--profile-panel)!important}
+    .profile-page{min-height:0!important;height:max-content!important;display:grid!important;gap:14px!important;align-content:start!important;grid-auto-rows:max-content!important;padding-bottom:18px!important;margin:0!important;background:var(--profile-bg)!important}
+    .profile-page>.profile-card:last-child{display:block!important;margin-bottom:0!important;min-height:0!important;height:auto!important;background:var(--profile-panel)!important}
+    .profile-page>.profile-card:last-child>.profile-table-wrap{min-height:0!important;height:auto!important;max-height:none!important;background:var(--profile-panel)!important}
     .profile-page>.profile-card:last-child>.profile-table-wrap table{height:auto!important}
     .profile-table-wrap{max-height:none!important;height:auto!important}
     .profile-app-shell,.profile-app-shell *{overflow-anchor:none!important}
@@ -113,23 +127,7 @@ function injectProfileWeekTableCss() {
   document.head.appendChild(style);
 }
 
-function installExtensionNoiseGuard() {
-  window.addEventListener(
-    'error',
-    (event) => {
-      const filename = String(event.filename || '');
-      const message = String(event.message || '');
-      if (filename.startsWith('chrome-extension://') || message.includes('chrome-extension://')) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }
-    },
-    true,
-  );
-}
-
 injectProfileWeekTableCss();
-installExtensionNoiseGuard();
 installProfileWeekTableFix();
 clampProfileScroll();
 
