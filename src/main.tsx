@@ -4,7 +4,7 @@ import './gasFetchCompat';
 import App from './App';
 import './personalizationSync';
 import './profileSuperApp';
-import './profileSuperSystemSync';
+import './profileFinalSystemPolish';
 import './taskViewEnhancer';
 import './startMenuListEnhancer';
 import './mobileAppShell';
