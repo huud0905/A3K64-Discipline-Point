@@ -58,6 +58,13 @@ function installContextGuard() {
       const target = event.target as HTMLElement | null;
       if (!target) return;
 
+      const insideProfileTabUi = Boolean(target.closest('.profile-tabs, .profile-tab-context-menu, .profile-new-tab-button, .profile-mini-new-tab'));
+      if (insideProfileTabUi) {
+        // Cho React xử lý menu chuột phải riêng của tab Profile.
+        closeDesktopContextMenu();
+        return;
+      }
+
       const insideApp = Boolean(target.closest('.win-window, .start-menu, .search-panel, .task-app-menu'));
       const insideDesktop = Boolean(target.closest('.win-desktop, .taskbar, .desktop-icons'));
 
