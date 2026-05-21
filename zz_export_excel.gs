@@ -38,9 +38,23 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
     return isFinite(parsed) ? parsed : "";
   }
 
+  function copyBasicFormat(sourceRange, targetRange) {
+    targetRange.setNumberFormats(sourceRange.getNumberFormats());
+    targetRange.setBackgrounds(sourceRange.getBackgrounds());
+    targetRange.setFontColors(sourceRange.getFontColors());
+    targetRange.setFontWeights(sourceRange.getFontWeights());
+    targetRange.setFontStyles(sourceRange.getFontStyles());
+    targetRange.setFontSizes(sourceRange.getFontSizes());
+    targetRange.setHorizontalAlignments(sourceRange.getHorizontalAlignments());
+    targetRange.setVerticalAlignments(sourceRange.getVerticalAlignments());
+    targetRange.setWraps(sourceRange.getWraps());
+  }
+
   function copyWeekAtoF(source, target) {
     const rowCount = Math.max(1, source.getLastRow());
-    source.getRange(1, 1, rowCount, 6).copyTo(target.getRange(1, 1, rowCount, 6), { formatOnly: true });
+    const sourceRange = source.getRange(1, 1, rowCount, 6);
+    const targetRange = target.getRange(1, 1, rowCount, 6);
+    copyBasicFormat(sourceRange, targetRange);
 
     const textValues = source.getRange(1, 1, rowCount, 3).getDisplayValues();
     const totalValues = source.getRange(1, 4, rowCount, 1).getValues().map(function (row) {
