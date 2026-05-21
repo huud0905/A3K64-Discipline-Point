@@ -55,14 +55,14 @@ body > .filter-select-menu.portal-menu.subject-floating-menu,
 
 body > .filter-select-menu.portal-menu.week-floating-menu,
 .filter-select-menu.portal-menu.week-floating-menu {
-  width: auto !important;
-  min-width: 238px !important;
-  max-width: min(540px, calc(100vw - 36px)) !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: min(360px, calc(100vw - 36px)) !important;
   display: grid !important;
   grid-template-rows: repeat(9, auto) !important;
   grid-auto-flow: column !important;
-  grid-auto-columns: minmax(86px, 1fr) !important;
-  gap: 6px 8px !important;
+  grid-auto-columns: 92px !important;
+  gap: 6px !important;
   max-height: none !important;
   overflow: visible !important;
   padding: 8px !important;
@@ -70,12 +70,12 @@ body > .filter-select-menu.portal-menu.week-floating-menu,
 
 body > .filter-select-menu.portal-menu.week-floating-menu .filter-select-option,
 .filter-select-menu.portal-menu.week-floating-menu .filter-select-option {
-  width: 100% !important;
+  width: 92px !important;
   min-height: 31px !important;
-  justify-content: flex-start !important;
-  text-align: left !important;
+  justify-content: center !important;
+  text-align: center !important;
   border-radius: 9px !important;
-  padding: 7px 10px !important;
+  padding: 7px 8px !important;
   white-space: nowrap !important;
 }
 
@@ -215,10 +215,16 @@ body > .filter-select-menu.portal-menu .filter-select-option,
 
   body > .filter-select-menu.portal-menu.week-floating-menu,
   .filter-select-menu.portal-menu.week-floating-menu {
-    min-width: 218px !important;
-    max-width: min(420px, calc(100vw - 24px)) !important;
-    grid-auto-columns: minmax(82px, 1fr) !important;
+    max-width: min(320px, calc(100vw - 24px)) !important;
+    grid-auto-columns: 84px !important;
     gap: 6px !important;
     padding: 7px !important;
+  }
+
+  body > .filter-select-menu.portal-menu.week-floating-menu .filter-select-option,
+  .filter-select-menu.portal-menu.week-floating-menu .filter-select-option {
+    width: 84px !important;
+    min-height: 30px !important;
+    padding: 7px 6px !important;
   }
 }
