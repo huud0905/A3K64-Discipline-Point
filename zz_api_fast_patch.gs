@@ -6,6 +6,7 @@ var __A3_FAST = __A3_FAST || {};
   __A3_FAST.installed = true;
   __A3_FAST.ttlSeconds = 20;
   __A3_FAST.memory = {};
+  __A3_FAST.lastEditorColumn = 16; // Cột P trong chính sheet TUẦN đang chấm.
 
   function cacheKey(prefix, value) {
     return "a3k64_" + prefix + "_" + String(value || "main");
@@ -41,13 +42,6 @@ var __A3_FAST = __A3_FAST || {};
 
   function lastEditorText(payload) {
     return actorIdentity(payload) + " - " + hanoiStamp();
-  }
-
-  function withLastEditor(payload) {
-    const next = Object.assign({}, payload || {});
-    next.createdBy = lastEditorText(payload || {});
-    next.lastEditor = next.createdBy;
-    return next;
   }
 
   function getCachedJson(name) {
@@ -197,9 +191,46 @@ var __A3_FAST = __A3_FAST || {};
     return result;
   };
 
+  function findScoreTarget(payload) {
+    payload = payload || {};
+    const weekNumber = Number(payload.week || DEFAULT_WEEK);
+    const sheet = weekSheet(weekNumber);
+    if (!sheet) throw new Error("Không tìm thấy TUẦN " + weekNumber);
+    const config = scoreCfg(vals(sheet));
+    if (!config) throw new Error("Không tìm thấy bảng chấm");
+    const info = findRow(sheet, config, txt(payload.studentId));
+    if (!info) throw new Error("Không tìm thấy học sinh");
+    return { sheet: sheet, row: info.row };
+  }
+
+  function writeLastEditorToColumnP(target, editorText) {
+    if (!target || !target.sheet || !target.row || !editorText) return;
+    target.sheet.getRange(target.row, __A3_FAST.lastEditorColumn).setValue(editorText);
+  }
+
+  function scorePayloadWithActor(payload) {
+    const next = Object.assign({}, payload || {});
+    next.createdBy = actorIdentity(payload || {});
+    return next;
+  }
+
   addScoreEvent = function (payload) {
     clearMemory();
-    const result = originalAddScoreEvent.call(this, withLastEditor(payload || {}));
+    const target = findScoreTarget(payload || {});
+    const editorText = lastEditorText(payload || {});
+    const result = originalAddScoreEvent.call(this, scorePayloadWithActor(payload || {}));
+    writeLastEditorToColumnP(target, editorText);
+    if (result) result.createdBy = editorText;
+    invalidateAll();
+    return result;
+  };
+
+  deleteScoreEvent = function (eventId) {
+    clearMemory();
+    const match = txt(eventId).match(/^w(\d+)r(\d+)([pm])(\d+)_/);
+    const target = match ? { sheet: weekSheet(Number(match[1])), row: Number(match[2]) + 1 } : null;
+    const result = originalDeleteScoreEvent.call(this, eventId);
+    writeLastEditorToColumnP(target, "Web - " + hanoiStamp());
     invalidateAll();
     return result;
   };
@@ -213,7 +244,6 @@ var __A3_FAST = __A3_FAST || {};
     };
   }
 
-  deleteScoreEvent = wrapMutation(originalDeleteScoreEvent);
   bulkScore = wrapMutation(originalBulkScore);
   createWeek = wrapMutation(originalCreateWeek);
   resetPassword = wrapMutation(originalResetPassword);
