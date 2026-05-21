@@ -30,6 +30,7 @@ type GasResponse = { ok?: boolean; error?: string; data?: any; [key: string]: an
 
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const SESSION_KEY = "a3k64-login-session-v1";
+const LOGIN_LOOK_DIRTY_KEY = "a3k64-login-look-dirty-v1";
 const QUIET_UNTIL_KEY = "a3k64-personalization-quiet-until";
 const JSONP_TIMEOUT_MS = 9000;
 
@@ -111,6 +112,14 @@ function isQuiet() {
   if (until > Date.now()) return true;
   if (until) localStorage.removeItem(QUIET_UNTIL_KEY);
   return false;
+}
+
+function loginLookWasChanged() {
+  return localStorage.getItem(LOGIN_LOOK_DIRTY_KEY) === "1";
+}
+
+function clearLoginLookChanged() {
+  localStorage.removeItem(LOGIN_LOOK_DIRTY_KEY);
 }
 
 function readSession(): SavedSession | null {
@@ -260,21 +269,29 @@ function scheduleSave() {
   }, 750);
 }
 
-async function syncForSession(user: SessionUser, options?: { loginAppearanceOnly?: boolean }) {
+async function syncForSession(user: SessionUser, options?: { fromLogin?: boolean }) {
   const account = accountId(user);
   if (!account || remoteDisabled || isQuiet()) return;
   activeAccount = account;
+
+  const loginChanged = Boolean(options?.fromLogin && loginLookWasChanged());
   const remotePrefs = await fetchRemotePrefs(user);
   if (remoteDisabled || isQuiet()) return;
+
   const merged: PersonalizationPayload = {
     version: 2,
-    ...(remotePrefs || {}),
-    ...(options?.loginAppearanceOnly ? loginLook() : {}),
+    ...(remotePrefs || collectPrefs()),
+    ...(loginChanged ? loginLook() : {}),
     updatedAt: new Date().toISOString(),
   };
-  if (options?.loginAppearanceOnly || !remotePrefs) await saveRemotePrefs(user, merged);
+
   lastSavedJson = JSON.stringify(merged);
   applyPrefs(merged);
+
+  if (loginChanged || !remotePrefs) {
+    await saveRemotePrefs(user, merged);
+    clearLoginLookChanged();
+  }
 }
 
 function installStorageHook() {
@@ -284,7 +301,7 @@ function installStorageHook() {
     originalSetItem.call(this, key, value);
     if (key === SESSION_KEY) {
       const session = readSession();
-      if (session?.user) void syncForSession(session.user, { loginAppearanceOnly: true });
+      if (session?.user) void syncForSession(session.user, { fromLogin: true });
       return;
     }
     if (PERSONALIZATION_KEYS.has(key)) scheduleSave();
@@ -302,7 +319,7 @@ function boot() {
   if (isQuiet()) remoteDisabled = true;
   installStorageHook();
   const session = readSession();
-  if (session?.user) void syncForSession(session.user, { loginAppearanceOnly: false });
+  if (session?.user) void syncForSession(session.user, { fromLogin: false });
   window.addEventListener("taskbar-settings-change", scheduleSave);
   window.addEventListener("accent-change", scheduleSave);
   window.addEventListener("desktop-theme-change", scheduleSave);
