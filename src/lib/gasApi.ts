@@ -56,10 +56,46 @@ type GasResponseData = Partial<GasScoreboardPayload> & {
 
 type RawGasResponse = GasResponseData & { data?: GasResponseData };
 type GlobalRuleCache = typeof globalThis & { __A3K64_SCORE_RULES?: QuickScoreRule[] };
+type GlobalScoreboardCache = typeof globalThis & {
+  __A3K64_SCOREBOARD_CACHE?: GasScoreboardPayload | null;
+  __A3K64_SCOREBOARD_PROMISE?: Promise<GasScoreboardPayload | null> | null;
+  __A3K64_SCOREBOARD_CACHE_AT?: number;
+};
 
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const JSONP_TIMEOUT_MS = 45000;
 let activeMutations = 0;
+
+function getCacheHost(): GlobalScoreboardCache | null {
+  return typeof globalThis === "undefined" ? null : (globalThis as GlobalScoreboardCache);
+}
+
+function emitScoreboardCacheEvent(payload: GasScoreboardPayload | null) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("a3k64-scoreboard-cache-updated", { detail: { payload } }));
+}
+
+function setScoreboardCache(payload: GasScoreboardPayload | null) {
+  const host = getCacheHost();
+  if (!host) return payload;
+  host.__A3K64_SCOREBOARD_CACHE = payload;
+  host.__A3K64_SCOREBOARD_CACHE_AT = Date.now();
+  emitScoreboardCacheEvent(payload);
+  return payload;
+}
+
+export function getCachedScoreboardFromGas() {
+  return getCacheHost()?.__A3K64_SCOREBOARD_CACHE || null;
+}
+
+export function invalidateScoreboardCache() {
+  const host = getCacheHost();
+  if (!host) return;
+  host.__A3K64_SCOREBOARD_CACHE = null;
+  host.__A3K64_SCOREBOARD_PROMISE = null;
+  host.__A3K64_SCOREBOARD_CACHE_AT = 0;
+  emitScoreboardCacheEvent(null);
+}
 
 function getLastNameInitial(name: string) {
   const parts = name.trim().split(/\s+/);
@@ -332,16 +368,35 @@ function actorPayload() {
   }
 }
 
-export async function fetchScoreboardFromGas(): Promise<GasScoreboardPayload | null> {
-  try {
-    const response = await gasGet("getScoreboard");
-    if (!response) return null;
-    const data = response.data || response;
-    return normalizePayload({ ...data, updatedAt: data.updatedAt || response.updatedAt });
-  } catch (error) {
-    console.warn("Không đọc được dữ liệu Google Sheets qua JSONP:", error);
-    return null;
-  }
+export async function fetchScoreboardFromGas(options: { force?: boolean } = {}): Promise<GasScoreboardPayload | null> {
+  const host = getCacheHost();
+  if (!options.force && host?.__A3K64_SCOREBOARD_CACHE) return host.__A3K64_SCOREBOARD_CACHE;
+  if (!options.force && host?.__A3K64_SCOREBOARD_PROMISE) return host.__A3K64_SCOREBOARD_PROMISE;
+
+  const request = (async () => {
+    try {
+      const response = await gasGet("getScoreboard");
+      if (!response) return host?.__A3K64_SCOREBOARD_CACHE || null;
+      const data = response.data || response;
+      return setScoreboardCache(normalizePayload({ ...data, updatedAt: data.updatedAt || response.updatedAt }));
+    } catch (error) {
+      console.warn("Không đọc được dữ liệu Google Sheets qua JSONP:", error);
+      return host?.__A3K64_SCOREBOARD_CACHE || null;
+    } finally {
+      if (host) host.__A3K64_SCOREBOARD_PROMISE = null;
+    }
+  })();
+
+  if (host) host.__A3K64_SCOREBOARD_PROMISE = request;
+  return request;
+}
+
+export function preloadScoreboardFromGas() {
+  return fetchScoreboardFromGas();
+}
+
+export async function refreshScoreboardFromGas() {
+  return fetchScoreboardFromGas({ force: true });
 }
 
 export async function createScoreEventInGas(event: ScoreEvent): Promise<ScoreEvent> {
@@ -349,8 +404,8 @@ export async function createScoreEventInGas(event: ScoreEvent): Promise<ScoreEve
   const data = response?.data || response;
   const scoreboard = data?.scoreboard as GasResponseData | undefined;
   if (scoreboard?.events) {
-    const normalized = normalizePayload(scoreboard);
-    const matched = normalized.events
+    const normalized = setScoreboardCache(normalizePayload(scoreboard));
+    const matched = normalized?.events
       .filter((item) => item.studentId === event.studentId && item.week === event.week && item.title === event.title && item.points === event.points)
       .at(-1);
     if (matched) return matched;
@@ -362,11 +417,13 @@ export async function createScoreEventInGas(event: ScoreEvent): Promise<ScoreEve
 export async function deleteScoreEventInGas(eventId: string) {
   const response = await gasPost("deleteScoreEvent", { id: eventId, ...actorPayload() }, "Đang xoá điểm trong Google Sheets...");
   const data = response?.data || response;
-  if (data?.scoreboard) normalizePayload(data.scoreboard as GasResponseData);
+  if (data?.scoreboard) setScoreboardCache(normalizePayload(data.scoreboard as GasResponseData));
+  else invalidateScoreboardCache();
 }
 
 export async function createWeekInGas(week: number) {
   await gasPost("createWeek", { week, ...actorPayload() }, "Đang tạo tuần mới...");
+  invalidateScoreboardCache();
 }
 
 export async function validateLoginWithGas(username: string, password: string): Promise<GasLoginUser | null> {
