@@ -26,10 +26,12 @@ body > .filter-select-menu.portal-menu,
 body > .filter-select-menu.portal-menu.subject-floating-menu,
 body > .filter-select-menu.portal-menu.category-floating-menu,
 body > .filter-select-menu.portal-menu.bulk-scope-floating-menu,
+body > .filter-select-menu.portal-menu.week-floating-menu,
 .filter-select-menu.portal-menu,
 .filter-select-menu.portal-menu.subject-floating-menu,
 .filter-select-menu.portal-menu.category-floating-menu,
-.filter-select-menu.portal-menu.bulk-scope-floating-menu {
+.filter-select-menu.portal-menu.bulk-scope-floating-menu,
+.filter-select-menu.portal-menu.week-floating-menu {
   position: fixed !important;
   left: var(--filter-menu-left) !important;
   top: var(--filter-menu-top) !important;
@@ -49,6 +51,32 @@ body > .filter-select-menu.portal-menu.subject-floating-menu,
   gap: 4px !important;
   max-height: none !important;
   overflow: visible !important;
+}
+
+body > .filter-select-menu.portal-menu.week-floating-menu,
+.filter-select-menu.portal-menu.week-floating-menu {
+  width: auto !important;
+  min-width: 310px !important;
+  max-width: min(760px, calc(100vw - 36px)) !important;
+  display: grid !important;
+  grid-template-rows: repeat(9, auto) !important;
+  grid-auto-flow: column !important;
+  grid-auto-columns: minmax(112px, 1fr) !important;
+  gap: 7px 10px !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 10px !important;
+}
+
+body > .filter-select-menu.portal-menu.week-floating-menu .filter-select-option,
+.filter-select-menu.portal-menu.week-floating-menu .filter-select-option {
+  width: 100% !important;
+  min-height: 34px !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  border-radius: 10px !important;
+  padding: 8px 11px !important;
+  white-space: nowrap !important;
 }
 
 body > .filter-select-menu.portal-menu.category-floating-menu,
@@ -183,5 +211,12 @@ body > .filter-select-menu.portal-menu .filter-select-option,
   .filter-select-menu.portal-menu.subject-floating-menu {
     width: 220px !important;
     min-width: 220px !important;
+  }
+
+  body > .filter-select-menu.portal-menu.week-floating-menu,
+  .filter-select-menu.portal-menu.week-floating-menu {
+    min-width: 260px !important;
+    grid-auto-columns: minmax(96px, 1fr) !important;
+    gap: 6px !important;
   }
 }
