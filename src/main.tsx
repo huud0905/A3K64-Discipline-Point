@@ -33,6 +33,7 @@ import './scoreboardFilterSelectHardFix.css';
 import './createWeekModal.css';
 import './scoreboardLiveNotifications.css';
 import './scoreboardModalInputCleanup';
+import './scoreboardExcelExport';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
