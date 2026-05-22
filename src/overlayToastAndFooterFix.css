@@ -1,0 +1,82 @@
+/* Keep screenshot copy toast above the preview footer buttons and support light/dark mode. */
+.a3-shot-toast {
+  z-index: 2147483647 !important;
+  right: 18px !important;
+  bottom: 96px !important;
+  max-width: min(360px, calc(100vw - 36px)) !important;
+  pointer-events: none !important;
+  border-radius: 18px !important;
+  backdrop-filter: blur(18px) !important;
+}
+
+.a3-shot-preview-backdrop ~ .a3-shot-toast,
+body:has(#a3-shot-preview) .a3-shot-toast {
+  bottom: 96px !important;
+}
+
+.a3-shot-preview-footer {
+  position: relative !important;
+  z-index: 3 !important;
+  min-height: 68px !important;
+  box-sizing: border-box !important;
+}
+
+.a3-shot-preview-body {
+  padding-bottom: 14px !important;
+}
+
+:root.a3-overlay-light .a3-shot-toast {
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(148, 163, 184, 0.38) !important;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.18) !important;
+}
+
+:root.a3-overlay-light .a3-shot-toast strong {
+  color: #0f172a !important;
+}
+
+:root.a3-overlay-light .a3-shot-toast span {
+  color: #475569 !important;
+}
+
+:root.a3-overlay-light .a3-shot-toast.success {
+  border-color: rgba(16, 185, 129, 0.42) !important;
+}
+
+:root.a3-overlay-light .a3-shot-toast.warning {
+  border-color: rgba(245, 158, 11, 0.48) !important;
+}
+
+:root.a3-overlay-light .a3-shot-toast.error {
+  border-color: rgba(239, 68, 68, 0.48) !important;
+}
+
+:root.a3-overlay-dark .a3-shot-toast {
+  background: rgba(15, 23, 42, 0.96) !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(148, 163, 184, 0.26) !important;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.38) !important;
+}
+
+:root.a3-overlay-dark .a3-shot-toast strong {
+  color: #f8fafc !important;
+}
+
+:root.a3-overlay-dark .a3-shot-toast span {
+  color: #cbd5e1 !important;
+}
+
+@media (max-width: 760px) {
+  .a3-shot-toast {
+    left: 14px !important;
+    right: 14px !important;
+    bottom: 92px !important;
+    max-width: none !important;
+  }
+
+  .a3-shot-preview-footer {
+    min-height: 72px !important;
+    padding: 12px 14px !important;
+  }
+}
