@@ -35,6 +35,7 @@ import './scoreboardLiveNotifications.css';
 import './scoreboardModalInputCleanup';
 import './scoreboardExcelExport';
 import './scoreboardScreenshotCapture';
+import './scoreboardScreenshotFullPreviewFix.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
