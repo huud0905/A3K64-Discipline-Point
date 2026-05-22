@@ -66,6 +66,7 @@ type ActorPayload = ReturnType<typeof actorPayload>;
 
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const JSONP_TIMEOUT_MS = 45000;
+const FORM_POST_WAIT_MS = 2500;
 const JSONP_URL_SOFT_LIMIT = 11000;
 let cachedScoreboard: GasScoreboardPayload | null = null;
 let scoreboardRequest: Promise<GasScoreboardPayload | null> | null = null;
@@ -283,7 +284,7 @@ function gasJsonp(action: string, payload?: unknown): Promise<RawGasResponse | n
 
     const finalUrl = url.toString();
     if (finalUrl.length > JSONP_URL_SOFT_LIMIT * 1.35) {
-      reject(new Error("Dữ liệu lưu quá lớn cho JSONP. Hệ thống sẽ tự chia nhỏ lệnh lưu."));
+      reject(new Error("Dữ liệu lưu quá lớn cho JSONP. Hệ thống sẽ tự gửi bằng form POST."));
       return;
     }
 
@@ -324,6 +325,50 @@ function gasJsonp(action: string, payload?: unknown): Promise<RawGasResponse | n
 
     script.src = finalUrl;
     document.head.appendChild(script);
+  });
+}
+
+function gasFormPost(action: string, payload: unknown): Promise<null> {
+  if (!GAS_URL || typeof document === "undefined") return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const iframeName = `a3-gas-post-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const iframe = document.createElement("iframe");
+    const form = document.createElement("form");
+    const actionInput = document.createElement("input");
+    const payloadInput = document.createElement("textarea");
+    let done = false;
+
+    const cleanup = () => {
+      if (done) return;
+      done = true;
+      window.setTimeout(() => {
+        form.remove();
+        iframe.remove();
+      }, 1000);
+      resolve(null);
+    };
+
+    iframe.name = iframeName;
+    iframe.style.display = "none";
+    form.style.display = "none";
+    form.method = "POST";
+    form.action = GAS_URL;
+    form.target = iframeName;
+    form.enctype = "application/x-www-form-urlencoded";
+
+    actionInput.type = "hidden";
+    actionInput.name = "action";
+    actionInput.value = action;
+
+    payloadInput.name = "payload";
+    payloadInput.value = JSON.stringify(payload);
+
+    form.append(actionInput, payloadInput);
+    document.body.append(iframe, form);
+
+    iframe.addEventListener("load", cleanup, { once: true });
+    window.setTimeout(cleanup, FORM_POST_WAIT_MS);
+    form.submit();
   });
 }
 
@@ -393,8 +438,14 @@ function splitScoreSavePayload(payload: SaveScoreChangesPayload, actor: ActorPay
 async function saveScoreChangesByChunks(payload: SaveScoreChangesPayload) {
   const actor = actorPayload();
   const fullPayload = withActor(payload, actor);
+
   if (jsonpUrlLength("saveScoreChanges", fullPayload) <= JSONP_URL_SOFT_LIMIT) {
     return gasPost("saveScoreChanges", fullPayload);
+  }
+
+  if (payload.additions.length > 8 || jsonpUrlLength("saveScoreChanges", fullPayload) > JSONP_URL_SOFT_LIMIT * 1.35) {
+    await gasFormPost("saveScoreChanges", fullPayload);
+    return gasJsonp("getScoreboard");
   }
 
   const chunks = splitScoreSavePayload(payload, actor);
