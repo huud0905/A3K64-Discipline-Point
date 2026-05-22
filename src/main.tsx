@@ -34,6 +34,7 @@ import './createWeekModal.css';
 import './scoreboardLiveNotifications.css';
 import './scoreboardModalInputCleanup';
 import './scoreboardExcelExport';
+import './scoreboardScreenshotCapture';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
