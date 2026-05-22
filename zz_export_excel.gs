@@ -6,9 +6,7 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
   __A3_EXPORT_EXCEL.installed = true;
 
   const originalRouteAction = routeAction;
-  const EXPORT_FOLDER_NAME = "A3K64_EXPORT";
-  const EXPORT_FOLDER_PROPERTY_KEY = "A3K64_EXPORT_FOLDER_ID";
-  const EXPORT_FOLDER_ID = ""; // Nếu muốn cố định thư mục thủ công, dán ID folder Drive vào đây.
+  const EXPORT_FOLDER_NAME = "export";
 
   function exportStamp() {
     return Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "yyyyMMdd_HHmmss");
@@ -81,44 +79,16 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
     trimSheetForExportAF(copiedSheet, lastDataRow);
   }
 
-  function folderById(folderId) {
-    if (!folderId) return null;
-    try {
-      return DriveApp.getFolderById(folderId);
-    } catch (err) {
-      return null;
-    }
+  function parentFolderOfSpreadsheet() {
+    const sourceFile = DriveApp.getFileById(SPREADSHEET_ID);
+    const parents = sourceFile.getParents();
+    return parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
   }
 
-  function getScriptProperty(keyName) {
-    try {
-      return PropertiesService.getScriptProperties().getProperty(keyName) || "";
-    } catch (err) {
-      return "";
-    }
-  }
-
-  function setScriptProperty(keyName, value) {
-    try {
-      PropertiesService.getScriptProperties().setProperty(keyName, value);
-    } catch (err) {}
-  }
-
-  function stableExportFolder() {
-    const manualFolder = folderById(EXPORT_FOLDER_ID);
-    if (manualFolder) {
-      setScriptProperty(EXPORT_FOLDER_PROPERTY_KEY, manualFolder.getId());
-      return manualFolder;
-    }
-
-    const rememberedFolder = folderById(getScriptProperty(EXPORT_FOLDER_PROPERTY_KEY));
-    if (rememberedFolder) return rememberedFolder;
-
-    const root = DriveApp.getRootFolder();
-    const folders = root.getFoldersByName(EXPORT_FOLDER_NAME);
-    const folder = folders.hasNext() ? folders.next() : root.createFolder(EXPORT_FOLDER_NAME);
-    setScriptProperty(EXPORT_FOLDER_PROPERTY_KEY, folder.getId());
-    return folder;
+  function exportFolderBesideSpreadsheet() {
+    const parent = parentFolderOfSpreadsheet();
+    const folders = parent.getFoldersByName(EXPORT_FOLDER_NAME);
+    return folders.hasNext() ? folders.next() : parent.createFolder(EXPORT_FOLDER_NAME);
   }
 
   function moveFileToFolder(fileId, folder) {
@@ -141,7 +111,7 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
   }
 
   function saveBlobToExportFolder(blob, fileName, folder) {
-    const targetFolder = folder || stableExportFolder();
+    const targetFolder = folder || exportFolderBesideSpreadsheet();
     const file = targetFolder.createFile(blob).setName(fileName);
     return {
       fileId: file.getId(),
@@ -162,7 +132,7 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
 
     const sourceBook = sourceSpreadsheet();
     const fileName = buildFilename(weeks);
-    const exportFolder = stableExportFolder();
+    const exportFolder = exportFolderBesideSpreadsheet();
     const temp = SpreadsheetApp.create("TMP_MULTI_EXPORT_" + exportStamp());
     const tempId = temp.getId();
     moveFileToFolder(tempId, exportFolder);
