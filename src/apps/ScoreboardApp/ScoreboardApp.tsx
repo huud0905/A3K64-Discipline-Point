@@ -19,6 +19,7 @@ type LiveToastKind = "foreground" | "background";
 type LiveToast = { id: string; kind: LiveToastKind; title: string; message: string; points?: number };
 type ScoreboardAppProps = { userRole?: string | null; userGroup?: number | string | null };
 type ScoreChanges = { additions: Omit<ScoreEvent, "id">[]; deletions: string[] };
+type ScoreSaveGuard = { additions: ScoreEvent[]; deletions: Set<string>; expiresAt: number };
 
 const STORAGE_KEY = "scoreboard-local-events-v1";
 const WEEK_STORAGE_KEY = "scoreboard-local-weeks-v1";
@@ -27,6 +28,7 @@ const FULL_ACCESS_ROLES = ["gvcn", "lop_truong", "bi_thu"];
 const WEEK_CREATORS = ["to_truong", ...FULL_ACCESS_ROLES];
 const LIVE_REFRESH_MS = 7000;
 const FRESH_EVENT_MARGIN_MS = 2500;
+const SAVE_GUARD_MS = 45000;
 
 function readLocalEvents() { try { const saved = localStorage.getItem(STORAGE_KEY); return saved ? (JSON.parse(saved) as ScoreEvent[]) : mockScoreEvents; } catch { return mockScoreEvents; } }
 function readLocalWeeks() { try { const saved = localStorage.getItem(WEEK_STORAGE_KEY); const weeks = saved ? (JSON.parse(saved) as number[]) : SCORE_WEEKS; return weeks.length ? weeks : SCORE_WEEKS; } catch { return SCORE_WEEKS; } }
@@ -34,6 +36,7 @@ function givenNameOf(fullName: string) { const parts = fullName.trim().split(/\s
 function compareByGivenName(a: { name: string }, b: { name: string }) { const given = givenNameOf(a.name).localeCompare(givenNameOf(b.name), "vi", { sensitivity: "base" }); return given || a.name.localeCompare(b.name, "vi", { sensitivity: "base" }); }
 function matchesGroups(group: number, selectedGroups: GroupId[]) { return selectedGroups.length === 0 || selectedGroups.includes(String(group) as GroupId); }
 function eventSignature(event: ScoreEvent) { return [event.studentId, event.week, event.title, event.points, event.type, event.category, event.note || "", event.createdBy || ""].join("|"); }
+function scoreContentSignature(event: Pick<ScoreEvent, "studentId" | "week" | "title" | "points" | "type" | "category" | "note">) { return [event.studentId, event.week, event.title, event.points, event.type, event.category, event.note || ""].join("|"); }
 function eventTime(event: ScoreEvent) { const time = Date.parse(event.createdAt || ""); return Number.isFinite(time) ? time : 0; }
 function normalizeRole(role?: string | null) { return String(role || "hoc_sinh").trim().toLowerCase(); }
 function parseGroup(value?: number | string | null) { const parsed = Number(String(value ?? "").replace(/[^0-9]/g, "")); return parsed === 1 || parsed === 2 || parsed === 3 || parsed === 4 ? parsed : null; }
@@ -41,6 +44,8 @@ function readSavedSessionUser() { try { const session = JSON.parse(localStorage.
 function readSavedUserGroup() { const user = readSavedSessionUser(); return parseGroup(user?.group as string | number | null) || parseGroup(user?.to as string | number | null); }
 function readSavedUserName() { const user = readSavedSessionUser(); return String(user?.displayName || user?.hoten || user?.name || "").trim(); }
 function isScoreboardForeground(root: HTMLDivElement | null) { if (!root || typeof window === "undefined") return false; const win = root.closest<HTMLElement>(".win-window"); if (!win) return document.visibilityState === "visible"; const minimized = win.classList.contains("minimized"); const hidden = win.offsetParent === null || getComputedStyle(win).display === "none" || getComputedStyle(win).visibility === "hidden"; return document.visibilityState === "visible" && !minimized && !hidden; }
+function remoteContainsSavedChanges(remoteEvents: ScoreEvent[], guard: ScoreSaveGuard) { const signatures = new Set(remoteEvents.map(scoreContentSignature)); const addedOk = guard.additions.every((event) => signatures.has(scoreContentSignature(event))); const deletedOk = [...guard.deletions].every((id) => !remoteEvents.some((event) => event.id === id)); return addedOk && deletedOk; }
+function mergeGuardedEvents(remoteEvents: ScoreEvent[], guard: ScoreSaveGuard) { const signatures = new Set(remoteEvents.map(scoreContentSignature)); const guarded = remoteEvents.filter((event) => !guard.deletions.has(event.id)); guard.additions.forEach((event) => { const signature = scoreContentSignature(event); if (!signatures.has(signature)) { guarded.unshift(event); signatures.add(signature); } }); return guarded; }
 
 export default function ScoreboardApp({ userRole, userGroup }: ScoreboardAppProps) {
   const [activeTab, setActiveTab] = useState<ScoreboardTab>("overview");
@@ -67,6 +72,7 @@ export default function ScoreboardApp({ userRole, userGroup }: ScoreboardAppProp
   const savingRef = useRef(false);
   const seenSignaturesRef = useRef<Set<string>>(new Set());
   const liveStartedAtRef = useRef(Date.now());
+  const pendingSaveGuardRef = useRef<ScoreSaveGuard | null>(null);
 
   const normalizedRole = normalizeRole(userRole);
   const userGroupNumber = parseGroup(userGroup) || readSavedUserGroup();
@@ -96,7 +102,13 @@ export default function ScoreboardApp({ userRole, userGroup }: ScoreboardAppProp
 
   const applyRemoteData = useCallback((remoteData: NonNullable<Awaited<ReturnType<typeof fetchScoreboardFromGas>>>, options?: { silent?: boolean; notify?: boolean }) => {
     const nextStudents = remoteData.students;
-    const nextEvents = remoteData.events;
+    const guard = pendingSaveGuardRef.current;
+    let nextEvents = remoteData.events;
+    if (guard) {
+      if (guard.expiresAt < Date.now()) pendingSaveGuardRef.current = null;
+      else if (remoteContainsSavedChanges(remoteData.events, guard)) pendingSaveGuardRef.current = null;
+      else nextEvents = mergeGuardedEvents(remoteData.events, guard);
+    }
     const nextWeeks = remoteData.weeks.length ? remoteData.weeks : [weekRef.current || 1];
     const seenBefore = seenSignaturesRef.current;
     const remoteSignatures = new Set(nextEvents.map(eventSignature));
@@ -216,6 +228,7 @@ export default function ScoreboardApp({ userRole, userGroup }: ScoreboardAppProp
     if (!optimisticAdditions.length && !deletionSet.size) return;
     const previousEvents = events;
     const nextEvents = [...optimisticAdditions, ...events.filter((event) => !deletionSet.has(event.id))];
+    pendingSaveGuardRef.current = { additions: optimisticAdditions, deletions: deletionSet, expiresAt: Date.now() + SAVE_GUARD_MS };
     setEvents(nextEvents);
     setSyncMessage("");
     if (dataSource !== "gas") return;
@@ -223,7 +236,12 @@ export default function ScoreboardApp({ userRole, userGroup }: ScoreboardAppProp
     void saveScoreChangesInGas({ additions: optimisticAdditions, deletions: changes.deletions }).then((remoteData) => {
       if (remoteData) applyRemoteData(remoteData, { silent: true, notify: false });
       setSyncMessage("");
+      window.setTimeout(async () => {
+        const fresh = await fetchScoreboardFromGas({ force: true });
+        if (fresh) applyRemoteData(fresh, { silent: true, notify: false });
+      }, 9500);
     }).catch((error) => {
+      pendingSaveGuardRef.current = null;
       setEvents(previousEvents);
       setSyncMessage(error instanceof Error ? error.message : "Không lưu được lên Google Sheets. Đã hoàn tác thay đổi tạm.");
     }).finally(() => {
@@ -255,7 +273,7 @@ export default function ScoreboardApp({ userRole, userGroup }: ScoreboardAppProp
     }
   };
   const requestCreateWeek = () => { if (!canCreateWeek || isCreatingWeek) return; setCreateWeekConfirmOpen(true); };
-  const resetLocalData = () => { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(WEEK_STORAGE_KEY); if (dataSource === "gas") { void loadScoreboardData(true); return; } setStudents(mockStudents); setEvents(mockScoreEvents); setWeeks(SCORE_WEEKS); setWeek(1); setWeekSettings([]); seenSignaturesRef.current = new Set(mockScoreEvents.map(eventSignature)); liveStartedAtRef.current = Date.now(); };
+  const resetLocalData = () => { pendingSaveGuardRef.current = null; localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(WEEK_STORAGE_KEY); if (dataSource === "gas") { void loadScoreboardData(true); return; } setStudents(mockStudents); setEvents(mockScoreEvents); setWeeks(SCORE_WEEKS); setWeek(1); setWeekSettings([]); seenSignaturesRef.current = new Set(mockScoreEvents.map(eventSignature)); liveStartedAtRef.current = Date.now(); };
   const overviewPermissionCheck = canUseScoringTab ? canEditStudent : undefined;
   const renderOverviewContent = () => viewMode === "students"
     ? <StudentTable title="Danh sách cá nhân" students={summaries} compact onOpenStudent={canUseScoringTab ? openStudent : undefined} canEditStudent={overviewPermissionCheck} highlightStudentName={highlightStudentName} />
