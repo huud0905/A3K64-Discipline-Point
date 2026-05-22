@@ -38,6 +38,7 @@ import './scoreboardScreenshotCapture';
 import './scoreboardScreenshotFullPreviewFix.css';
 import './shotFix.css';
 import './shotLoadingDomFix.css';
+import './scoreboardScreenshotAllClassCompact';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
