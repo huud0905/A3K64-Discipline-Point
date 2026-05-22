@@ -79,21 +79,42 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
     trimSheetForExportAF(copiedSheet, lastDataRow);
   }
 
-  function parentFolderOfSpreadsheet() {
-    const sourceFile = DriveApp.getFileById(SPREADSHEET_ID);
-    const parents = sourceFile.getParents();
-    return parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+  function optionalDriveSave(blob, fileName) {
+    try {
+      const sourceFile = DriveApp.getFileById(SPREADSHEET_ID);
+      const parents = sourceFile.getParents();
+      const parent = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+      const folders = parent.getFoldersByName(EXPORT_FOLDER_NAME);
+      const folder = folders.hasNext() ? folders.next() : parent.createFolder(EXPORT_FOLDER_NAME);
+      const file = folder.createFile(blob.copyBlob ? blob.copyBlob() : blob).setName(fileName);
+      return {
+        savedToDrive: true,
+        fileId: file.getId(),
+        fileUrl: file.getUrl(),
+        downloadUrl: file.getUrl(),
+        folderId: folder.getId(),
+        folderName: folder.getName(),
+        folderUrl: folder.getUrl(),
+        saveError: ""
+      };
+    } catch (err) {
+      return {
+        savedToDrive: false,
+        fileId: "",
+        fileUrl: "",
+        downloadUrl: "",
+        folderId: "",
+        folderName: EXPORT_FOLDER_NAME,
+        folderUrl: "",
+        saveError: String(err && err.message ? err.message : err)
+      };
+    }
   }
 
-  function exportFolderBesideSpreadsheet() {
-    const parent = parentFolderOfSpreadsheet();
-    const folders = parent.getFoldersByName(EXPORT_FOLDER_NAME);
-    return folders.hasNext() ? folders.next() : parent.createFolder(EXPORT_FOLDER_NAME);
-  }
-
-  function moveFileToFolder(fileId, folder) {
-    if (!fileId || !folder) return;
-    DriveApp.getFileById(fileId).moveTo(folder);
+  function optionalTrashTempFile(tempId) {
+    try {
+      DriveApp.getFileById(tempId).setTrashed(true);
+    } catch (err) {}
   }
 
   function exportTempSpreadsheetXlsx(tempId, fileName) {
@@ -108,20 +129,6 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
     return response.getBlob().setName(fileName);
   }
 
-  function saveBlobToExportFolder(blob, fileName, folder) {
-    const targetFolder = folder || exportFolderBesideSpreadsheet();
-    const file = targetFolder.createFile(blob).setName(fileName);
-    return {
-      fileId: file.getId(),
-      fileUrl: file.getUrl(),
-      downloadUrl: file.getUrl(),
-      folderId: targetFolder.getId(),
-      folderName: targetFolder.getName(),
-      folderUrl: targetFolder.getUrl(),
-      savedToDrive: true
-    };
-  }
-
   function exportWeeksToExcel(payload) {
     payload = payload || {};
     const weekSource = Array.isArray(payload.weeks) ? payload.weeks : [payload.week || DEFAULT_WEEK];
@@ -130,10 +137,8 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
 
     const sourceBook = sourceSpreadsheet();
     const fileName = buildFilename(weeks);
-    const exportFolder = exportFolderBesideSpreadsheet();
     const temp = SpreadsheetApp.create("TMP_MULTI_EXPORT_" + exportStamp());
     const tempId = temp.getId();
-    moveFileToFolder(tempId, exportFolder);
 
     try {
       const placeholder = temp.getSheets()[0];
@@ -158,7 +163,7 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
 
       SpreadsheetApp.flush();
       const blob = exportTempSpreadsheetXlsx(tempId, fileName);
-      const saveInfo = saveBlobToExportFolder(blob.copyBlob ? blob.copyBlob() : blob, fileName, exportFolder);
+      const saveInfo = optionalDriveSave(blob, fileName);
 
       const result = {
         ok: true,
@@ -166,20 +171,22 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
         fileName: fileName,
         fileUrl: saveInfo.fileUrl || "",
         downloadUrl: saveInfo.downloadUrl || "",
-        folderId: saveInfo.folderId || exportFolder.getId(),
-        folderName: saveInfo.folderName || exportFolder.getName(),
-        folderUrl: saveInfo.folderUrl || exportFolder.getUrl(),
-        savedToDrive: true,
-        saveError: "",
+        folderId: saveInfo.folderId || "",
+        folderName: saveInfo.folderName || EXPORT_FOLDER_NAME,
+        folderUrl: saveInfo.folderUrl || "",
+        savedToDrive: !!saveInfo.savedToDrive,
+        saveError: saveInfo.saveError || "",
         base64: Utilities.base64Encode(blob.getBytes()),
         weeks: weeks,
         createdAt: exportDisplayStamp(),
-        message: "Đã xuất " + weeks.length + " tuần từ cột A đến F và lưu vào thư mục export."
+        message: saveInfo.savedToDrive
+          ? "Đã xuất " + weeks.length + " tuần và lưu vào thư mục export."
+          : "Đã xuất " + weeks.length + " tuần để tải về. Chưa lưu Drive vì thiếu quyền Drive."
       };
       if (typeof log === "function") log("exportExcel", exportActor(payload), "Xuất Excel " + weeks.map(function (week) { return "TUẦN " + week; }).join(", "), result);
       return result;
     } finally {
-      try { DriveApp.getFileById(tempId).setTrashed(true); } catch (err) {}
+      optionalTrashTempFile(tempId);
     }
   }
 
