@@ -20,6 +20,64 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
     return txt(payload.actorEmail || payload.email || payload.username || payload.actorName || payload.createdBy || "Web");
   }
 
+  function makeUniqueSheetName(ss, desired) {
+    const base = String(desired || "TUAN").trim() || "TUAN";
+    const exists = {};
+    ss.getSheets().forEach(function (sheet) { exists[sheet.getName()] = true; });
+    if (!exists[base]) return base;
+    let index = 2;
+    while (exists[base + " (" + index + ")"]) index++;
+    return base + " (" + index + ")";
+  }
+
+  function buildFilename(weeks) {
+    const clean = weeks.map(function (week) { return ("Tuan_" + week).replace(/[\\/:*?"<>|]+/g, "_"); });
+    const head = clean.slice(0, 3).join("_");
+    const tail = clean.length > 3 ? ("_va_" + (clean.length - 3) + "_tuan") : "";
+    return "A3K64_Export_" + (head || "TongHop") + tail + "_" + exportStamp() + ".xlsx";
+  }
+
+  function sourceSpreadsheet() {
+    if (typeof book === "function") return book();
+    return SpreadsheetApp.openById(SPREADSHEET_ID);
+  }
+
+  function findLastDataRowByName(sheet) {
+    const lastRow = Math.max(sheet.getLastRow(), 1);
+    const values = sheet.getRange(1, 2, lastRow, 1).getDisplayValues();
+    for (let i = values.length - 1; i >= 0; i--) {
+      if (String(values[i][0] || "").trim() !== "") return i + 1;
+    }
+    return 1;
+  }
+
+  function trimSheetForExportAF(sheet, lastDataRow) {
+    try {
+      const maxColumns = sheet.getMaxColumns();
+      if (maxColumns > 6) sheet.deleteColumns(7, maxColumns - 6);
+    } catch (err) {}
+    try {
+      const maxRows = sheet.getMaxRows();
+      if (maxRows > lastDataRow) sheet.deleteRows(lastDataRow + 1, maxRows - lastDataRow);
+    } catch (err) {}
+  }
+
+  function freezeColumnDValues(sourceSheet, copiedSheet, lastDataRow) {
+    try {
+      const safeRows = Math.max(Number(lastDataRow || 0), 1);
+      const sourceRange = sourceSheet.getRange(1, 4, safeRows, 1);
+      const targetRange = copiedSheet.getRange(1, 4, safeRows, 1);
+      targetRange.setValues(sourceRange.getValues());
+      targetRange.setNumberFormats(sourceRange.getNumberFormats());
+    } catch (err) {}
+  }
+
+  function prepareCopiedWeek(sourceSheet, copiedSheet) {
+    const lastDataRow = findLastDataRowByName(sourceSheet || copiedSheet);
+    freezeColumnDValues(sourceSheet || copiedSheet, copiedSheet, lastDataRow);
+    trimSheetForExportAF(copiedSheet, lastDataRow);
+  }
+
   function exportParentFolder() {
     const sourceFile = DriveApp.getFileById(SPREADSHEET_ID);
     const parents = sourceFile.getParents();
@@ -32,51 +90,28 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
     return folders.hasNext() ? folders.next() : parent.createFolder("export");
   }
 
-  function numberOrBlank(value) {
-    if (typeof value === "number" && isFinite(value)) return value;
-    const parsed = typeof num === "function" ? num(value) : Number(String(value || "").replace(/\+/g, "").replace(",", "."));
-    return isFinite(parsed) ? parsed : "";
-  }
-
-  function copyBasicFormat(sourceRange, targetRange) {
-    targetRange.setNumberFormats(sourceRange.getNumberFormats());
-    targetRange.setBackgrounds(sourceRange.getBackgrounds());
-    targetRange.setFontColors(sourceRange.getFontColors());
-    targetRange.setFontWeights(sourceRange.getFontWeights());
-    targetRange.setFontStyles(sourceRange.getFontStyles());
-    targetRange.setFontSizes(sourceRange.getFontSizes());
-    targetRange.setHorizontalAlignments(sourceRange.getHorizontalAlignments());
-    targetRange.setVerticalAlignments(sourceRange.getVerticalAlignments());
-    targetRange.setWraps(sourceRange.getWraps());
-  }
-
-  function copyWeekAtoF(source, target) {
-    const rowCount = Math.max(1, source.getLastRow());
-    const sourceRange = source.getRange(1, 1, rowCount, 6);
-    const targetRange = target.getRange(1, 1, rowCount, 6);
-    copyBasicFormat(sourceRange, targetRange);
-
-    const textValues = source.getRange(1, 1, rowCount, 3).getDisplayValues();
-    const totalValues = source.getRange(1, 4, rowCount, 1).getValues().map(function (row) {
-      return [numberOrBlank(row[0])];
+  function exportTempSpreadsheetXlsx(tempId, fileName) {
+    const url = "https://docs.google.com/spreadsheets/d/" + tempId + "/export?format=xlsx";
+    const response = UrlFetchApp.fetch(url, {
+      headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true
     });
-    const formulaRange = source.getRange(1, 5, rowCount, 2);
-    const formulas = formulaRange.getFormulas();
-    const fallbackValues = formulaRange.getDisplayValues();
-    const formulaOrValues = formulas.map(function (row, rowIndex) {
-      return row.map(function (formula, columnIndex) {
-        return formula || fallbackValues[rowIndex][columnIndex] || "";
-      });
-    });
-
-    target.getRange(1, 1, rowCount, 3).setValues(textValues);
-    target.getRange(1, 4, rowCount, 1).setValues(totalValues).setNumberFormat("0");
-    target.getRange(1, 5, rowCount, 2).setValues(formulaOrValues);
-
-    for (let column = 1; column <= 6; column++) {
-      try { target.setColumnWidth(column, source.getColumnWidth(column)); } catch (err) {}
+    if (response.getResponseCode() !== 200) {
+      throw new Error("Không xuất được XLSX (HTTP " + response.getResponseCode() + "): " + response.getContentText());
     }
-    try { target.setFrozenRows(source.getFrozenRows()); } catch (err) {}
+    return response.getBlob().setName(fileName);
+  }
+
+  function saveBlobToExportFolder(blob, fileName) {
+    const folder = exportFolder();
+    const file = folder.createFile(blob).setName(fileName);
+    return {
+      fileId: file.getId(),
+      fileUrl: file.getUrl(),
+      downloadUrl: file.getUrl(),
+      folderUrl: folder.getUrl(),
+      savedToDrive: true
+    };
   }
 
   function exportWeeksToExcel(payload) {
@@ -85,35 +120,54 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
     const weeks = Array.from(new Set(weekSource.map(function (item) { return Number(item); }).filter(function (item) { return isFinite(item) && item > 0; }))).sort(function (a, b) { return a - b; });
     if (!weeks.length) throw new Error("Chưa chọn tuần để xuất Excel.");
 
-    const label = weeks.length === 1 ? ("Tuan_" + weeks[0]) : ("Tuan_" + weeks[0] + "-" + weeks[weeks.length - 1]);
-    const baseName = "A3K64_Export_" + label + "_" + exportStamp();
-    const fileName = baseName + ".xlsx";
-    const temp = SpreadsheetApp.create(baseName);
+    const sourceBook = sourceSpreadsheet();
+    const fileName = buildFilename(weeks);
+    const temp = SpreadsheetApp.create("TMP_MULTI_EXPORT_" + exportStamp());
     const tempId = temp.getId();
+    let saveInfo = { savedToDrive: false, fileId: "", fileUrl: "", downloadUrl: "", folderUrl: "" };
 
     try {
-      const defaultSheet = temp.getSheets()[0];
-      weeks.forEach(function (weekNumber, index) {
-        const source = weekSheet(weekNumber);
+      const placeholder = temp.getSheets()[0];
+      const addedSheets = [];
+
+      weeks.forEach(function (weekNumber) {
+        const source = sourceBook.getSheetByName("TUẦN " + weekNumber) || sourceBook.getSheetByName("Tuan " + weekNumber) || weekSheet(weekNumber);
         if (!source) throw new Error("Không tìm thấy TUẦN " + weekNumber);
-        const target = index === 0 ? defaultSheet : temp.insertSheet();
-        target.setName(("TUAN " + weekNumber).slice(0, 100));
-        copyWeekAtoF(source, target);
+        const copied = source.copyTo(temp);
+        copied.setName(makeUniqueSheetName(temp, "TUAN " + weekNumber));
+        prepareCopiedWeek(source, copied);
+        addedSheets.push(copied.getName());
       });
 
+      if (placeholder && temp.getSheets().length > 1) {
+        try { temp.deleteSheet(placeholder); } catch (err) {}
+      }
+      if (addedSheets.length) {
+        const first = temp.getSheetByName(addedSheets[0]);
+        if (first) temp.setActiveSheet(first);
+      }
+
       SpreadsheetApp.flush();
-      const excelBlob = DriveApp.getFileById(tempId).getAs(MimeType.MICROSOFT_EXCEL).setName(fileName);
-      const folder = exportFolder();
-      const file = folder.createFile(excelBlob).setName(fileName);
+      const blob = exportTempSpreadsheetXlsx(tempId, fileName);
+      try {
+        saveInfo = saveBlobToExportFolder(blob.copyBlob ? blob.copyBlob() : blob, fileName);
+      } catch (err) {
+        saveInfo = { savedToDrive: false, fileId: "", fileUrl: "", downloadUrl: "", folderUrl: "", saveError: String(err && err.message ? err.message : err) };
+      }
+
       const result = {
         ok: true,
-        fileId: file.getId(),
+        fileId: saveInfo.fileId || "",
         fileName: fileName,
-        fileUrl: file.getUrl(),
-        downloadUrl: file.getUrl(),
-        folderUrl: folder.getUrl(),
+        fileUrl: saveInfo.fileUrl || "",
+        downloadUrl: saveInfo.downloadUrl || "",
+        folderUrl: saveInfo.folderUrl || "",
+        savedToDrive: !!saveInfo.savedToDrive,
+        saveError: saveInfo.saveError || "",
+        base64: Utilities.base64Encode(blob.getBytes()),
         weeks: weeks,
-        createdAt: exportDisplayStamp()
+        createdAt: exportDisplayStamp(),
+        message: "Đã xuất " + weeks.length + " tuần từ cột A đến F."
       };
       if (typeof log === "function") log("exportExcel", exportActor(payload), "Xuất Excel " + weeks.map(function (week) { return "TUẦN " + week; }).join(", "), result);
       return result;
