@@ -1,1 +1,128 @@
-.a3-shot-loading>div{display:flex!important;align-items:center!important;gap:10px!important;min-width:230px!important;max-width:min(92vw,320px)!important;padding:12px 16px!important}.a3-shot-loading i{flex:0 0 auto!important;width:20px!important;height:20px!important}.a3-shot-loading-copy{min-width:0!important;display:block!important}.a3-shot-loading-copy strong{display:block!important;margin:0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}.a3-shot-loading-copy span{display:block!important;margin:4px 0 0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}.theme-light .a3-shot-loading>div,.win-root.theme-light .a3-shot-loading>div,:root.light .a3-shot-loading>div{background:rgba(248,250,252,.97)!important;color:#0f172a!important}.theme-light .a3-shot-loading-copy strong,.win-root.theme-light .a3-shot-loading-copy strong,:root.light .a3-shot-loading-copy strong{color:#0f172a!important}.theme-light .a3-shot-loading-copy span,.win-root.theme-light .a3-shot-loading-copy span,:root.light .a3-shot-loading-copy span{color:#64748b!important}.theme-dark .a3-shot-loading>div,.win-root.theme-dark .a3-shot-loading>div,:root.dark .a3-shot-loading>div{background:rgba(15,23,42,.96)!important;color:#f8fafc!important}.theme-dark .a3-shot-loading-copy strong,.win-root.theme-dark .a3-shot-loading-copy strong,:root.dark .a3-shot-loading-copy strong{color:#f8fafc!important}.theme-dark .a3-shot-loading-copy span,.win-root.theme-dark .a3-shot-loading-copy span,:root.dark .a3-shot-loading-copy span{color:#94a3b8!important}
+/* Screenshot loading: compact layout + light/dark theme support. */
+.a3-shot-loading {
+  background: var(--a3-shot-loading-backdrop, rgba(2, 6, 23, 0.46)) !important;
+  backdrop-filter: blur(2px) !important;
+}
+
+.a3-shot-loading > div {
+  display: grid !important;
+  grid-template-columns: 24px minmax(0, 1fr) !important;
+  grid-template-rows: auto auto !important;
+  align-items: center !important;
+  column-gap: 10px !important;
+  row-gap: 3px !important;
+  min-width: 230px !important;
+  max-width: min(92vw, 320px) !important;
+  padding: 12px 16px !important;
+  border-radius: 18px !important;
+  border: 1px solid var(--a3-shot-loading-card-border, rgba(148, 163, 184, 0.24)) !important;
+  background: var(--a3-shot-loading-card-bg, #111827) !important;
+  color: var(--a3-shot-loading-card-text, #f8fafc) !important;
+  box-shadow: var(--a3-shot-loading-shadow, 0 18px 48px rgba(0, 0, 0, 0.38)) !important;
+}
+
+.a3-shot-loading i {
+  grid-column: 1 !important;
+  grid-row: 1 / span 2 !important;
+  align-self: center !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-width: 3px !important;
+  border-style: solid !important;
+  border-color: var(--a3-shot-loading-spinner-track, rgba(59, 130, 246, 0.22)) !important;
+  border-top-color: var(--a3-shot-loading-spinner-head, #3b82f6) !important;
+  border-radius: 999px !important;
+}
+
+.a3-shot-loading strong,
+.a3-shot-loading-copy strong {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  display: block !important;
+  margin: 0 !important;
+  color: var(--a3-shot-loading-card-text, #f8fafc) !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+  line-height: 1.12 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.a3-shot-loading strong::after {
+  content: "" !important;
+}
+
+.a3-shot-loading span,
+.a3-shot-loading-copy span {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  display: block !important;
+  margin: 0 !important;
+  max-width: 100% !important;
+  color: var(--a3-shot-loading-card-sub, #94a3b8) !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.a3-shot-loading-copy {
+  display: contents !important;
+}
+
+/* Default dark theme */
+:root,
+.theme-dark,
+.win-root.theme-dark,
+.dark,
+[data-theme="dark"] {
+  --a3-shot-loading-backdrop: rgba(2, 6, 23, 0.46);
+  --a3-shot-loading-card-bg: rgba(15, 23, 42, 0.96);
+  --a3-shot-loading-card-text: #f8fafc;
+  --a3-shot-loading-card-sub: #94a3b8;
+  --a3-shot-loading-card-border: rgba(148, 163, 184, 0.28);
+  --a3-shot-loading-spinner-track: rgba(96, 165, 250, 0.22);
+  --a3-shot-loading-spinner-head: #60a5fa;
+  --a3-shot-loading-shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
+}
+
+/* Light theme */
+.theme-light,
+.win-root.theme-light,
+.light,
+:root.light,
+[data-theme="light"] {
+  --a3-shot-loading-backdrop: rgba(241, 245, 249, 0.58);
+  --a3-shot-loading-card-bg: rgba(248, 250, 252, 0.97);
+  --a3-shot-loading-card-text: #0f172a;
+  --a3-shot-loading-card-sub: #64748b;
+  --a3-shot-loading-card-border: rgba(148, 163, 184, 0.35);
+  --a3-shot-loading-spinner-track: rgba(37, 99, 235, 0.18);
+  --a3-shot-loading-spinner-head: #2563eb;
+  --a3-shot-loading-shadow: 0 16px 42px rgba(15, 23, 42, 0.18);
+}
+
+/* Follow OS only when the app did not explicitly set a theme class. */
+@media (prefers-color-scheme: light) {
+  :root:not(.theme-dark):not(.dark):not([data-theme="dark"]) {
+    --a3-shot-loading-backdrop: rgba(241, 245, 249, 0.58);
+    --a3-shot-loading-card-bg: rgba(248, 250, 252, 0.97);
+    --a3-shot-loading-card-text: #0f172a;
+    --a3-shot-loading-card-sub: #64748b;
+    --a3-shot-loading-card-border: rgba(148, 163, 184, 0.35);
+    --a3-shot-loading-spinner-track: rgba(37, 99, 235, 0.18);
+    --a3-shot-loading-spinner-head: #2563eb;
+    --a3-shot-loading-shadow: 0 16px 42px rgba(15, 23, 42, 0.18);
+  }
+}
+
+@media (max-width: 760px) {
+  .a3-shot-loading > div {
+    min-width: 210px !important;
+    max-width: min(92vw, 290px) !important;
+    padding: 11px 14px !important;
+  }
+}
