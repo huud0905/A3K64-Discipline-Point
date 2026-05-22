@@ -121,7 +121,7 @@ export function ScoreEditModal({ student, allStudents = [], week, events, onSave
   const [rules, setRules] = useState<QuickRule[]>(cachedRules || (globalThis as RuleCacheGlobal).__A3K64_SCORE_RULES || []);
   const [pinnedRuleKeys, setPinnedRuleKeys] = useState<string[]>(readPinnedRuleKeys);
   const [rulesStatus, setRulesStatus] = useState(rules.length ? "" : "Đang đọc VI_PHAM...");
-  const [draftEvents, setDraftEvents] = useState<ScoreEvent[]>(events.filter((event) => event.studentId === student.id && event.week === week));
+  const [draftEvents, setDraftEvents] = useState<ScoreEvent[]>(() => events.filter((event) => event.studentId === student.id && event.week === week));
   const [deletedEventIds, setDeletedEventIds] = useState<string[]>([]);
   const [bulkScope, setBulkScope] = useState<BulkScope>("single");
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([student.id]);
@@ -129,7 +129,7 @@ export function ScoreEditModal({ student, allStudents = [], week, events, onSave
   const [isSaving, setIsSaving] = useState(false);
 
   const groupMembers = useMemo(() => { const source = allStudents.length ? allStudents : [student]; return source.filter((item) => item.group === student.group); }, [allStudents, student]);
-  useEffect(() => { setDraftEvents(events.filter((event) => event.studentId === student.id && event.week === week)); setDeletedEventIds([]); setSelectedStudentIds([student.id]); }, [events, student.id, week]);
+  useEffect(() => { setDraftEvents(events.filter((event) => event.studentId === student.id && event.week === week)); setDeletedEventIds([]); setSelectedStudentIds([student.id]); }, [student.id, week]);
   useEffect(() => { localStorage.setItem(PINNED_RULES_KEY, JSON.stringify(pinnedRuleKeys)); }, [pinnedRuleKeys]);
   useEffect(() => { const closeRuleSearch = (event: MouseEvent) => { if (!ruleSearchRef.current?.contains(event.target as Node)) setRuleDropdownOpen(false); }; window.addEventListener("mousedown", closeRuleSearch); return () => window.removeEventListener("mousedown", closeRuleSearch); }, []);
   useEffect(() => { const globalRules = (globalThis as RuleCacheGlobal).__A3K64_SCORE_RULES; if (globalRules?.length) { setRules(globalRules); setRulesStatus(""); return; } let mounted = true; fetchRulesFromGas().then((nextRules) => { if (!mounted) return; setRules(nextRules); setRulesStatus(nextRules.length ? "" : "Sheet VI_PHAM chưa có dữ liệu hoặc chưa đúng cột."); }).catch(() => { if (!mounted) return; setRules([]); setRulesStatus("Không đọc được sheet VI_PHAM."); }); return () => { mounted = false; }; }, []);
