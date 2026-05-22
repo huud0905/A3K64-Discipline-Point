@@ -44,6 +44,11 @@ export type GasRecoveryResult = {
   user?: GasLoginUser;
 };
 
+export type SaveScoreChangesPayload = {
+  additions: ScoreEvent[];
+  deletions: string[];
+};
+
 type GasResponseData = Partial<GasScoreboardPayload> & {
   ok?: boolean;
   error?: string;
@@ -57,68 +62,12 @@ type GasResponseData = Partial<GasScoreboardPayload> & {
 
 type RawGasResponse = GasResponseData & { data?: GasResponseData };
 type GlobalRuleCache = typeof globalThis & { __A3K64_SCORE_RULES?: QuickScoreRule[] };
-type GlobalScoreboardCache = typeof globalThis & {
-  __A3K64_SCOREBOARD_CACHE?: GasScoreboardPayload | null;
-  __A3K64_SCOREBOARD_PROMISE?: Promise<GasScoreboardPayload | null> | null;
-  __A3K64_SCOREBOARD_CACHE_AT?: number;
-};
-
-type PendingAdd = {
-  event: ScoreEvent;
-  resolve: (event: ScoreEvent) => void;
-  reject: (error: unknown) => void;
-};
-
-type PendingDelete = {
-  id: string;
-  resolve: () => void;
-  reject: (error: unknown) => void;
-};
 
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const JSONP_TIMEOUT_MS = 45000;
-const SCORE_BATCH_DELAY_MS = 120;
+let cachedScoreboard: GasScoreboardPayload | null = null;
+let scoreboardRequest: Promise<GasScoreboardPayload | null> | null = null;
 let activeMutations = 0;
-let pendingAdds: PendingAdd[] = [];
-let pendingDeletes: PendingDelete[] = [];
-let scoreBatchTimer = 0;
-let scoreBatchRunning = false;
-
-function getCacheHost(): GlobalScoreboardCache | null {
-  return typeof globalThis === "undefined" ? null : (globalThis as GlobalScoreboardCache);
-}
-
-function emitScoreboardCacheEvent(payload: GasScoreboardPayload | null) {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent("a3k64-scoreboard-cache-updated", { detail: { payload } }));
-}
-
-function setScoreboardCache(payload: GasScoreboardPayload | null) {
-  const host = getCacheHost();
-  if (!host) return payload;
-  host.__A3K64_SCOREBOARD_CACHE = payload;
-  host.__A3K64_SCOREBOARD_CACHE_AT = Date.now();
-  emitScoreboardCacheEvent(payload);
-  return payload;
-}
-
-export function getCachedScoreboardFromGas() {
-  return getCacheHost()?.__A3K64_SCOREBOARD_CACHE || null;
-}
-
-export function invalidateScoreboardCache() {
-  const host = getCacheHost();
-  if (!host) return;
-  host.__A3K64_SCOREBOARD_CACHE = null;
-  host.__A3K64_SCOREBOARD_PROMISE = null;
-  host.__A3K64_SCOREBOARD_CACHE_AT = 0;
-  emitScoreboardCacheEvent(null);
-}
-
-function getLastNameInitial(name: string) {
-  const parts = name.trim().split(/\s+/);
-  return (parts[parts.length - 1]?.[0] || name[0] || "?").toUpperCase();
-}
 
 function asText(value: unknown, fallback = "") {
   if (value === null || value === undefined) return fallback;
@@ -149,43 +98,39 @@ function normalizeCategory(value: unknown): ScoreCategory {
   return "HOC_TAP";
 }
 
+function getLastNameInitial(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return (parts[parts.length - 1]?.[0] || name[0] || "?").toUpperCase();
+}
+
 function normalizeStudents(raw: unknown): Student[] {
   if (!Array.isArray(raw)) return [];
-  const students: Student[] = [];
-
-  raw.forEach((item, index) => {
+  return raw.flatMap((item, index) => {
     const record = item as Partial<Student> & Record<string, unknown>;
     const name = asText(record.name ?? record["Họ và tên"] ?? record["Học sinh"] ?? record["Tên"]);
-    if (!name) return;
+    if (!name) return [];
     const role = asText(record.role ?? record["Chức vụ"]);
-
-    students.push({
+    return [{
       id: asText(record.id ?? record.studentId, `s${String(index + 1).padStart(2, "0")}`),
       name,
       group: normalizeGroup(record.group ?? record["Tổ"]),
       role: role || undefined,
       avatarInitial: asText(record.avatarInitial, getLastNameInitial(name)),
-    });
+    }];
   });
-
-  return students;
 }
 
 function normalizeEvents(raw: unknown): ScoreEvent[] {
   if (!Array.isArray(raw)) return [];
-  const events: ScoreEvent[] = [];
-
-  raw.forEach((item, index) => {
+  return raw.flatMap((item, index) => {
     const record = item as Partial<ScoreEvent> & Record<string, unknown>;
-    const studentId = asText(record.studentId ?? record["Mã học sinh"] ?? record["student_id"]);
+    const studentId = asText(record.studentId ?? record["Mã học sinh"] ?? record.student_id);
     const title = asText(record.title ?? record["Nội dung"] ?? record["Lý do"]);
-    if (!studentId || !title) return;
-
-    const points = asNumber(record.points ?? record["Điểm"] ?? record["score"], 0);
-    const createdAt = asText(record.createdAt ?? record["Thời gian"] ?? record["Ngày"] ?? record.timestamp ?? record.created_at, "");
+    if (!studentId || !title) return [];
+    const points = asNumber(record.points ?? record["Điểm"] ?? record.score, 0);
+    const createdAt = asText(record.createdAt ?? record["Thời gian"] ?? record["Ngày"] ?? record.timestamp ?? record.created_at);
     const note = asText(record.note ?? record["Ghi chú"]);
-
-    events.push({
+    return [{
       id: asText(record.id, `e${String(index + 1).padStart(4, "0")}`),
       studentId,
       week: asNumber(record.week ?? record["Tuần"], 1),
@@ -196,60 +141,46 @@ function normalizeEvents(raw: unknown): ScoreEvent[] {
       note: note || undefined,
       createdBy: asText(record.createdBy ?? record["Người nhập"] ?? record.actor ?? record.user, "Google Sheets"),
       createdAt,
-    });
+    }];
   });
-
-  return events;
 }
 
 function normalizeRules(raw: unknown): QuickScoreRule[] {
   if (!Array.isArray(raw)) return [];
-  const rules: QuickScoreRule[] = [];
-
-  raw.forEach((item) => {
+  return raw.flatMap((item) => {
     const record = item as Record<string, unknown>;
     const title = asText(record.title ?? record["Tên"] ?? record.ten);
     const rawPoint = asNumber(record.points ?? record["Điểm"] ?? record.diem, NaN);
-    if (!title || !Number.isFinite(rawPoint)) return;
+    if (!title || !Number.isFinite(rawPoint)) return [];
     const type = normalizeType(record.type ?? record["Tính"] ?? record.tinh, rawPoint);
-    rules.push({
+    return [{
       title,
       type,
       points: type === "TRU" ? -Math.abs(rawPoint) : Math.abs(rawPoint),
       category: normalizeCategory(record.category ?? record["Phân loại"] ?? record.phanloai),
       note: asText(record.note ?? record["Ghi chú"] ?? record.ghichu) || undefined,
-    });
+    }];
   });
-
-  return rules;
 }
 
 function normalizeWeekSettings(raw: unknown): WeekSetting[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => {
-      const record = item as Record<string, unknown>;
-      const week = asNumber(record.week ?? record["tuần"] ?? record["tuan"], NaN);
-      if (!Number.isFinite(week)) return null;
-      const editable = Boolean(record.editable ?? !record.locked);
-      const locked = Boolean(record.locked ?? !editable);
-      return {
-        week,
-        label: asText(record.label, `TUẦN ${week}`),
-        start: asText(record.start),
-        end: asText(record.end),
-        today: asText(record.today),
-        editable,
-        locked,
-        reason: asText(record.reason) || undefined,
-      };
-    })
-    .filter((item): item is WeekSetting => Boolean(item));
-}
-
-function setGlobalRules(rules: QuickScoreRule[]) {
-  if (typeof globalThis === "undefined") return;
-  (globalThis as GlobalRuleCache).__A3K64_SCORE_RULES = rules;
+  return raw.flatMap((item) => {
+    const record = item as Record<string, unknown>;
+    const week = asNumber(record.week ?? record["tuần"] ?? record.tuan, NaN);
+    if (!Number.isFinite(week)) return [];
+    const editable = Boolean(record.editable ?? !record.locked);
+    return [{
+      week,
+      label: asText(record.label, `TUẦN ${week}`),
+      start: asText(record.start),
+      end: asText(record.end),
+      today: asText(record.today),
+      editable,
+      locked: Boolean(record.locked ?? !editable),
+      reason: asText(record.reason) || undefined,
+    }];
+  });
 }
 
 function normalizeWeeks(raw: unknown, events: ScoreEvent[]) {
@@ -265,9 +196,31 @@ function normalizePayload(data: GasResponseData): GasScoreboardPayload {
   const weeks = normalizeWeeks(data.weeks, events);
   const quickScoreReasons = normalizeRules(data.quickScoreReasons ?? data.rules);
   const weekSettings = normalizeWeekSettings(data.weekSettings);
-  if (quickScoreReasons.length) setGlobalRules(quickScoreReasons);
-
+  if (quickScoreReasons.length && typeof globalThis !== "undefined") {
+    (globalThis as GlobalRuleCache).__A3K64_SCORE_RULES = quickScoreReasons;
+  }
   return { students, events, weeks, quickScoreReasons, weekSettings, updatedAt: asText(data.updatedAt) || undefined };
+}
+
+function emitScoreboardCacheEvent(payload: GasScoreboardPayload | null) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("a3k64-scoreboard-cache-updated", { detail: { payload } }));
+}
+
+function setScoreboardCache(payload: GasScoreboardPayload | null) {
+  cachedScoreboard = payload;
+  emitScoreboardCacheEvent(payload);
+  return payload;
+}
+
+export function getCachedScoreboardFromGas() {
+  return cachedScoreboard;
+}
+
+export function invalidateScoreboardCache() {
+  cachedScoreboard = null;
+  scoreboardRequest = null;
+  emitScoreboardCacheEvent(null);
 }
 
 function ensureProcessingStyle() {
@@ -303,12 +256,11 @@ function hideProcessing() {
 
 function gasJsonp(action: string, payload?: unknown): Promise<RawGasResponse | null> {
   if (!GAS_URL || typeof document === "undefined") return Promise.resolve(null);
-
   return new Promise((resolve, reject) => {
-    const callbackName = `__a3k64GasCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const callbackName = `__a3k64Gas_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const script = document.createElement("script");
     const url = new URL(GAS_URL);
-    const globalCallbacks = window as typeof window & Record<string, unknown>;
+    const callbacks = window as typeof window & Record<string, unknown>;
     let timeoutId = 0;
     let settled = false;
 
@@ -317,19 +269,19 @@ function gasJsonp(action: string, payload?: unknown): Promise<RawGasResponse | n
     url.searchParams.set("t", String(Date.now()));
     if (payload !== undefined) url.searchParams.set("payload", JSON.stringify(payload));
 
-    const cleanup = (keepLateNoop = false) => {
+    const cleanup = (lateNoop = false) => {
       window.clearTimeout(timeoutId);
       script.onerror = null;
-      if (keepLateNoop) {
-        globalCallbacks[callbackName] = () => undefined;
-        window.setTimeout(() => delete globalCallbacks[callbackName], 60000);
+      if (lateNoop) {
+        callbacks[callbackName] = () => undefined;
+        window.setTimeout(() => delete callbacks[callbackName], 60000);
       } else {
-        delete globalCallbacks[callbackName];
+        delete callbacks[callbackName];
       }
       script.remove();
     };
 
-    globalCallbacks[callbackName] = (json: RawGasResponse) => {
+    callbacks[callbackName] = (json: RawGasResponse) => {
       if (settled) return;
       settled = true;
       cleanup(false);
@@ -342,22 +294,19 @@ function gasJsonp(action: string, payload?: unknown): Promise<RawGasResponse | n
       if (settled) return;
       settled = true;
       cleanup(true);
-      reject(new Error("Không tải được JSONP từ Google Apps Script. Hãy cập nhật api.gs và deploy lại Web App."));
+      reject(new Error("Không tải được JSONP từ Google Apps Script."));
     };
+
     timeoutId = window.setTimeout(() => {
       if (settled) return;
       settled = true;
       cleanup(true);
-      reject(new Error("Google Apps Script phản hồi quá lâu. Kiểm tra deploy Web App hoặc api.gs."));
+      reject(new Error("Google Apps Script phản hồi quá lâu."));
     }, JSONP_TIMEOUT_MS);
+
     script.src = url.toString();
     document.head.appendChild(script);
   });
-}
-
-async function gasGet(action: string) {
-  if (!GAS_URL) return null;
-  return gasJsonp(action);
 }
 
 async function gasPost(action: string, payload: unknown, processingMessage?: string) {
@@ -386,74 +335,29 @@ function actorPayload() {
   }
 }
 
-function eventMatch(left: ScoreEvent, right: ScoreEvent) {
-  return left.studentId === right.studentId && left.week === right.week && left.title === right.title && left.points === right.points;
-}
-
-function scheduleScoreBatch() {
-  if (scoreBatchTimer) window.clearTimeout(scoreBatchTimer);
-  scoreBatchTimer = window.setTimeout(() => void flushScoreBatch(), SCORE_BATCH_DELAY_MS);
-}
-
-async function flushScoreBatch() {
-  if (scoreBatchRunning || (!pendingAdds.length && !pendingDeletes.length)) return;
-  scoreBatchRunning = true;
-  if (scoreBatchTimer) window.clearTimeout(scoreBatchTimer);
-  scoreBatchTimer = 0;
-
-  const adds = pendingAdds;
-  const deletes = pendingDeletes;
-  pendingAdds = [];
-  pendingDeletes = [];
-
-  try {
-    const response = await gasJsonp("saveScoreChanges", {
-      additions: adds.map((item) => item.event),
-      deletions: deletes.map((item) => item.id),
-      ...actorPayload(),
-    });
-    const data = response?.data || response;
-    const savedEvents = normalizeEvents((data as GasResponseData | null)?.events);
-    const scoreboard = (data as GasResponseData | null)?.scoreboard as GasResponseData | undefined;
-
-    if (scoreboard?.events) setScoreboardCache(normalizePayload(scoreboard));
-    else invalidateScoreboardCache();
-
-    adds.forEach((item) => {
-      const matched = savedEvents.find((event) => eventMatch(event, item.event));
-      item.resolve(matched || item.event);
-    });
-    deletes.forEach((item) => item.resolve());
-  } catch (error) {
-    adds.forEach((item) => item.reject(error));
-    deletes.forEach((item) => item.reject(error));
-  } finally {
-    scoreBatchRunning = false;
-    if (pendingAdds.length || pendingDeletes.length) scheduleScoreBatch();
-  }
+function extractScoreboard(response: RawGasResponse | null): GasScoreboardPayload | null {
+  if (!response) return null;
+  const data = response.data || response;
+  const scoreboard = data.scoreboard as GasResponseData | undefined;
+  if (scoreboard?.events || scoreboard?.students) return normalizePayload(scoreboard);
+  return normalizePayload({ ...data, updatedAt: data.updatedAt || response.updatedAt });
 }
 
 export async function fetchScoreboardFromGas(options: { force?: boolean } = {}): Promise<GasScoreboardPayload | null> {
-  const host = getCacheHost();
-  if (!options.force && host?.__A3K64_SCOREBOARD_CACHE) return host.__A3K64_SCOREBOARD_CACHE;
-  if (!options.force && host?.__A3K64_SCOREBOARD_PROMISE) return host.__A3K64_SCOREBOARD_PROMISE;
-
-  const request = (async () => {
+  if (!GAS_URL) return cachedScoreboard;
+  if (!options.force && scoreboardRequest) return scoreboardRequest;
+  scoreboardRequest = (async () => {
     try {
-      const response = await gasGet("getScoreboard");
-      if (!response) return host?.__A3K64_SCOREBOARD_CACHE || null;
-      const data = response.data || response;
-      return setScoreboardCache(normalizePayload({ ...data, updatedAt: data.updatedAt || response.updatedAt }));
+      const response = await gasJsonp("getScoreboard");
+      return setScoreboardCache(extractScoreboard(response));
     } catch (error) {
-      console.warn("Không đọc được dữ liệu Google Sheets qua JSONP:", error);
-      return host?.__A3K64_SCOREBOARD_CACHE || null;
+      console.warn("Không đọc được dữ liệu Google Sheets:", error);
+      return cachedScoreboard;
     } finally {
-      if (host) host.__A3K64_SCOREBOARD_PROMISE = null;
+      scoreboardRequest = null;
     }
   })();
-
-  if (host) host.__A3K64_SCOREBOARD_PROMISE = request;
-  return request;
+  return scoreboardRequest;
 }
 
 export function preloadScoreboardFromGas() {
@@ -464,20 +368,20 @@ export async function refreshScoreboardFromGas() {
   return fetchScoreboardFromGas({ force: true });
 }
 
+export async function saveScoreChangesInGas(payload: SaveScoreChangesPayload): Promise<GasScoreboardPayload | null> {
+  if (!GAS_URL) return cachedScoreboard;
+  const response = await gasPost("saveScoreChanges", { ...payload, ...actorPayload() });
+  const scoreboard = extractScoreboard(response);
+  return setScoreboardCache(scoreboard);
+}
+
 export async function createScoreEventInGas(event: ScoreEvent): Promise<ScoreEvent> {
-  if (!GAS_URL) return event;
-  return new Promise((resolve, reject) => {
-    pendingAdds.push({ event, resolve, reject });
-    scheduleScoreBatch();
-  });
+  const scoreboard = await saveScoreChangesInGas({ additions: [event], deletions: [] });
+  return scoreboard?.events.find((item) => item.studentId === event.studentId && item.week === event.week && item.title === event.title && item.points === event.points) || event;
 }
 
 export async function deleteScoreEventInGas(eventId: string) {
-  if (!GAS_URL) return;
-  return new Promise<void>((resolve, reject) => {
-    pendingDeletes.push({ id: eventId, resolve, reject });
-    scheduleScoreBatch();
-  });
+  await saveScoreChangesInGas({ additions: [], deletions: [eventId] });
 }
 
 export async function createWeekInGas(week: number) {
@@ -490,7 +394,6 @@ export async function validateLoginWithGas(username: string, password: string): 
     const response = await gasPost("login", { username, password });
     const data = response?.data || response;
     if (!data?.ok || !data.user) return null;
-
     const user = data.user as Partial<GasLoginUser> & Record<string, unknown>;
     return {
       uid: asText(user.uid, `gas-${username}`),
