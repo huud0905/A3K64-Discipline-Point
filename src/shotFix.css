@@ -1,1 +1,21 @@
 .a3-shot-loading>div{display:grid!important;grid-template-columns:24px 1fr!important;grid-template-rows:auto auto!important;column-gap:10px!important;row-gap:3px!important}.a3-shot-loading i{grid-column:1!important;grid-row:1/span 2!important}.a3-shot-loading strong{grid-column:2!important;grid-row:1!important;display:block!important;margin:0!important}.a3-shot-loading span{grid-column:2!important;grid-row:2!important;display:block!important;margin:0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+
+/* Screenshot export: keep each student name on exactly one line. */
+#a3-shot-hidden-area .a3-shot-page table{font-size:12.5px!important;line-height:1.12!important}
+#a3-shot-hidden-area .a3-shot-page table th{padding:6px 4px!important;line-height:1.12!important}
+#a3-shot-hidden-area .a3-shot-page table td{padding:5px 4px!important;vertical-align:middle!important;line-height:1.12!important}
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(2){min-width:0!important;max-width:0!important;overflow:hidden!important}
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(2)>span,
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(2)>div:first-child{display:block!important;width:100%!important;max-width:100%!important;font-size:12.5px!important;line-height:1.12!important;font-weight:900!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(3),
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(4),
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(5),
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(6),
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(7){white-space:nowrap!important}
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(3) span,
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(4) span,
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(5) span,
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(6) span,
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(7) span{white-space:nowrap!important}
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(2)>div:not(:first-child){font-size:10.5px!important;line-height:1.15!important}
+#a3-shot-hidden-area .a3-shot-page table td:nth-child(2)>div:first-child+div{margin-top:2px!important}
