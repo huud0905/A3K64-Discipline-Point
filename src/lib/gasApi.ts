@@ -62,9 +62,11 @@ type GasResponseData = Partial<GasScoreboardPayload> & {
 
 type RawGasResponse = GasResponseData & { data?: GasResponseData };
 type GlobalRuleCache = typeof globalThis & { __A3K64_SCORE_RULES?: QuickScoreRule[] };
+type ActorPayload = ReturnType<typeof actorPayload>;
 
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const JSONP_TIMEOUT_MS = 45000;
+const JSONP_URL_SOFT_LIMIT = 11000;
 let cachedScoreboard: GasScoreboardPayload | null = null;
 let scoreboardRequest: Promise<GasScoreboardPayload | null> | null = null;
 let activeMutations = 0;
@@ -254,6 +256,16 @@ function hideProcessing() {
   document.getElementById("a3k64-processing-mask")?.remove();
 }
 
+function jsonpUrlLength(action: string, payload?: unknown) {
+  if (!GAS_URL) return 0;
+  const url = new URL(GAS_URL);
+  url.searchParams.set("action", action);
+  url.searchParams.set("callback", "__a3k64Gas_length_check");
+  url.searchParams.set("t", String(Date.now()));
+  if (payload !== undefined) url.searchParams.set("payload", JSON.stringify(payload));
+  return url.toString().length;
+}
+
 function gasJsonp(action: string, payload?: unknown): Promise<RawGasResponse | null> {
   if (!GAS_URL || typeof document === "undefined") return Promise.resolve(null);
   return new Promise((resolve, reject) => {
@@ -268,6 +280,12 @@ function gasJsonp(action: string, payload?: unknown): Promise<RawGasResponse | n
     url.searchParams.set("callback", callbackName);
     url.searchParams.set("t", String(Date.now()));
     if (payload !== undefined) url.searchParams.set("payload", JSON.stringify(payload));
+
+    const finalUrl = url.toString();
+    if (finalUrl.length > JSONP_URL_SOFT_LIMIT * 1.35) {
+      reject(new Error("Dữ liệu lưu quá lớn cho JSONP. Hệ thống sẽ tự chia nhỏ lệnh lưu."));
+      return;
+    }
 
     const cleanup = (lateNoop = false) => {
       window.clearTimeout(timeoutId);
@@ -304,7 +322,7 @@ function gasJsonp(action: string, payload?: unknown): Promise<RawGasResponse | n
       reject(new Error("Google Apps Script phản hồi quá lâu."));
     }, JSONP_TIMEOUT_MS);
 
-    script.src = url.toString();
+    script.src = finalUrl;
     document.head.appendChild(script);
   });
 }
@@ -343,6 +361,52 @@ function extractScoreboard(response: RawGasResponse | null): GasScoreboardPayloa
   return normalizePayload({ ...data, updatedAt: data.updatedAt || response.updatedAt });
 }
 
+function withActor(payload: SaveScoreChangesPayload, actor: ActorPayload) {
+  return { additions: payload.additions, deletions: payload.deletions, ...actor };
+}
+
+function splitScoreSavePayload(payload: SaveScoreChangesPayload, actor: ActorPayload) {
+  const chunks: SaveScoreChangesPayload[] = [];
+  const newChunk = () => ({ additions: [] as ScoreEvent[], deletions: [] as string[] });
+  let current = newChunk();
+
+  const pushCurrent = () => {
+    if (current.additions.length || current.deletions.length) chunks.push(current);
+    current = newChunk();
+  };
+
+  const tryPush = <T,>(kind: "additions" | "deletions", item: T) => {
+    (current[kind] as T[]).push(item);
+    if (jsonpUrlLength("saveScoreChanges", withActor(current, actor)) <= JSONP_URL_SOFT_LIMIT) return;
+
+    (current[kind] as T[]).pop();
+    pushCurrent();
+    (current[kind] as T[]).push(item);
+  };
+
+  payload.deletions.forEach((eventId) => tryPush("deletions", eventId));
+  payload.additions.forEach((event) => tryPush("additions", event));
+  pushCurrent();
+  return chunks.length ? chunks : [payload];
+}
+
+async function saveScoreChangesByChunks(payload: SaveScoreChangesPayload) {
+  const actor = actorPayload();
+  const fullPayload = withActor(payload, actor);
+  if (jsonpUrlLength("saveScoreChanges", fullPayload) <= JSONP_URL_SOFT_LIMIT) {
+    return gasPost("saveScoreChanges", fullPayload);
+  }
+
+  const chunks = splitScoreSavePayload(payload, actor);
+  let latestResponse: RawGasResponse | null = null;
+
+  for (const chunk of chunks) {
+    latestResponse = await gasPost("saveScoreChanges", withActor(chunk, actor));
+  }
+
+  return latestResponse;
+}
+
 export async function fetchScoreboardFromGas(options: { force?: boolean } = {}): Promise<GasScoreboardPayload | null> {
   if (!GAS_URL) return cachedScoreboard;
   if (!options.force && scoreboardRequest) return scoreboardRequest;
@@ -370,7 +434,7 @@ export async function refreshScoreboardFromGas() {
 
 export async function saveScoreChangesInGas(payload: SaveScoreChangesPayload): Promise<GasScoreboardPayload | null> {
   if (!GAS_URL) return cachedScoreboard;
-  const response = await gasPost("saveScoreChanges", { ...payload, ...actorPayload() });
+  const response = await saveScoreChangesByChunks(payload);
   const scoreboard = extractScoreboard(response);
   return setScoreboardCache(scoreboard);
 }
