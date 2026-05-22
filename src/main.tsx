@@ -36,6 +36,7 @@ import './scoreboardModalInputCleanup';
 import './scoreboardExcelExport';
 import './scoreboardScreenshotCapture';
 import './scoreboardScreenshotFullPreviewFix.css';
+import './shotFix.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
