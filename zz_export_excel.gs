@@ -93,9 +93,7 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
 
   function moveFileToFolder(fileId, folder) {
     if (!fileId || !folder) return;
-    try {
-      DriveApp.getFileById(fileId).moveTo(folder);
-    } catch (err) {}
+    DriveApp.getFileById(fileId).moveTo(folder);
   }
 
   function exportTempSpreadsheetXlsx(tempId, fileName) {
@@ -136,7 +134,6 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
     const temp = SpreadsheetApp.create("TMP_MULTI_EXPORT_" + exportStamp());
     const tempId = temp.getId();
     moveFileToFolder(tempId, exportFolder);
-    let saveInfo = { savedToDrive: false, fileId: "", fileUrl: "", downloadUrl: "", folderId: exportFolder.getId(), folderName: exportFolder.getName(), folderUrl: exportFolder.getUrl() };
 
     try {
       const placeholder = temp.getSheets()[0];
@@ -161,11 +158,7 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
 
       SpreadsheetApp.flush();
       const blob = exportTempSpreadsheetXlsx(tempId, fileName);
-      try {
-        saveInfo = saveBlobToExportFolder(blob.copyBlob ? blob.copyBlob() : blob, fileName, exportFolder);
-      } catch (err) {
-        saveInfo = { savedToDrive: false, fileId: "", fileUrl: "", downloadUrl: "", folderId: exportFolder.getId(), folderName: exportFolder.getName(), folderUrl: exportFolder.getUrl(), saveError: String(err && err.message ? err.message : err) };
-      }
+      const saveInfo = saveBlobToExportFolder(blob.copyBlob ? blob.copyBlob() : blob, fileName, exportFolder);
 
       const result = {
         ok: true,
@@ -176,12 +169,12 @@ var __A3_EXPORT_EXCEL = __A3_EXPORT_EXCEL || {};
         folderId: saveInfo.folderId || exportFolder.getId(),
         folderName: saveInfo.folderName || exportFolder.getName(),
         folderUrl: saveInfo.folderUrl || exportFolder.getUrl(),
-        savedToDrive: !!saveInfo.savedToDrive,
-        saveError: saveInfo.saveError || "",
+        savedToDrive: true,
+        saveError: "",
         base64: Utilities.base64Encode(blob.getBytes()),
         weeks: weeks,
         createdAt: exportDisplayStamp(),
-        message: "Đã xuất " + weeks.length + " tuần từ cột A đến F."
+        message: "Đã xuất " + weeks.length + " tuần từ cột A đến F và lưu vào thư mục export."
       };
       if (typeof log === "function") log("exportExcel", exportActor(payload), "Xuất Excel " + weeks.map(function (week) { return "TUẦN " + week; }).join(", "), result);
       return result;
