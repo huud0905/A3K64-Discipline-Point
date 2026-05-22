@@ -48,6 +48,7 @@ type GasResponseData = Partial<GasScoreboardPayload> & {
   ok?: boolean;
   error?: string;
   event?: unknown;
+  events?: unknown;
   user?: unknown;
   scoreboard?: unknown;
   rules?: unknown;
@@ -62,9 +63,26 @@ type GlobalScoreboardCache = typeof globalThis & {
   __A3K64_SCOREBOARD_CACHE_AT?: number;
 };
 
+type PendingAdd = {
+  event: ScoreEvent;
+  resolve: (event: ScoreEvent) => void;
+  reject: (error: unknown) => void;
+};
+
+type PendingDelete = {
+  id: string;
+  resolve: () => void;
+  reject: (error: unknown) => void;
+};
+
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const JSONP_TIMEOUT_MS = 45000;
+const SCORE_BATCH_DELAY_MS = 120;
 let activeMutations = 0;
+let pendingAdds: PendingAdd[] = [];
+let pendingDeletes: PendingDelete[] = [];
+let scoreBatchTimer = 0;
+let scoreBatchRunning = false;
 
 function getCacheHost(): GlobalScoreboardCache | null {
   return typeof globalThis === "undefined" ? null : (globalThis as GlobalScoreboardCache);
@@ -368,6 +386,53 @@ function actorPayload() {
   }
 }
 
+function eventMatch(left: ScoreEvent, right: ScoreEvent) {
+  return left.studentId === right.studentId && left.week === right.week && left.title === right.title && left.points === right.points;
+}
+
+function scheduleScoreBatch() {
+  if (scoreBatchTimer) window.clearTimeout(scoreBatchTimer);
+  scoreBatchTimer = window.setTimeout(() => void flushScoreBatch(), SCORE_BATCH_DELAY_MS);
+}
+
+async function flushScoreBatch() {
+  if (scoreBatchRunning || (!pendingAdds.length && !pendingDeletes.length)) return;
+  scoreBatchRunning = true;
+  if (scoreBatchTimer) window.clearTimeout(scoreBatchTimer);
+  scoreBatchTimer = 0;
+
+  const adds = pendingAdds;
+  const deletes = pendingDeletes;
+  pendingAdds = [];
+  pendingDeletes = [];
+
+  try {
+    const response = await gasJsonp("saveScoreChanges", {
+      additions: adds.map((item) => item.event),
+      deletions: deletes.map((item) => item.id),
+      ...actorPayload(),
+    });
+    const data = response?.data || response;
+    const savedEvents = normalizeEvents((data as GasResponseData | null)?.events);
+    const scoreboard = (data as GasResponseData | null)?.scoreboard as GasResponseData | undefined;
+
+    if (scoreboard?.events) setScoreboardCache(normalizePayload(scoreboard));
+    else invalidateScoreboardCache();
+
+    adds.forEach((item) => {
+      const matched = savedEvents.find((event) => eventMatch(event, item.event));
+      item.resolve(matched || item.event);
+    });
+    deletes.forEach((item) => item.resolve());
+  } catch (error) {
+    adds.forEach((item) => item.reject(error));
+    deletes.forEach((item) => item.reject(error));
+  } finally {
+    scoreBatchRunning = false;
+    if (pendingAdds.length || pendingDeletes.length) scheduleScoreBatch();
+  }
+}
+
 export async function fetchScoreboardFromGas(options: { force?: boolean } = {}): Promise<GasScoreboardPayload | null> {
   const host = getCacheHost();
   if (!options.force && host?.__A3K64_SCOREBOARD_CACHE) return host.__A3K64_SCOREBOARD_CACHE;
@@ -400,25 +465,19 @@ export async function refreshScoreboardFromGas() {
 }
 
 export async function createScoreEventInGas(event: ScoreEvent): Promise<ScoreEvent> {
-  const response = await gasPost("addScoreEvent", { ...event, ...actorPayload() }, "Đang lưu điểm vào Google Sheets...");
-  const data = response?.data || response;
-  const scoreboard = data?.scoreboard as GasResponseData | undefined;
-  if (scoreboard?.events) {
-    const normalized = setScoreboardCache(normalizePayload(scoreboard));
-    const matched = normalized?.events
-      .filter((item) => item.studentId === event.studentId && item.week === event.week && item.title === event.title && item.points === event.points)
-      .at(-1);
-    if (matched) return matched;
-  }
-  const normalizedEvents = normalizeEvents([data?.event || data]);
-  return normalizedEvents[0] || event;
+  if (!GAS_URL) return event;
+  return new Promise((resolve, reject) => {
+    pendingAdds.push({ event, resolve, reject });
+    scheduleScoreBatch();
+  });
 }
 
 export async function deleteScoreEventInGas(eventId: string) {
-  const response = await gasPost("deleteScoreEvent", { id: eventId, ...actorPayload() }, "Đang xoá điểm trong Google Sheets...");
-  const data = response?.data || response;
-  if (data?.scoreboard) setScoreboardCache(normalizePayload(data.scoreboard as GasResponseData));
-  else invalidateScoreboardCache();
+  if (!GAS_URL) return;
+  return new Promise<void>((resolve, reject) => {
+    pendingDeletes.push({ id: eventId, resolve, reject });
+    scheduleScoreBatch();
+  });
 }
 
 export async function createWeekInGas(week: number) {
