@@ -41,6 +41,7 @@ import './shotLoadingDomFix.css';
 import './scoreboardScreenshotAllClassCompact';
 import './overlayThemeSync';
 import './overlayLightDarkFix.css';
+import './overlayToastAndFooterFix.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
