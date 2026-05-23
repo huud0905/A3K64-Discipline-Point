@@ -39,6 +39,7 @@ import './scoreboardScreenshotFullPreviewFix.css';
 import './shotFix.css';
 import './shotLoadingDomFix.css';
 import './scoreboardScreenshotAllClassCompact';
+import './scoreboardScreenshotGroupFullDetailsFix';
 import './overlayThemeSync';
 import './overlayLightDarkFix.css';
 import './overlayToastAndFooterFix.css';
