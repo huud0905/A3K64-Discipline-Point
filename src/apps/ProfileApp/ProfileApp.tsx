@@ -305,8 +305,12 @@ function StudentProfile({ data, studentId, week, onWeekChange }: { data: DataSta
         <strong>#{student.rank}<small>Hạng lớp</small></strong>
       </section>
       <section className="profile-stat-grid">
+        <article className="profile-total-rank-card">
+          <div className="profile-total-side"><span>Tổng điểm</span><b className={student.total < 0 ? 'negative' : 'positive'}>{formatScore(student.total)}</b></div>
+          <div className="profile-rank-side"><span>Hạng lớp</span><b>#{student.rank}</b></div>
+        </article>
         {[
-          ['Tổng điểm', formatScore(student.total)], ['Điểm cộng', formatScore(student.positive)], ['Điểm trừ', String(student.negative)], ['Hạng tổ', `#${groupRank}/${groupMembers.length}`],
+          ['Điểm cộng', formatScore(student.positive)], ['Điểm trừ', String(student.negative)], ['Hạng tổ', `#${groupRank}/${groupMembers.length}`],
           ['Học tập', formatScore(categoryTotal(weekEvents, 'HOC_TAP'))], ['Nề nếp', formatScore(categoryTotal(weekEvents, 'NE_NEP'))], ['Phong trào', formatScore(categoryTotal(weekEvents, 'PHONG_TRAO'))], ['TB tổ', String(groupAverage)],
         ].map(([label, value]) => <article key={label}><span>{label}</span><b className={String(value).startsWith('-') ? 'negative' : 'positive'}>{value}</b></article>)}
       </section>
