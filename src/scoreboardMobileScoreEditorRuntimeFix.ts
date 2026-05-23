@@ -16,23 +16,12 @@ function activeMobileSection(modal: HTMLElement) {
   return reviewButton?.classList.contains('active') ? 'review' : 'add';
 }
 
-function moveMobileTabs(modal: HTMLElement) {
-  const left = modal.querySelector<HTMLElement>('.score-edit-left');
-  const tabs = modal.querySelector<HTMLElement>('.score-mobile-mode-tabs');
-  const dayRow = modal.querySelector<HTMLElement>('.score-day-switch-row');
-  if (!left || !tabs || !dayRow) return;
-  if (tabs.nextElementSibling !== dayRow) {
-    left.insertBefore(tabs, dayRow);
-  }
-}
-
 function hardFixMobileScoreEditor() {
   const modal = document.querySelector<HTMLElement>('.score-edit-modal.modern-score-editor');
   if (!modal || !isMobileScoreEditor()) return;
 
   const section = activeMobileSection(modal);
   modal.dataset.mobileScoreSection = section;
-  moveMobileTabs(modal);
 
   const backdrop = modal.closest<HTMLElement>('.score-edit-backdrop');
   const header = modal.querySelector<HTMLElement>('.score-edit-header');
@@ -93,6 +82,7 @@ function hardFixMobileScoreEditor() {
     padding: '0',
     WebkitOverflowScrolling: 'touch',
     overscrollBehavior: 'contain',
+    touchAction: 'pan-y',
   });
 
   setStyle(left, {
@@ -208,11 +198,30 @@ function hardFixMobileScoreEditor() {
   footer?.querySelectorAll<HTMLElement>('button').forEach((el) => setStyle(el, { gridColumn: '1 / -1', minHeight: '44px', margin: '0', borderRadius: '13px', fontSize: '13px' }));
 }
 
-const run = () => window.requestAnimationFrame(hardFixMobileScoreEditor);
-new MutationObserver(run).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+let scheduled = false;
+function run() {
+  if (scheduled) return;
+  scheduled = true;
+  window.requestAnimationFrame(() => {
+    scheduled = false;
+    try {
+      hardFixMobileScoreEditor();
+    } catch (error) {
+      console.warn('Mobile score editor runtime fix skipped:', error);
+    }
+  });
+}
+
+new MutationObserver(run).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
 window.addEventListener('resize', run);
 window.addEventListener('orientationchange', run);
-window.setInterval(hardFixMobileScoreEditor, 250);
+window.setInterval(() => {
+  try {
+    hardFixMobileScoreEditor();
+  } catch (error) {
+    console.warn('Mobile score editor runtime fix skipped:', error);
+  }
+}, 400);
 run();
 
 export {};
