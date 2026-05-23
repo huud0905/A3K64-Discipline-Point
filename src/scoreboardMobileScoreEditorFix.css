@@ -1,0 +1,339 @@
+/* Mobile-only hard fix for the scoring modal. Keep it last in main.tsx. */
+@media (max-width: 760px) {
+  .win-root:has(.score-edit-backdrop) .taskbar {
+    display: none !important;
+  }
+
+  .win-root:has(.score-edit-backdrop) .win-window {
+    inset: 0 !important;
+    height: 100svh !important;
+    z-index: 9999 !important;
+  }
+
+  .win-root:has(.score-edit-backdrop) .win-window .win-body {
+    height: calc(100svh - 46px) !important;
+    overflow: hidden !important;
+  }
+
+  .score-edit-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 2147483000 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    padding: 8px !important;
+    display: flex !important;
+    align-items: stretch !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    background: rgba(2, 6, 23, .72) !important;
+  }
+
+  .scoreboard-app .score-edit-modal.modern-score-editor,
+  .score-edit-modal.modern-score-editor {
+    width: 100% !important;
+    max-width: 520px !important;
+    height: calc(100dvh - 16px) !important;
+    max-height: calc(100dvh - 16px) !important;
+    margin: 0 auto !important;
+    border-radius: 20px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    transform: none !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-edit-header,
+  .score-edit-modal.modern-score-editor .score-edit-header {
+    flex: 0 0 auto !important;
+    min-height: 62px !important;
+    padding: 10px 12px !important;
+    gap: 10px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-edit-header h2,
+  .score-edit-modal.modern-score-editor .score-edit-header h2 {
+    font-size: 21px !important;
+    line-height: 1.08 !important;
+    letter-spacing: -.03em !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-edit-close,
+  .score-edit-modal.modern-score-editor .score-edit-close {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-edit-body,
+  .score-edit-modal.modern-score-editor .score-edit-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    display: block !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 0 !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-edit-left,
+  .score-edit-modal.modern-score-editor .score-edit-left {
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 12px !important;
+    gap: 10px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: visible !important;
+  }
+
+  .scoreboard-app .modern-score-editor .rules-directory,
+  .score-edit-modal.modern-score-editor .rules-directory,
+  .scoreboard-app .modern-score-editor .score-week-table,
+  .score-edit-modal.modern-score-editor .score-week-table {
+    display: none !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-mobile-mode-tabs,
+  .score-edit-modal.modern-score-editor .score-mobile-mode-tabs {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 15 !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    padding: 4px 0 10px !important;
+    background: inherit !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-mobile-mode-tabs button,
+  .score-edit-modal.modern-score-editor .score-mobile-mode-tabs button {
+    min-height: 40px !important;
+    border-radius: 13px !important;
+    font-size: 13px !important;
+    font-weight: 950 !important;
+  }
+
+  .scoreboard-app .modern-score-editor:has(.score-mobile-mode-tabs button:first-child.active) .score-day-switch-row,
+  .score-edit-modal.modern-score-editor:has(.score-mobile-mode-tabs button:first-child.active) .score-day-switch-row,
+  .scoreboard-app .modern-score-editor:has(.score-mobile-mode-tabs button:first-child.active) .day-record-panel,
+  .score-edit-modal.modern-score-editor:has(.score-mobile-mode-tabs button:first-child.active) .day-record-panel {
+    display: none !important;
+  }
+
+  .scoreboard-app .modern-score-editor:has(.score-mobile-mode-tabs button:nth-child(2).active) .score-add-panel,
+  .score-edit-modal.modern-score-editor:has(.score-mobile-mode-tabs button:nth-child(2).active) .score-add-panel {
+    display: none !important;
+  }
+
+  .scoreboard-app .modern-score-editor .mobile-hidden-section,
+  .score-edit-modal.modern-score-editor .mobile-hidden-section {
+    display: none !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-edit-columns,
+  .score-edit-modal.modern-score-editor .score-edit-columns {
+    display: block !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-add-panel,
+  .score-edit-modal.modern-score-editor .score-add-panel {
+    display: block !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  .scoreboard-app .modern-score-editor .rule-select-form,
+  .score-edit-modal.modern-score-editor .rule-select-form,
+  .scoreboard-app .modern-score-editor .special-score-form,
+  .score-edit-modal.modern-score-editor .special-score-form,
+  .scoreboard-app .modern-score-editor .bulk-score-box,
+  .score-edit-modal.modern-score-editor .bulk-score-box {
+    margin: 0 0 10px !important;
+    padding: 12px !important;
+    border-radius: 16px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .rule-pick-row,
+  .score-edit-modal.modern-score-editor .rule-pick-row {
+    display: grid !important;
+    grid-template-columns: 76px minmax(0, 1fr) 62px !important;
+    gap: 8px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .subject-picker,
+  .scoreboard-app .modern-score-editor .subject-picker .filter-select,
+  .scoreboard-app .modern-score-editor .subject-picker .filter-select-button,
+  .score-edit-modal.modern-score-editor .subject-picker,
+  .score-edit-modal.modern-score-editor .subject-picker .filter-select,
+  .score-edit-modal.modern-score-editor .subject-picker .filter-select-button {
+    width: 76px !important;
+    min-width: 76px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .rule-search-input,
+  .score-edit-modal.modern-score-editor .rule-search-input,
+  .scoreboard-app .modern-score-editor .count-box,
+  .score-edit-modal.modern-score-editor .count-box {
+    height: 40px !important;
+    min-height: 40px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .count-box,
+  .score-edit-modal.modern-score-editor .count-box {
+    padding: 0 6px !important;
+    gap: 4px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .count-box span,
+  .score-edit-modal.modern-score-editor .count-box span {
+    font-size: 10px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .count-box input,
+  .score-edit-modal.modern-score-editor .count-box input {
+    width: 30px !important;
+    font-size: 13px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-add-button,
+  .score-edit-modal.modern-score-editor .score-add-button {
+    width: 100% !important;
+    min-height: 44px !important;
+    height: auto !important;
+    border-radius: 13px !important;
+    margin-top: 8px !important;
+    font-size: 13px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .special-row,
+  .scoreboard-app .modern-score-editor .special-row.second,
+  .score-edit-modal.modern-score-editor .special-row,
+  .score-edit-modal.modern-score-editor .special-row.second {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .bulk-score-box,
+  .score-edit-modal.modern-score-editor .bulk-score-box {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .scoreboard-app .modern-score-editor .bulk-score-box > span,
+  .score-edit-modal.modern-score-editor .bulk-score-box > span {
+    justify-self: start !important;
+  }
+
+  .scoreboard-app .modern-score-editor .bulk-score-box textarea,
+  .score-edit-modal.modern-score-editor .bulk-score-box textarea {
+    min-height: 64px !important;
+    max-height: 110px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .rule-suggestion-menu,
+  .score-edit-modal.modern-score-editor .rule-suggestion-menu {
+    z-index: 2147483100 !important;
+    max-height: 260px !important;
+    overscroll-behavior: contain !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-day-switch-row,
+  .score-edit-modal.modern-score-editor .score-day-switch-row {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+    margin: 0 0 10px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-day-switch-row .day-tabs,
+  .score-edit-modal.modern-score-editor .score-day-switch-row .day-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+    overflow: visible !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-day-switch-row .day-tabs button,
+  .score-edit-modal.modern-score-editor .score-day-switch-row .day-tabs button {
+    min-width: 0 !important;
+    min-height: 38px !important;
+    border-radius: 12px !important;
+    font-size: 12px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .inline-day-head,
+  .score-edit-modal.modern-score-editor .inline-day-head {
+    min-height: 48px !important;
+    padding: 8px 10px !important;
+    border-radius: 13px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .day-record-panel,
+  .score-edit-modal.modern-score-editor .day-record-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 260px !important;
+    overflow: visible !important;
+  }
+
+  .scoreboard-app .modern-score-editor .day-event-list,
+  .score-edit-modal.modern-score-editor .day-event-list {
+    min-height: 220px !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-edit-footer,
+  .score-edit-modal.modern-score-editor .score-edit-footer {
+    flex: 0 0 auto !important;
+    position: relative !important;
+    z-index: 30 !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    border-top: 1px solid rgba(148, 163, 184, .2) !important;
+    background: #050b18 !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-edit-footer strong,
+  .score-edit-modal.modern-score-editor .score-edit-footer strong {
+    min-height: 40px !important;
+    display: grid !important;
+    place-items: center !important;
+    border: 1px solid #22304a !important;
+    border-radius: 12px !important;
+    background: rgba(15, 23, 42, .86) !important;
+    font-size: 14px !important;
+    line-height: 1 !important;
+  }
+
+  .scoreboard-app .modern-score-editor .score-edit-footer button,
+  .score-edit-modal.modern-score-editor .score-edit-footer button {
+    grid-column: 1 / -1 !important;
+    min-height: 44px !important;
+    height: auto !important;
+    border-radius: 13px !important;
+    margin: 0 !important;
+    font-size: 13px !important;
+  }
+
+  .win-root.theme-light:has(.score-edit-backdrop) .score-edit-footer,
+  .theme-light .scoreboard-app .modern-score-editor .score-edit-footer,
+  :root.light .scoreboard-app .modern-score-editor .score-edit-footer {
+    background: #f8fafc !important;
+    border-top-color: #d8e3ef !important;
+  }
+
+  .win-root.theme-light:has(.score-edit-backdrop) .score-edit-footer strong,
+  .theme-light .scoreboard-app .modern-score-editor .score-edit-footer strong,
+  :root.light .scoreboard-app .modern-score-editor .score-edit-footer strong {
+    background: #ffffff !important;
+    border-color: #d8e3ef !important;
+    color: #18243a !important;
+  }
+}
