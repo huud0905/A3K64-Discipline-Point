@@ -16,12 +16,25 @@ function activeMobileSection(modal: HTMLElement) {
   return reviewButton?.classList.contains('active') ? 'review' : 'add';
 }
 
+function getWindowTitlebarHeight(modal: HTMLElement) {
+  const winWindow = modal.closest<HTMLElement>('.win-window');
+  const titlebar = winWindow?.querySelector<HTMLElement>('.win-titlebar');
+  const measured = titlebar?.offsetHeight || 0;
+  return Math.max(0, measured || 38);
+}
+
 function hardFixMobileScoreEditor() {
   const modal = document.querySelector<HTMLElement>('.score-edit-modal.modern-score-editor');
   if (!modal || !isMobileScoreEditor()) return;
 
   const section = activeMobileSection(modal);
   modal.dataset.mobileScoreSection = section;
+
+  const winWindow = modal.closest<HTMLElement>('.win-window');
+  const titlebar = winWindow?.querySelector<HTMLElement>('.win-titlebar');
+  const winBody = winWindow?.querySelector<HTMLElement>('.win-body');
+  const titlebarHeight = getWindowTitlebarHeight(modal);
+  const availableHeight = Math.max(360, window.innerHeight - titlebarHeight);
 
   const backdrop = modal.closest<HTMLElement>('.score-edit-backdrop');
   const header = modal.querySelector<HTMLElement>('.score-edit-header');
@@ -40,12 +53,43 @@ function hardFixMobileScoreEditor() {
     setStyle(taskbar, { display: 'none' });
   });
 
-  setStyle(backdrop, {
-    position: 'fixed',
+  setStyle(titlebar, {
+    flex: '0 0 auto',
+    height: `${titlebarHeight}px`,
+    minHeight: `${titlebarHeight}px`,
+    maxHeight: `${titlebarHeight}px`,
+    padding: '4px 8px',
+    margin: '0',
+    lineHeight: '1',
+    zIndex: '50',
+  });
+
+  setStyle(winWindow, {
     inset: '0',
     width: '100vw',
     height: '100dvh',
-    padding: '6px',
+    maxHeight: '100dvh',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+  });
+
+  setStyle(winBody, {
+    flex: '1 1 auto',
+    height: `${availableHeight}px`,
+    minHeight: '0',
+    padding: '0',
+    margin: '0',
+    overflow: 'hidden',
+    position: 'relative',
+  });
+
+  setStyle(backdrop, {
+    position: 'absolute',
+    inset: '0',
+    width: '100%',
+    height: '100%',
+    padding: '4px 6px 6px',
     overflow: 'hidden',
     zIndex: '2147483000',
     display: 'flex',
@@ -54,11 +98,12 @@ function hardFixMobileScoreEditor() {
     boxSizing: 'border-box',
   });
 
+  const modalOuterHeight = Math.max(320, availableHeight - 10);
   setStyle(modal, {
     width: '100%',
     maxWidth: '520px',
-    height: 'calc(100dvh - 12px)',
-    maxHeight: 'calc(100dvh - 12px)',
+    height: `${modalOuterHeight}px`,
+    maxHeight: `${modalOuterHeight}px`,
     margin: '0 auto',
     display: 'flex',
     flexDirection: 'column',
@@ -68,21 +113,22 @@ function hardFixMobileScoreEditor() {
 
   setStyle(header, {
     flex: '0 0 auto',
-    minHeight: '54px',
-    padding: '7px 12px',
+    minHeight: '50px',
+    padding: '6px 10px',
     zIndex: '40',
+    margin: '0',
   });
 
   setStyle(footer, {
     flex: '0 0 auto',
-    position: 'sticky',
-    bottom: '0',
+    position: 'relative',
+    bottom: 'auto',
     zIndex: '35',
     display: 'grid',
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
     gap: '7px',
     padding: '8px 12px calc(8px + env(safe-area-inset-bottom, 0px))',
-    marginTop: 'auto',
+    marginTop: '0',
     boxSizing: 'border-box',
     background: 'var(--score-editor-bg, #050b18)',
   });
@@ -106,10 +152,9 @@ function hardFixMobileScoreEditor() {
     boxSizing: 'border-box',
   }));
 
-  const modalHeight = modal.clientHeight || window.innerHeight - 12;
-  const headerHeight = header?.offsetHeight || 54;
+  const headerHeight = header?.offsetHeight || 50;
   const footerHeight = footer?.offsetHeight || 130;
-  const bodyHeight = Math.max(190, modalHeight - headerHeight - footerHeight);
+  const bodyHeight = Math.max(190, modalOuterHeight - headerHeight - footerHeight);
 
   setStyle(body, {
     flex: '1 1 auto',
@@ -119,7 +164,7 @@ function hardFixMobileScoreEditor() {
     display: 'block',
     overflowY: 'auto',
     overflowX: 'hidden',
-    padding: '0 0 16px 0',
+    padding: '0 0 18px 0',
     WebkitOverflowScrolling: 'touch',
     overscrollBehavior: 'contain',
     touchAction: 'pan-y',
@@ -130,7 +175,7 @@ function hardFixMobileScoreEditor() {
     flexDirection: 'column',
     minHeight: 'max-content',
     height: 'auto',
-    padding: '10px 12px 20px',
+    padding: '8px 12px 22px',
     overflow: 'visible',
     gap: '9px',
   });
