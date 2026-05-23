@@ -378,3 +378,174 @@ input {
   border-color: #d6e0ef !important;
   background: #ffffff !important;
 }
+
+/* Final Profile mobile layout patch */
+.profile-app-shell,
+.profile-app-shell * {
+  box-sizing: border-box !important;
+}
+
+.profile-app-shell .profile-stat-grid article {
+  border-radius: 13px !important;
+  background: var(--profile-panel, #0f172a) !important;
+}
+
+.profile-app-shell .profile-week-switcher select,
+.profile-app-shell .profile-week-switcher select option {
+  color: #f8fafc !important;
+  background: #07111f !important;
+}
+
+.profile-app-shell .profile-week-switcher select option:hover,
+.profile-app-shell .profile-week-switcher select option:checked {
+  color: #ffffff !important;
+  background: #334155 !important;
+}
+
+.profile-app-shell .profile-week-switcher select:focus {
+  outline: 2px solid color-mix(in srgb, var(--desktop-accent, #ef4444) 70%, transparent) !important;
+  outline-offset: 2px !important;
+}
+
+@media (max-width: 768px) {
+  .profile-app-shell .profile-page {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    padding: 8px !important;
+    padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .profile-app-shell .profile-hero {
+    display: grid !important;
+    grid-template-columns: 60px minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 12px !important;
+    border-radius: 18px !important;
+  }
+
+  .profile-app-shell .profile-hero > strong {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    width: auto !important;
+    min-width: 64px !important;
+    height: auto !important;
+    display: grid !important;
+    justify-items: end !important;
+    align-self: center !important;
+    padding: 6px 8px !important;
+    border: 1px solid color-mix(in srgb, var(--profile-border, #233047) 85%, transparent) !important;
+    border-radius: 12px !important;
+    background: color-mix(in srgb, var(--profile-panel, #0f172a) 76%, transparent) !important;
+    color: var(--profile-text, #f8fafc) !important;
+    font-size: 19px !important;
+    line-height: 1.05 !important;
+    text-align: right !important;
+  }
+
+  .profile-app-shell .profile-hero > strong small {
+    display: block !important;
+    margin-top: 2px !important;
+    color: var(--profile-muted, #94a3b8) !important;
+    font-size: 10.5px !important;
+    line-height: 1.1 !important;
+  }
+
+  .profile-app-shell .profile-hero-info {
+    min-width: 0 !important;
+  }
+
+  .profile-app-shell .profile-hero h1 {
+    font-size: clamp(19px, 5.6vw, 24px) !important;
+    line-height: 1.08 !important;
+    margin: 4px 0 !important;
+  }
+
+  .profile-app-shell .profile-total-rank-card {
+    grid-column: 1 / -1 !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    min-height: 54px !important;
+    height: 54px !important;
+    padding: 8px 11px !important;
+    border-radius: 13px !important;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--desktop-accent, #ef4444) 12%, var(--profile-panel, #0f172a)), var(--profile-panel, #0f172a)) !important;
+  }
+
+  .profile-app-shell .profile-total-rank-card .profile-rank-side {
+    display: none !important;
+  }
+
+  .profile-app-shell .profile-total-rank-card .profile-total-side {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .profile-app-shell .profile-stat-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+    align-items: stretch !important;
+  }
+
+  .profile-app-shell .profile-stat-grid article:not(.profile-total-rank-card) {
+    height: 48px !important;
+    min-height: 48px !important;
+    padding: 7px 9px !important;
+    display: grid !important;
+    align-content: center !important;
+  }
+
+  .profile-app-shell .profile-stat-grid article span {
+    font-size: 10.5px !important;
+    line-height: 1.12 !important;
+  }
+
+  .profile-app-shell .profile-stat-grid article b {
+    margin-top: 2px !important;
+    font-size: 15.5px !important;
+    line-height: 1.1 !important;
+  }
+
+  .profile-app-shell .profile-total-rank-card b {
+    font-size: 21px !important;
+  }
+
+  .profile-app-shell .profile-week-switcher {
+    gap: 3px !important;
+  }
+
+  .profile-app-shell .profile-week-switcher button {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .profile-app-shell .profile-week-switcher select {
+    min-width: 104px !important;
+    max-width: 116px !important;
+    height: 28px !important;
+    border: 1px solid color-mix(in srgb, var(--profile-border, #233047) 70%, transparent) !important;
+    border-radius: 999px !important;
+    color: #f8fafc !important;
+    background: #07111f !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .profile-app-shell .profile-hero {
+    grid-template-columns: 54px minmax(0, 1fr) auto !important;
+  }
+
+  .profile-app-shell .profile-hero > strong {
+    min-width: 58px !important;
+    padding: 5px 7px !important;
+    font-size: 18px !important;
+  }
+
+  .profile-app-shell .profile-stat-grid article:not(.profile-total-rank-card) {
+    height: 46px !important;
+    min-height: 46px !important;
+    padding: 6px 8px !important;
+  }
+}
