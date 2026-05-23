@@ -189,8 +189,13 @@ function hardFixMobileScoreEditor() {
     margin: '0 0 8px',
     overflow: 'visible',
     width: '100%',
-    position: 'relative',
-    zIndex: '22',
+    position: 'sticky',
+    top: '0',
+    zIndex: '80',
+    padding: '0 0 6px',
+    background: 'var(--score-editor-bg, #050b18)',
+    borderBottom: '1px solid rgba(239, 68, 68, .55)',
+    boxShadow: '0 10px 18px rgba(2, 6, 23, .4)',
   });
 
   setStyle(dayHead, { display: 'none' });
@@ -202,7 +207,7 @@ function hardFixMobileScoreEditor() {
     gap: '7px',
     overflowX: 'auto',
     overflowY: 'hidden',
-    padding: '0 0 6px',
+    padding: '0 0 4px',
     WebkitOverflowScrolling: 'touch',
     scrollbarWidth: 'thin',
   });
