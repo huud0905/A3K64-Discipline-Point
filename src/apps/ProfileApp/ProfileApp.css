@@ -295,6 +295,69 @@
   font-size:12px;
 }
 
+.profile-hero-info{
+  min-width:0;
+}
+
+.profile-hero-meta-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.profile-week-switcher{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:4px;
+  border:1px solid var(--profile-border);
+  border-radius:999px;
+  background:color-mix(in srgb,var(--profile-panel) 76%,transparent);
+}
+
+.profile-week-switcher button{
+  width:28px;
+  height:28px;
+  border:0;
+  border-radius:999px;
+  display:grid;
+  place-items:center;
+  color:var(--profile-text);
+  background:var(--profile-soft);
+  cursor:pointer;
+}
+
+.profile-week-switcher button:disabled{
+  opacity:.35;
+  cursor:default;
+}
+
+.profile-week-switcher label{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  color:var(--profile-muted);
+  font-size:11px;
+  font-weight:900;
+}
+
+.profile-week-switcher select{
+  min-width:92px;
+  height:28px;
+  border:0;
+  outline:0;
+  border-radius:999px;
+  padding:0 24px 0 10px;
+  color:var(--profile-text);
+  background:var(--profile-bg);
+  font:inherit;
+  font-size:12px;
+  font-weight:900;
+  cursor:pointer;
+}
+
 .profile-stat-grid{
   display:grid;
   grid-template-columns:repeat(4,minmax(0,1fr));
@@ -689,6 +752,27 @@
   .profile-hero p,
   .profile-hero span{
     font-size:13px;
+  }
+
+  .profile-hero-meta-row{
+    align-items:flex-start;
+    gap:7px;
+  }
+
+  .profile-week-switcher{
+    width:100%;
+    justify-content:space-between;
+    border-radius:14px;
+  }
+
+  .profile-week-switcher label{
+    flex:1;
+    justify-content:center;
+  }
+
+  .profile-week-switcher select{
+    min-width:96px;
+    max-width:132px;
   }
 
   .profile-hero strong{
