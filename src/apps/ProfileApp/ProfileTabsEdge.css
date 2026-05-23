@@ -287,3 +287,89 @@
     font-size:15.5px!important;
   }
 }
+
+@media(max-width:768px){
+  .profile-stat-grid{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:6px!important;
+    align-items:stretch!important;
+  }
+
+  .profile-stat-grid article{
+    display:grid!important;
+    align-content:center!important;
+    min-height:48px!important;
+    padding:7px 9px!important;
+    border-radius:13px!important;
+  }
+
+  .profile-stat-grid article:nth-child(1){
+    grid-column:1/-1!important;
+    min-height:58px!important;
+    padding:9px 12px!important;
+    background:linear-gradient(135deg,color-mix(in srgb,var(--desktop-accent,#2563eb) 14%,var(--profile-panel)),var(--profile-panel))!important;
+    border-color:color-mix(in srgb,var(--desktop-accent,#2563eb) 35%,var(--profile-border))!important;
+  }
+
+  .profile-stat-grid article:nth-child(1) span{
+    font-size:11.5px!important;
+  }
+
+  .profile-stat-grid article:nth-child(1) b{
+    font-size:21px!important;
+    line-height:1.1!important;
+  }
+
+  .profile-stat-grid article:nth-child(4){
+    background:color-mix(in srgb,var(--desktop-accent,#2563eb) 8%,var(--profile-panel))!important;
+    border-color:color-mix(in srgb,var(--desktop-accent,#2563eb) 28%,var(--profile-border))!important;
+  }
+
+  .profile-stat-grid article:nth-child(4) b{
+    font-size:17.5px!important;
+  }
+
+  .profile-stat-grid article:nth-child(n+5){
+    min-height:44px!important;
+    padding:6px 8px!important;
+  }
+
+  .profile-stat-grid article:nth-child(n+5) span{
+    font-size:10px!important;
+    line-height:1.1!important;
+  }
+
+  .profile-stat-grid article:nth-child(n+5) b{
+    font-size:15px!important;
+    line-height:1.1!important;
+  }
+}
+
+@media(min-width:520px) and (max-width:768px){
+  .profile-stat-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  }
+
+  .profile-stat-grid article:nth-child(1){
+    grid-column:span 2!important;
+  }
+}
+
+@media(max-width:420px){
+  .profile-stat-grid{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:5px!important;
+  }
+
+  .profile-stat-grid article{
+    padding:6px 8px!important;
+    min-height:44px!important;
+  }
+
+  .profile-stat-grid article:nth-child(1){
+    grid-column:1/-1!important;
+    min-height:54px!important;
+  }
+}
