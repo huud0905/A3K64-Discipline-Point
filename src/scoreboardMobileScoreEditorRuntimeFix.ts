@@ -73,13 +73,31 @@ function hardFixMobileScoreEditor() {
     zIndex: '40',
   });
 
+  setStyle(footer, {
+    flex: '0 0 auto',
+    position: 'relative',
+    bottom: 'auto',
+    zIndex: '35',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: '8px',
+    padding: '10px 12px calc(10px + env(safe-area-inset-bottom, 0px))',
+  });
+
+  const modalHeight = modal.clientHeight || window.innerHeight - 16;
+  const headerHeight = header?.offsetHeight || 58;
+  const footerHeight = footer?.offsetHeight || 144;
+  const bodyHeight = Math.max(220, modalHeight - headerHeight - footerHeight);
+
   setStyle(body, {
     flex: '1 1 auto',
     minHeight: '0',
+    height: `${bodyHeight}px`,
+    maxHeight: `${bodyHeight}px`,
     display: 'block',
     overflowY: 'auto',
     overflowX: 'hidden',
-    padding: '0',
+    padding: '0 0 18px 0',
     WebkitOverflowScrolling: 'touch',
     overscrollBehavior: 'contain',
     touchAction: 'pan-y',
@@ -88,9 +106,9 @@ function hardFixMobileScoreEditor() {
   setStyle(left, {
     display: 'flex',
     flexDirection: 'column',
-    minHeight: '0',
+    minHeight: 'max-content',
     height: 'auto',
-    padding: '10px 12px 14px',
+    padding: '10px 12px 20px',
     overflow: 'visible',
     gap: '10px',
   });
@@ -99,6 +117,7 @@ function hardFixMobileScoreEditor() {
 
   setStyle(tabs, {
     order: '1',
+    flex: '0 0 auto',
     position: 'relative',
     top: 'auto',
     zIndex: '20',
@@ -126,6 +145,7 @@ function hardFixMobileScoreEditor() {
 
   setStyle(dayRow, {
     order: '2',
+    flex: '0 0 auto',
     display: section === 'review' ? 'block' : 'none',
     margin: '0 0 10px',
     overflow: 'visible',
@@ -183,16 +203,6 @@ function hardFixMobileScoreEditor() {
   modal.querySelectorAll<HTMLElement>('.score-edit-columns').forEach((el) => setStyle(el, { order: '3', display: 'block', minHeight: '0', overflow: 'visible' }));
   modal.querySelectorAll<HTMLElement>('.rule-select-form,.special-score-form,.bulk-score-box').forEach((el) => setStyle(el, { margin: '0 0 10px', padding: '12px', borderRadius: '16px' }));
   modal.querySelectorAll<HTMLElement>('.day-event').forEach((el) => setStyle(el, { position: 'relative', zIndex: '1', minHeight: '44px', marginBottom: '8px', borderRadius: '12px' }));
-
-  setStyle(footer, {
-    flex: '0 0 auto',
-    position: 'relative',
-    zIndex: '35',
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    gap: '8px',
-    padding: '10px 12px calc(10px + env(safe-area-inset-bottom, 0px))',
-  });
 
   footer?.querySelectorAll<HTMLElement>('strong').forEach((el) => setStyle(el, { minHeight: '40px', display: 'grid', placeItems: 'center', borderRadius: '12px', fontSize: '14px' }));
   footer?.querySelectorAll<HTMLElement>('button').forEach((el) => setStyle(el, { gridColumn: '1 / -1', minHeight: '44px', margin: '0', borderRadius: '13px', fontSize: '13px' }));
