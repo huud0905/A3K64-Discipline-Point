@@ -17,4 +17,4 @@ function validFirebaseConfig() {
 
 export const isFirebaseAuthEnabled = validFirebaseConfig();
 export const app: FirebaseApp | null = isFirebaseAuthEnabled ? initializeApp(cfg) : null;
-export const auth: Auth | null = app ? getAuth(app) : null;
+export const auth: Auth = app ? getAuth(app) : (undefined as unknown as Auth);
