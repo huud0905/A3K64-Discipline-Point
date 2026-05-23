@@ -23,6 +23,90 @@ function getWindowTitlebarHeight(modal: HTMLElement) {
   return Math.max(0, measured || 38);
 }
 
+function styleDayTabs(row: HTMLElement | null | undefined) {
+  const tabs = row?.querySelector<HTMLElement>('.day-tabs');
+  setStyle(row, {
+    flex: '0 0 auto',
+    display: 'block',
+    margin: '0 0 10px',
+    overflow: 'visible',
+    width: '100%',
+    position: 'relative',
+    zIndex: '80',
+    padding: '0 0 6px',
+    background: 'var(--score-editor-bg, #050b18)',
+    borderBottom: '1px solid rgba(239, 68, 68, .55)',
+    boxShadow: '0 10px 18px rgba(2, 6, 23, .34)',
+  });
+  setStyle(tabs, {
+    width: '100%',
+    display: 'flex',
+    flexWrap: 'nowrap',
+    gap: '7px',
+    overflowX: 'auto',
+    overflowY: 'hidden',
+    padding: '0 0 4px',
+    WebkitOverflowScrolling: 'touch',
+    scrollbarWidth: 'thin',
+  });
+  tabs?.querySelectorAll<HTMLElement>('button').forEach((button) => {
+    setStyle(button, {
+      flex: '0 0 50px',
+      width: '50px',
+      minWidth: '50px',
+      minHeight: '36px',
+      height: '36px',
+      borderRadius: '12px',
+      fontSize: '12px',
+    });
+  });
+}
+
+function syncMobileReviewDaySelector(modal: HTMLElement, show: boolean) {
+  const reviewPanel = modal.querySelector<HTMLElement>('.day-record-panel');
+  const sourceRow = modal.querySelector<HTMLElement>('.score-day-switch-row');
+  if (!reviewPanel || !sourceRow) return;
+
+  setStyle(sourceRow, { display: 'none' });
+  let mobileRow = reviewPanel.querySelector<HTMLElement>(':scope > .mobile-review-day-switch-row');
+
+  if (!show) {
+    if (mobileRow) setStyle(mobileRow, { display: 'none' });
+    return;
+  }
+
+  if (!mobileRow) {
+    mobileRow = document.createElement('div');
+    mobileRow.className = 'mobile-review-day-switch-row';
+    const tabs = document.createElement('div');
+    tabs.className = 'day-tabs';
+    Array.from(sourceRow.querySelectorAll<HTMLButtonElement>('.day-tabs button')).forEach((sourceButton, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = sourceButton.textContent || '';
+      button.addEventListener('click', () => {
+        const latestButtons = modal.querySelectorAll<HTMLButtonElement>('.score-day-switch-row .day-tabs button');
+        latestButtons[index]?.click();
+      });
+      tabs.appendChild(button);
+    });
+    mobileRow.appendChild(tabs);
+  }
+
+  if (mobileRow.parentElement !== reviewPanel || reviewPanel.firstElementChild !== mobileRow) {
+    reviewPanel.prepend(mobileRow);
+  }
+
+  const sourceButtons = Array.from(sourceRow.querySelectorAll<HTMLButtonElement>('.day-tabs button'));
+  const mobileButtons = Array.from(mobileRow.querySelectorAll<HTMLButtonElement>('.day-tabs button'));
+  mobileButtons.forEach((button, index) => {
+    button.className = sourceButtons[index]?.className || '';
+    button.disabled = Boolean(sourceButtons[index]?.disabled);
+  });
+  setStyle(mobileRow, { display: 'block' });
+  styleDayTabs(mobileRow);
+}
+
 function hardFixMobileScoreEditor() {
   const modal = document.querySelector<HTMLElement>('.score-edit-modal.modern-score-editor');
   if (!modal || !isMobileScoreEditor()) return;
@@ -41,8 +125,6 @@ function hardFixMobileScoreEditor() {
   const body = modal.querySelector<HTMLElement>('.score-edit-body');
   const left = modal.querySelector<HTMLElement>('.score-edit-left');
   const tabs = modal.querySelector<HTMLElement>('.score-mobile-mode-tabs');
-  const dayRow = modal.querySelector<HTMLElement>('.score-day-switch-row');
-  const dayTabs = modal.querySelector<HTMLElement>('.score-day-switch-row .day-tabs');
   const dayHead = modal.querySelector<HTMLElement>('.inline-day-head');
   const addPanel = modal.querySelector<HTMLElement>('.score-add-panel');
   const reviewPanel = modal.querySelector<HTMLElement>('.day-record-panel');
@@ -181,51 +263,11 @@ function hardFixMobileScoreEditor() {
   });
 
   modal.querySelectorAll<HTMLElement>('.rules-directory,.score-week-table').forEach((el) => setStyle(el, { display: 'none' }));
-
-  setStyle(dayRow, {
-    order: '1',
-    flex: '0 0 auto',
-    display: section === 'review' ? 'block' : 'none',
-    margin: '0 0 8px',
-    overflow: 'visible',
-    width: '100%',
-    position: 'sticky',
-    top: '0',
-    zIndex: '80',
-    padding: '0 0 6px',
-    background: 'var(--score-editor-bg, #050b18)',
-    borderBottom: '1px solid rgba(239, 68, 68, .55)',
-    boxShadow: '0 10px 18px rgba(2, 6, 23, .4)',
-  });
-
+  syncMobileReviewDaySelector(modal, section === 'review');
   setStyle(dayHead, { display: 'none' });
 
-  setStyle(dayTabs, {
-    width: '100%',
-    display: 'flex',
-    flexWrap: 'nowrap',
-    gap: '7px',
-    overflowX: 'auto',
-    overflowY: 'hidden',
-    padding: '0 0 4px',
-    WebkitOverflowScrolling: 'touch',
-    scrollbarWidth: 'thin',
-  });
-
-  dayTabs?.querySelectorAll<HTMLElement>('button').forEach((button) => {
-    setStyle(button, {
-      flex: '0 0 50px',
-      width: '50px',
-      minWidth: '50px',
-      minHeight: '36px',
-      height: '36px',
-      borderRadius: '12px',
-      fontSize: '12px',
-    });
-  });
-
   setStyle(tabs, {
-    order: '2',
+    order: '1',
     flex: '0 0 auto',
     position: 'relative',
     top: 'auto',
@@ -253,14 +295,14 @@ function hardFixMobileScoreEditor() {
   });
 
   setStyle(addPanel, {
-    order: '3',
+    order: '2',
     display: section === 'add' ? 'block' : 'none',
     overflow: 'visible',
     maxHeight: 'none',
   });
 
   setStyle(reviewPanel, {
-    order: '3',
+    order: '2',
     display: section === 'review' ? 'flex' : 'none',
     flexDirection: 'column',
     minHeight: '0',
@@ -274,7 +316,7 @@ function hardFixMobileScoreEditor() {
     paddingBottom: '10px',
   });
 
-  modal.querySelectorAll<HTMLElement>('.score-edit-columns').forEach((el) => setStyle(el, { order: '3', display: 'block', minHeight: '0', overflow: 'visible' }));
+  modal.querySelectorAll<HTMLElement>('.score-edit-columns').forEach((el) => setStyle(el, { order: '2', display: 'block', minHeight: '0', overflow: 'visible' }));
   modal.querySelectorAll<HTMLElement>('.rule-select-form,.special-score-form,.bulk-score-box').forEach((el) => setStyle(el, { margin: '0 0 10px', padding: '12px', borderRadius: '16px' }));
   modal.querySelectorAll<HTMLElement>('.day-event').forEach((el) => setStyle(el, { position: 'relative', zIndex: '1', minHeight: '44px', marginBottom: '8px', borderRadius: '12px' }));
 }
