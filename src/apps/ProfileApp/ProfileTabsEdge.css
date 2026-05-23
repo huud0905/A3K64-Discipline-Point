@@ -223,6 +223,42 @@
   background:color-mix(in srgb,var(--desktop-accent,#2563eb) 11%,transparent);
 }
 
+/* Compact week switcher: keep only the dropdown text such as "Tuần 2". */
+.profile-week-switcher{
+  width:auto!important;
+  max-width:100%!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:4px!important;
+  padding:3px!important;
+  border-radius:999px!important;
+}
+
+.profile-week-switcher label{
+  flex:0 0 auto!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-width:0!important;
+  gap:0!important;
+}
+
+.profile-week-switcher label > span{
+  display:none!important;
+}
+
+.profile-week-switcher button{
+  flex:0 0 auto!important;
+}
+
+.profile-week-switcher select{
+  width:auto!important;
+  min-width:104px!important;
+  max-width:132px!important;
+  text-align:center!important;
+}
+
 @media(max-width:768px){
   html,
   body,
@@ -388,14 +424,13 @@
   }
 
   .profile-week-switcher{
-    width:100%!important;
-    max-width:100%!important;
-    display:grid!important;
-    grid-template-columns:30px minmax(0,1fr) 30px!important;
+    width:auto!important;
+    display:inline-flex!important;
     align-items:center!important;
-    gap:5px!important;
+    justify-content:flex-start!important;
+    gap:4px!important;
     padding:3px!important;
-    border-radius:12px!important;
+    border-radius:999px!important;
   }
 
   .profile-week-switcher button{
@@ -404,21 +439,25 @@
   }
 
   .profile-week-switcher label{
-    min-width:0!important;
-    display:flex!important;
+    flex:0 0 auto!important;
+    display:inline-flex!important;
     align-items:center!important;
     justify-content:center!important;
-    gap:4px!important;
-    font-size:10px!important;
+    gap:0!important;
+  }
+
+  .profile-week-switcher label > span{
+    display:none!important;
   }
 
   .profile-week-switcher select{
-    width:100%!important;
-    min-width:0!important;
-    max-width:120px!important;
+    width:auto!important;
+    min-width:104px!important;
+    max-width:124px!important;
     height:30px!important;
-    padding:0 8px!important;
+    padding:0 24px 0 12px!important;
     font-size:12px!important;
+    text-align:left!important;
   }
 
   .profile-hero h1{
