@@ -749,3 +749,134 @@
     min-height:54px!important;
   }
 }
+
+/* Inlined from ProfileMobilePolish.css so it is active without an extra import. */
+.profile-total-rank-card{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  align-items:center!important;
+  gap:12px!important;
+}
+
+.profile-total-side,
+.profile-rank-side{
+  min-width:0!important;
+}
+
+.profile-rank-side{
+  text-align:right!important;
+  padding-left:12px!important;
+  border-left:1px solid color-mix(in srgb,var(--profile-border) 78%,transparent)!important;
+}
+
+.profile-rank-side b{
+  color:var(--profile-text)!important;
+}
+
+.profile-week-switcher select,
+.profile-week-switcher select option{
+  color:#f8fafc!important;
+  background:#08111f!important;
+}
+
+.profile-week-switcher select option:hover,
+.profile-week-switcher select option:checked{
+  color:#fff!important;
+  background:color-mix(in srgb,var(--desktop-accent,#2563eb) 58%,#111827)!important;
+}
+
+.profile-week-switcher select:focus{
+  outline:2px solid color-mix(in srgb,var(--desktop-accent,#2563eb) 60%,transparent)!important;
+  outline-offset:2px!important;
+}
+
+.theme-light .profile-week-switcher select,
+.theme-light .profile-week-switcher select option{
+  color:#0f172a!important;
+  background:#ffffff!important;
+}
+
+@media(max-width:768px){
+  .profile-hero > strong{
+    display:none!important;
+  }
+
+  .profile-stat-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:6px!important;
+  }
+
+  .profile-stat-grid article{
+    min-height:48px!important;
+    height:48px!important;
+    padding:7px 9px!important;
+    border-radius:13px!important;
+    display:grid!important;
+    align-content:center!important;
+  }
+
+  .profile-total-rank-card{
+    grid-column:1/-1!important;
+    height:auto!important;
+    min-height:58px!important;
+    grid-template-columns:minmax(0,1fr) minmax(92px,auto)!important;
+    padding:9px 12px!important;
+    background:linear-gradient(135deg,color-mix(in srgb,var(--desktop-accent,#2563eb) 14%,var(--profile-panel)),var(--profile-panel))!important;
+    border-color:color-mix(in srgb,var(--desktop-accent,#2563eb) 35%,var(--profile-border))!important;
+  }
+
+  .profile-total-rank-card span{
+    font-size:11.5px!important;
+    line-height:1.15!important;
+  }
+
+  .profile-total-rank-card b{
+    margin-top:2px!important;
+    font-size:21px!important;
+    line-height:1.1!important;
+  }
+
+  .profile-stat-grid article:not(.profile-total-rank-card) span{
+    font-size:10px!important;
+    line-height:1.1!important;
+  }
+
+  .profile-stat-grid article:not(.profile-total-rank-card) b{
+    margin-top:2px!important;
+    font-size:15.5px!important;
+    line-height:1.1!important;
+  }
+
+  .profile-week-switcher{
+    gap:3px!important;
+  }
+
+  .profile-week-switcher button{
+    width:28px!important;
+    height:28px!important;
+  }
+
+  .profile-week-switcher select{
+    min-width:104px!important;
+    max-width:116px!important;
+    height:28px!important;
+    border:1px solid color-mix(in srgb,var(--profile-border) 70%,transparent)!important;
+    border-radius:999px!important;
+    color:#f8fafc!important;
+    background:#07111f!important;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.03)!important;
+  }
+}
+
+@media(max-width:420px){
+  .profile-stat-grid article{
+    min-height:46px!important;
+    height:46px!important;
+    padding:6px 8px!important;
+  }
+
+  .profile-total-rank-card{
+    min-height:54px!important;
+    height:auto!important;
+  }
+}
