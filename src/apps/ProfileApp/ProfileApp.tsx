@@ -127,6 +127,11 @@ function realWeeks(data: DataState) {
   return Array.from(new Set([...fromSettings, ...fromEvents])).sort((a, b) => a - b);
 }
 
+function latestWeek(data: DataState) {
+  const weeks = realWeeks(data);
+  return weeks[weeks.length - 1] || 1;
+}
+
 function defaultCompareWeeks(weeks: number[], activeWeek: number) {
   if (!weeks.length) return [Math.max(1, activeWeek || 1)];
   return weeks.slice(-9);
@@ -184,12 +189,19 @@ function StudentProfile({ data, studentId, week, onWeekChange }: { data: DataSta
 
   const availableWeeks = useMemo(() => realWeeks(data), [data.weeks, data.events]);
   const activeWeek = availableWeeks.includes(week) ? week : availableWeeks[availableWeeks.length - 1] || Math.max(1, week || 1);
+  const activeWeekIndex = Math.max(0, availableWeeks.indexOf(activeWeek));
+  const previousWeek = activeWeekIndex > 0 ? availableWeeks[activeWeekIndex - 1] : null;
+  const nextWeek = activeWeekIndex >= 0 && activeWeekIndex < availableWeeks.length - 1 ? availableWeeks[activeWeekIndex + 1] : null;
   const defaultWeeks = useMemo(() => defaultCompareWeeks(availableWeeks, activeWeek), [availableWeeks, activeWeek]);
   const selectedWeeks = compareWeeks.filter((item) => availableWeeks.includes(item)).sort((a, b) => a - b);
   const tableWeeks = selectedWeeks.length ? selectedWeeks : defaultWeeks;
   const tableWeekKey = tableWeeks.join('|');
   const tableWeekSet = useMemo(() => new Set(tableWeeks), [tableWeekKey]);
   const fallbackHistoryWeek = tableWeekSet.has(activeWeek) ? activeWeek : tableWeeks[tableWeeks.length - 1] || activeWeek;
+
+  useEffect(() => {
+    if (availableWeeks.length && (!week || !availableWeeks.includes(week))) onWeekChange(activeWeek);
+  }, [availableWeeks.join('|'), activeWeek, week, onWeekChange]);
 
   useEffect(() => {
     setCompareWeeks((current) => current.filter((item) => availableWeeks.includes(item)).sort((a, b) => a - b));
@@ -200,12 +212,12 @@ function StudentProfile({ data, studentId, week, onWeekChange }: { data: DataSta
       const cleaned = current.filter((item) => tableWeekSet.has(item)).sort((a, b) => a - b);
       return cleaned.length ? cleaned : [fallbackHistoryWeek].filter(Boolean);
     });
-  }, [tableWeekKey]);
+  }, [tableWeekKey, fallbackHistoryWeek, tableWeekSet]);
 
   const historyWeeksToShow = useMemo(() => {
     const cleaned = historyWeeks.filter((item) => tableWeekSet.has(item)).sort((a, b) => a - b);
     return cleaned.length ? cleaned : [fallbackHistoryWeek].filter(Boolean);
-  }, [historyWeeks, tableWeekKey, fallbackHistoryWeek]);
+  }, [historyWeeks, tableWeekKey, fallbackHistoryWeek, tableWeekSet]);
 
   const summaries = useMemo(() => summarizeStudents(data.students, data.events, activeWeek), [data.students, data.events, activeWeek]);
   const student = summaries.find((item) => item.id === studentId);
@@ -273,7 +285,23 @@ function StudentProfile({ data, studentId, week, onWeekChange }: { data: DataSta
     <div className="profile-page">
       <section className="profile-hero">
         <div className="profile-avatar-big">{student.avatarInitial || student.name[0]}</div>
-        <div><span>Hồ sơ học sinh · Tuần {activeWeek}</span><h1>{student.name}</h1><p>Tổ {student.group} · {student.role || 'Học sinh'} · {student.status}</p></div>
+        <div className="profile-hero-info">
+          <div className="profile-hero-meta-row">
+            <span>Hồ sơ học sinh · Tuần {activeWeek}</span>
+            <div className="profile-week-switcher" aria-label="Chọn tuần hồ sơ">
+              <button type="button" title="Tuần trước" disabled={!previousWeek} onClick={() => previousWeek && onWeekChange(previousWeek)}><ArrowLeft size={14} /></button>
+              <label>
+                <span>Tuần</span>
+                <select value={activeWeek} onChange={(event) => onWeekChange(Number(event.target.value))}>
+                  {availableWeeks.length ? availableWeeks.map((itemWeek) => <option key={itemWeek} value={itemWeek}>Tuần {itemWeek}</option>) : <option value={activeWeek}>Tuần {activeWeek}</option>}
+                </select>
+              </label>
+              <button type="button" title="Tuần sau" disabled={!nextWeek} onClick={() => nextWeek && onWeekChange(nextWeek)}><ArrowRight size={14} /></button>
+            </div>
+          </div>
+          <h1>{student.name}</h1>
+          <p>Tổ {student.group} · {student.role || 'Học sinh'} · {student.status}</p>
+        </div>
         <strong>#{student.rank}<small>Hạng lớp</small></strong>
       </section>
       <section className="profile-stat-grid">
@@ -307,14 +335,14 @@ export default function ProfileApp({ userName, userEmail, requestedStudentId, re
   const [data, setData] = useState<DataState>({ ...DEFAULT_DATA, source: 'loading' });
   const [tabs, setTabs] = useState<ProfileTab[]>([]);
   const [activeKey, setActiveKey] = useState('');
-  const [week, setWeek] = useState(requestedWeek || 1);
+  const [week, setWeek] = useState(requestedWeek || 0);
   const [query, setQuery] = useState('');
   const [tabMenu, setTabMenu] = useState<TabContextMenu>(null);
   const [verticalTabs, setVerticalTabs] = useState(() => localStorage.getItem(VERTICAL_TABS_KEY) !== 'off');
   const refresh = async () => { setData(await loadProfileData()); };
   const closeMenu = () => setTabMenu(null);
   const openNewTab = (afterKey?: string) => { const tab: ProfileTab = { key: newTabKey(), kind: 'new', title: 'Tab mới' }; setTabs((current) => { if (!afterKey) return [...current, tab]; const index = current.findIndex((item) => item.key === afterKey); if (index < 0) return [...current, tab]; return [...current.slice(0, index + 1), tab, ...current.slice(index + 1)]; }); setActiveKey(tab.key); setQuery(''); };
-  const openStudent = (id?: string, targetWeek?: number) => { if (data.source === 'loading' || !data.students.length) return; const student = id ? findStudentByIdOrName(data.students, id) : currentUserStudent(data.students, userName, userEmail); if (!student) return; let nextActive = ''; setTabs((current) => { const existing = current.find((tab) => tab.kind === 'student' && normalize(tab.name) === normalize(student.name)); if (existing) { nextActive = existing.key; return current.map((tab) => tab.key === existing.key ? { ...tab, id: student.id, name: student.name, title: studentTitle(data.students, student.id) } : tab); } const activeTab = current.find((tab) => tab.key === activeKey); const nextStudentTab: ProfileTab = { key: activeTab?.kind === 'new' ? activeTab.key : `student-${student.id}-${Date.now()}`, kind: 'student', id: student.id, name: student.name, title: studentTitle(data.students, student.id) }; nextActive = nextStudentTab.key; return activeTab?.kind === 'new' ? current.map((tab) => tab.key === activeTab.key ? nextStudentTab : tab) : [...current, nextStudentTab]; }); setActiveKey(nextActive); setWeek(targetWeek || week || 1); };
+  const openStudent = (id?: string, targetWeek?: number) => { if (data.source === 'loading' || !data.students.length) return; const student = id ? findStudentByIdOrName(data.students, id) : currentUserStudent(data.students, userName, userEmail); if (!student) return; const nextWeekValue = targetWeek || latestWeek(data); let nextActive = ''; setTabs((current) => { const existing = current.find((tab) => tab.kind === 'student' && normalize(tab.name) === normalize(student.name)); if (existing) { nextActive = existing.key; return current.map((tab) => tab.key === existing.key ? { ...tab, id: student.id, name: student.name, title: studentTitle(data.students, student.id) } : tab); } const activeTab = current.find((tab) => tab.key === activeKey); const nextStudentTab: ProfileTab = { key: activeTab?.kind === 'new' ? activeTab.key : `student-${student.id}-${Date.now()}`, kind: 'student', id: student.id, name: student.name, title: studentTitle(data.students, student.id) }; nextActive = nextStudentTab.key; return activeTab?.kind === 'new' ? current.map((tab) => tab.key === activeTab.key ? nextStudentTab : tab) : [...current, nextStudentTab]; }); setActiveKey(nextActive); setWeek(nextWeekValue); };
   const closeTab = (key: string) => setTabs((current) => { const index = current.findIndex((tab) => tab.key === key); const next = current.filter((tab) => tab.key !== key); if (activeKey === key) setActiveKey(next[Math.max(0, index - 1)]?.key || next[0]?.key || ''); return next; });
   const pinTab = (key: string) => setTabs((current) => { const target = current.find((tab) => tab.key === key); if (!target) return current; setActiveKey(key); return [target, ...current.filter((tab) => tab.key !== key)]; });
   const closeOtherTabs = (key: string) => { setTabs((current) => current.filter((tab) => tab.key === key)); setActiveKey(key); };
@@ -323,8 +351,8 @@ export default function ProfileApp({ userName, userEmail, requestedStudentId, re
   const runMenuAction = (action: () => void) => { action(); closeMenu(); };
   useEffect(() => { void refresh(); }, []);
   useEffect(() => { if (data.source === 'loading' || !data.students.length) return; setTabs((current) => current.map((tab) => { if (tab.kind === 'new') return tab; const student = findStudentByIdOrName(data.students, tab.id, tab.name); return student ? { ...tab, id: student.id, name: student.name, title: studentTitle(data.students, student.id) } : tab; })); }, [data.source, data.students]);
-  useEffect(() => { if (data.source !== 'loading' && data.students.length && !tabs.length) openStudent(requestedStudentId); }, [data.source, data.students.length]);
-  useEffect(() => { if (data.source !== 'loading' && requestedStudentId) openStudent(requestedStudentId, requestedWeek); }, [requestedStudentId, requestedWeek, data.source]);
+  useEffect(() => { if (data.source !== 'loading' && data.students.length && !tabs.length) openStudent(requestedStudentId, requestedWeek || latestWeek(data)); }, [data.source, data.students.length]);
+  useEffect(() => { if (data.source !== 'loading' && requestedStudentId) openStudent(requestedStudentId, requestedWeek || latestWeek(data)); }, [requestedStudentId, requestedWeek, data.source]);
   useEffect(() => { const handler = (event: KeyboardEvent) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 't') { event.preventDefault(); openNewTab(activeKey); } if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'r') { event.preventDefault(); void refresh(); } if (event.key === 'Escape') closeMenu(); }; const hideMenu = () => closeMenu(); window.addEventListener('keydown', handler); window.addEventListener('click', hideMenu); window.addEventListener('resize', hideMenu); return () => { window.removeEventListener('keydown', handler); window.removeEventListener('click', hideMenu); window.removeEventListener('resize', hideMenu); }; }, [data.source, data.students, activeKey]);
   const activeTab = tabs.find((tab) => tab.key === activeKey) || tabs[0];
   const activeStudent = activeTab?.kind === 'student' ? findStudentByIdOrName(data.students, activeTab.id, activeTab.name)?.id || '' : '';
