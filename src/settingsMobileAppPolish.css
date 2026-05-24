@@ -1,567 +1,158 @@
-/* Settings app mobile layout: list-view, grouped rows, and light/profile-like colors. */
+/* Settings mobile hard-fix: prevent clipped text and broken dropdown buttons. */
 
 @media (max-width: 600px) {
-  body .win-window:has(.settings-app),
-  body .win-window:has(.settings-app) .win-titlebar,
-  body .win-window:has(.settings-app) .win-body,
-  body .win-window:has(.settings-app) .win-body.settings-mode {
+  body .win-window:has(.settings-mobile-native),
+  body .win-window:has(.settings-mobile-native) .win-titlebar,
+  body .win-window:has(.settings-mobile-native) .win-body,
+  body .win-window:has(.settings-mobile-native) .win-body.settings-mode,
+  body .settings-mobile-native,
+  body .settings-mobile-native .settings-screen {
     color: #0f172a !important;
     background: #f8fafc !important;
     border-color: #d7dee8 !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+    box-sizing: border-box !important;
   }
 
-  body .win-window:has(.settings-app) .win-titlebar {
-    border-bottom: 1px solid #d7dee8 !important;
+  body .settings-mobile-native .settings-screen {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    padding-bottom: 96px !important;
   }
 
-  body .settings-app,
-  body .win-root.theme-dark .settings-app,
-  body .win-root.theme-light .settings-app {
-    width: 100% !important;
-    height: 100% !important;
-    min-height: 100% !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    color: #0f172a !important;
-    background: #f8fafc !important;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
-    -webkit-overflow-scrolling: touch !important;
+  body .settings-mobile-native .settings-group,
+  body .settings-mobile-native .settings-list-card,
+  body .settings-mobile-native .settings-card,
+  body .settings-mobile-native .settings-account-card,
+  body .settings-mobile-native .setting-row,
+  body .settings-mobile-native .settings-nav-row {
+    box-sizing: border-box !important;
   }
 
-  body .settings-layout {
-    display: block !important;
-    width: 100% !important;
-    height: auto !important;
-    min-height: 100% !important;
+  body .settings-mobile-native .settings-card {
     overflow: visible !important;
-    color: #0f172a !important;
-    background: #f8fafc !important;
   }
 
-  body .settings-sidebar {
-    width: 100% !important;
-    max-height: none !important;
-    overflow: visible !important;
-    padding: 14px 16px 20px !important;
-    border: 0 !important;
-    color: #0f172a !important;
-    background: #f8fafc !important;
-    box-sizing: border-box !important;
+  body .settings-mobile-native .settings-list-card,
+  body .settings-mobile-native .settings-account-card {
+    overflow: hidden !important;
   }
 
-  body .settings-topline {
-    height: 32px !important;
-    margin: 0 0 26px !important;
-    gap: 10px !important;
-    color: #0f172a !important;
-    font-size: 15px !important;
-    font-weight: 800 !important;
-  }
-
-  body .settings-topline svg,
-  body .settings-card-title svg,
-  body .setting-row-left svg,
-  body .personal-card > svg:first-child {
-    width: 24px !important;
-    height: 24px !important;
-    flex: 0 0 24px !important;
-    color: var(--desktop-accent, #ef4444) !important;
-    stroke-width: 2.25 !important;
-  }
-
-  body .profile-card {
-    position: relative !important;
-    width: 100% !important;
-    min-height: 72px !important;
-    margin: 0 0 20px !important;
-    padding: 10px 12px !important;
-    display: grid !important;
-    grid-template-columns: 54px minmax(0, 1fr) !important;
-    align-items: center !important;
-    gap: 12px !important;
-    border: 1px solid #d7dee8 !important;
-    border-radius: 16px !important;
-    color: #0f172a !important;
-    background: #ffffff !important;
-    box-shadow: 0 8px 18px rgba(15, 23, 42, .04) !important;
-    box-sizing: border-box !important;
-  }
-
-  body .profile-card::before {
-    content: "Tài khoản";
-    position: absolute !important;
-    left: 0 !important;
-    top: -24px !important;
-    color: #64748b !important;
-    font-size: 12px !important;
-    font-weight: 800 !important;
-    letter-spacing: .02em !important;
-  }
-
-  body .profile-avatar {
-    width: 54px !important;
-    height: 54px !important;
-    border-radius: 999px !important;
-  }
-
-  body .profile-avatar svg {
-    width: 28px !important;
-    height: 28px !important;
-  }
-
-  body .profile-card strong {
-    color: #0f172a !important;
-    font-size: 14px !important;
-    line-height: 1.22 !important;
-    font-weight: 850 !important;
-  }
-
-  body .profile-card span {
-    margin-top: 3px !important;
-    color: #64748b !important;
-    font-size: 12px !important;
-    line-height: 1.25 !important;
-  }
-
-  body .windows-settings-nav {
-    display: none !important;
-  }
-
-  body .settings-content {
-    width: 100% !important;
-    min-width: 0 !important;
-    overflow: visible !important;
-    padding: 0 0 94px !important;
-    color: #0f172a !important;
-    background: #f8fafc !important;
-    box-sizing: border-box !important;
-  }
-
-  body .settings-breadcrumb {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 50 !important;
-    min-height: 46px !important;
-    margin: 0 0 18px !important;
-    padding: 12px 16px !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 7px !important;
-    border-top: 1px solid #d7dee8 !important;
-    border-bottom: 1px solid #d7dee8 !important;
-    color: #64748b !important;
-    background: rgba(248, 250, 252, .96) !important;
-    font-size: 13px !important;
-    backdrop-filter: blur(12px) !important;
-    box-sizing: border-box !important;
-  }
-
-  body .settings-breadcrumb button {
-    color: #64748b !important;
-  }
-
-  body .settings-breadcrumb span,
-  body .settings-breadcrumb button:hover {
-    color: #0f172a !important;
-  }
-
-  body .settings-breadcrumb svg {
-    width: 16px !important;
-    height: 16px !important;
-  }
-
-  body .settings-content > h1 {
-    margin: 0 0 18px !important;
-    padding: 0 16px !important;
-    color: #0f172a !important;
-    font-size: 30px !important;
-    line-height: 1.05 !important;
-    font-weight: 900 !important;
-    letter-spacing: -.04em !important;
-  }
-
-  /* Group: Giao diện */
-  body .personalization-grid {
-    position: relative !important;
-    width: auto !important;
-    margin: 0 16px 20px !important;
-    padding: 24px 0 0 !important;
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: 0 !important;
-    border: 1px solid #d7dee8 !important;
-    border-radius: 16px !important;
-    overflow: visible !important;
-    background: #ffffff !important;
-    box-sizing: border-box !important;
-  }
-
-  body .personalization-grid::before {
-    content: "Giao diện";
-    position: absolute !important;
-    left: 0 !important;
-    top: -24px !important;
-    color: #64748b !important;
-    font-size: 12px !important;
-    font-weight: 800 !important;
-    letter-spacing: .02em !important;
-  }
-
-  body .personal-card {
-    width: 100% !important;
+  body .settings-mobile-native .setting-row,
+  body .settings-mobile-native .settings-nav-row {
     min-height: 60px !important;
-    display: grid !important;
-    grid-template-columns: 28px minmax(0, 1fr) 22px !important;
     align-items: center !important;
-    gap: 12px !important;
-    margin: 0 !important;
-    padding: 10px 14px !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    border-bottom: 1px solid #e2e8f0 !important;
-    color: #0f172a !important;
-    background: #ffffff !important;
-    box-shadow: none !important;
-    text-align: left !important;
-    box-sizing: border-box !important;
+    position: relative !important;
   }
 
-  body .personal-card:first-of-type {
-    border-top-left-radius: 16px !important;
-    border-top-right-radius: 16px !important;
-  }
-
-  body .personal-card:last-of-type {
-    border-bottom: 0 !important;
-    border-bottom-left-radius: 16px !important;
-    border-bottom-right-radius: 16px !important;
-  }
-
-  body .personal-card:hover,
-  body .personal-card:active {
-    background: #f1f5f9 !important;
-  }
-
-  body .personal-card > div {
+  body .settings-mobile-native .setting-row-left,
+  body .settings-mobile-native .settings-nav-row > div {
     min-width: 0 !important;
+    max-width: 100% !important;
   }
 
-  body .personal-card strong {
-    display: block !important;
-    color: #0f172a !important;
-    font-size: 14.5px !important;
+  body .settings-mobile-native .setting-row-left > div {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  body .settings-mobile-native .settings-nav-row strong,
+  body .settings-mobile-native .settings-nav-row span,
+  body .settings-mobile-native .setting-row-left strong,
+  body .settings-mobile-native .setting-row-left span,
+  body .settings-mobile-native .settings-page-header p,
+  body .settings-mobile-native .color-section-head span,
+  body .settings-mobile-native .custom-color-row span {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  body .settings-mobile-native .settings-nav-row strong,
+  body .settings-mobile-native .setting-row-left strong {
     line-height: 1.2 !important;
-    font-weight: 850 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
   }
 
-  body .personal-card span {
-    display: block !important;
-    margin-top: 3px !important;
-    color: #64748b !important;
-    font-size: 12px !important;
-    line-height: 1.25 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-  }
-
-  body .personal-card > svg:last-child {
-    width: 19px !important;
-    height: 19px !important;
-    justify-self: end !important;
-    color: var(--desktop-accent, #ef4444) !important;
-  }
-
-  /* Subpages: list groups and rows */
-  body .settings-card {
-    width: auto !important;
-    margin: 0 16px 20px !important;
-    border: 1px solid #d7dee8 !important;
-    border-radius: 16px !important;
-    overflow: hidden !important;
-    color: #0f172a !important;
-    background: #ffffff !important;
-    box-shadow: 0 8px 18px rgba(15, 23, 42, .04) !important;
-    box-sizing: border-box !important;
-  }
-
-  body .settings-card-title,
-  body .settings-card-title.pinned-title {
-    position: static !important;
-    top: auto !important;
-    min-height: 60px !important;
-    display: grid !important;
-    grid-template-columns: 28px minmax(0, 1fr) !important;
-    align-items: center !important;
-    gap: 12px !important;
-    padding: 12px 14px !important;
-    border: 0 !important;
-    border-bottom: 1px solid #e2e8f0 !important;
-    color: #0f172a !important;
-    background: #ffffff !important;
-    box-sizing: border-box !important;
-  }
-
-  body .settings-card-title h2 {
-    margin: 0 !important;
-    color: #0f172a !important;
-    font-size: 16px !important;
-    line-height: 1.2 !important;
-    font-weight: 900 !important;
-  }
-
-  body .settings-card-title p {
-    margin: 3px 0 0 !important;
-    color: #64748b !important;
-    font-size: 12px !important;
+  body .settings-mobile-native .settings-nav-row span,
+  body .settings-mobile-native .setting-row-left span {
     line-height: 1.3 !important;
   }
 
-  body .setting-row {
-    width: 100% !important;
-    min-height: 58px !important;
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) auto !important;
-    align-items: center !important;
-    gap: 12px !important;
-    padding: 10px 14px !important;
-    border-bottom: 1px solid #e2e8f0 !important;
-    color: #0f172a !important;
-    background: #ffffff !important;
-    box-sizing: border-box !important;
+  body .settings-mobile-native .setting-row:has(.select-wrap) {
+    z-index: 20 !important;
   }
 
-  body .setting-row:last-child {
-    border-bottom: 0 !important;
-  }
-
-  body .setting-row-left {
-    min-width: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 12px !important;
-  }
-
-  body .setting-row-left > div {
-    min-width: 0 !important;
-  }
-
-  body .setting-row-left strong {
-    display: block !important;
-    color: #0f172a !important;
-    font-size: 14.5px !important;
-    line-height: 1.2 !important;
-    font-weight: 850 !important;
-  }
-
-  body .setting-row-left span {
-    display: block !important;
-    margin-top: 3px !important;
-    color: #64748b !important;
-    font-size: 12px !important;
-    line-height: 1.3 !important;
-  }
-
-  body .setting-row-right {
-    min-width: max-content !important;
-    justify-self: end !important;
-    justify-content: flex-end !important;
-    align-items: center !important;
-  }
-
-  body .toggle {
-    width: 48px !important;
-    height: 28px !important;
-    padding: 3px !important;
-    flex: 0 0 auto !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 999px !important;
-    background: #e2e8f0 !important;
-  }
-
-  body .toggle span {
-    width: 20px !important;
-    height: 20px !important;
-    border-radius: 999px !important;
-    background: #ffffff !important;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, .18) !important;
-  }
-
-  body .toggle.on {
-    border-color: transparent !important;
-    background: var(--desktop-accent, #ef4444) !important;
-  }
-
-  body .toggle.on span {
-    transform: translateX(20px) !important;
-  }
-
-  body .select-wrap {
-    max-width: 152px !important;
-  }
-
-  body .select-button {
+  body .settings-mobile-native .select-wrap {
+    position: relative !important;
+    z-index: 100 !important;
     min-width: 126px !important;
-    max-width: 152px !important;
-    height: 40px !important;
-    padding: 0 10px !important;
-    border: 1px solid #d7dee8 !important;
-    border-radius: 10px !important;
+    max-width: 156px !important;
+  }
+
+  body .settings-mobile-native .select-button {
+    height: 42px !important;
+    min-width: 126px !important;
+    max-width: 156px !important;
+    padding: 0 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    border: 2px solid #111827 !important;
+    border-radius: 12px !important;
     color: #0f172a !important;
     background: #ffffff !important;
-    font-size: 13px !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    z-index: 101 !important;
   }
 
-  body .select-button span {
+  body .settings-mobile-native .select-button span {
+    min-width: 0 !important;
+    white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    white-space: nowrap !important;
   }
 
-  body .select-menu {
+  body .settings-mobile-native .select-menu {
+    position: absolute !important;
+    top: calc(100% + 8px) !important;
     right: 0 !important;
+    z-index: 9999 !important;
     min-width: 190px !important;
+    max-width: min(260px, calc(100vw - 32px)) !important;
     padding: 6px !important;
-    color: #0f172a !important;
     border: 1px solid #cbd5e1 !important;
     border-radius: 12px !important;
-    background: #ffffff !important;
-    box-shadow: 0 18px 50px rgba(15, 23, 42, .16) !important;
-  }
-
-  body .select-menu button {
-    min-height: 40px !important;
-    color: #0f172a !important;
-    font-size: 13px !important;
-  }
-
-  body .select-menu button:hover,
-  body .select-menu button.active {
-    background: #f1f5f9 !important;
-  }
-
-  body .taskbar-group {
-    margin-bottom: 20px !important;
-    border: 0 !important;
-    background: transparent !important;
-  }
-
-  body .taskbar-group-head {
-    padding: 0 0 8px !important;
-    color: #0f172a !important;
-    background: transparent !important;
-  }
-
-  body .taskbar-group-head strong {
-    color: #64748b !important;
-    font-size: 12px !important;
-    line-height: 1.2 !important;
-    font-weight: 800 !important;
-    letter-spacing: .02em !important;
-  }
-
-  body .taskbar-group-head span {
-    display: none !important;
-  }
-
-  body .taskbar-group .setting-row:first-of-type {
-    border-top-left-radius: 16px !important;
-    border-top-right-radius: 16px !important;
-  }
-
-  body .taskbar-group .setting-row:last-of-type {
-    border-bottom-left-radius: 16px !important;
-    border-bottom-right-radius: 16px !important;
-    border-bottom: 0 !important;
-  }
-
-  body .color-section {
-    padding: 14px !important;
-    border-bottom: 1px solid #e2e8f0 !important;
     color: #0f172a !important;
     background: #ffffff !important;
+    box-shadow: 0 18px 50px rgba(15, 23, 42, .18) !important;
     box-sizing: border-box !important;
   }
 
-  body .color-section-head,
-  body .custom-color-row {
-    gap: 12px !important;
-  }
-
-  body .color-section-head strong,
-  body .custom-color-row strong {
-    color: #0f172a !important;
-    font-size: 14.5px !important;
-    line-height: 1.2 !important;
-    font-weight: 850 !important;
-  }
-
-  body .color-section-head span,
-  body .custom-color-row span {
-    color: #64748b !important;
-    font-size: 12px !important;
-    line-height: 1.3 !important;
-  }
-
-  body .color-label {
-    margin: 16px 0 10px !important;
-    color: #64748b !important;
-    font-size: 12px !important;
-    font-weight: 800 !important;
-  }
-
-  body .recent-colors,
-  body .windows-color-grid {
-    gap: 8px !important;
-  }
-
-  body .recent-colors button,
-  body .windows-color-grid button {
-    width: 40px !important;
-    height: 40px !important;
-    border-radius: 9px !important;
-  }
-
-  body .windows-color-grid {
-    max-width: none !important;
-  }
-
-  body .custom-color-row {
-    margin-top: 16px !important;
-    padding-top: 14px !important;
-    border-top: 1px solid #e2e8f0 !important;
-  }
-
-  body .custom-color-actions {
-    flex: 0 0 auto !important;
-    gap: 8px !important;
-  }
-
-  body .custom-color-actions input {
-    width: 44px !important;
-    height: 40px !important;
-  }
-
-  body .soft-button {
-    min-height: 40px !important;
+  body .settings-mobile-native .select-menu button {
+    min-height: 42px !important;
     padding: 0 12px !important;
-    border: 1px solid #d7dee8 !important;
-    border-radius: 10px !important;
-    color: #0f172a !important;
-    background: #ffffff !important;
-    font-size: 13px !important;
+    display: flex !important;
+    align-items: center !important;
+    border-radius: 8px !important;
+    box-sizing: border-box !important;
+    white-space: normal !important;
   }
 
-  body .background-preview {
-    height: 150px !important;
-    margin: 14px !important;
-    border: 1px solid #d7dee8 !important;
-    border-radius: 14px !important;
-    color: #0f172a !important;
-    background: #eef2f7 !important;
+  body .settings-mobile-native .toggle {
+    flex: 0 0 auto !important;
+    box-sizing: border-box !important;
+  }
+
+  body .settings-mobile-native .soft-button {
+    min-height: 42px !important;
+    padding: 0 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
   }
 }
