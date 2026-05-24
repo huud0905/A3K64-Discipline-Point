@@ -1,0 +1,9 @@
+/* Desktop Settings hierarchy fix: sidebar only shows parent levels.
+   Child pages stay inside the main content cards. */
+.settings-desktop-only .windows-settings-nav > button:not(:first-child) {
+  display: none !important;
+}
+
+.settings-desktop-only .windows-settings-nav > button:first-child {
+  margin-top: 0 !important;
+}
