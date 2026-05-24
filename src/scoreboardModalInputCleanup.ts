@@ -1,3 +1,6 @@
+import './settingsCustomColorPicker.css';
+import './settingsCustomColorPicker';
+
 function getScoreModal() {
   return document.querySelector<HTMLElement>('.score-edit-modal.modern-score-editor');
 }
