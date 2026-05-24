@@ -46,6 +46,7 @@ import './overlayToastAndFooterFix.css';
 import './globalLoadingThemeFix';
 import './globalLoadingThemeFix.css';
 import './scoreboardMobileScoreEditorFix.css';
+import './scoreboardMobileLightThemeHardFix.css';
 import './scoreboardMobileScoreEditorRuntimeFix';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
