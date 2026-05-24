@@ -50,6 +50,7 @@ import './scoreboardMobileScoreEditorFix.css';
 import './scoreboardMobileLightThemeHardFix.css';
 import './scoreboardMobileScoreEditorRuntimeFix';
 import './scoreboardPositiveColor.css';
+import './settingsMobileAppPolish.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
