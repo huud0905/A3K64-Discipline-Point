@@ -1,0 +1,39 @@
+/* Centralized positive score color. */
+:root,
+.win-root,
+.scoreboard-app {
+  --color-positive: #308A30;
+}
+
+.scoreboard-app .score-positive,
+.scoreboard-app .event-plus,
+.scoreboard-app .point-cell.score-positive,
+.scoreboard-app .total-cell.score-positive,
+.scoreboard-app .compact-score-table .score-positive,
+.scoreboard-app .score-detail-table .score-positive,
+.scoreboard-app .student-profile .score-positive,
+.scoreboard-app .student-profile .event-plus,
+.scoreboard-app .profile-page .score-positive,
+.scoreboard-app .profile-page .event-plus,
+.scoreboard-app .group-stats-v2-bar.positive span,
+.scoreboard-app [class*="score-positive"],
+.scoreboard-app [class*="event-plus"] {
+  color: var(--color-positive) !important;
+}
+
+.scoreboard-app .group-stats-v2-bar.positive,
+.scoreboard-app .positive-score-bar,
+.scoreboard-app .score-positive-bg {
+  background: var(--color-positive) !important;
+  border-color: var(--color-positive) !important;
+}
+
+.scoreboard-app svg [fill="#10b981"],
+.scoreboard-app svg [fill="#059669"] {
+  fill: var(--color-positive) !important;
+}
+
+.scoreboard-app svg [stroke="#10b981"],
+.scoreboard-app svg [stroke="#059669"] {
+  stroke: var(--color-positive) !important;
+}
