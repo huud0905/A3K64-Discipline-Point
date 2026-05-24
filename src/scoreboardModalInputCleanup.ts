@@ -1,5 +1,6 @@
 import './settingsCustomColorPicker.css';
 import './settingsCustomColorPicker';
+import './accentPersistenceFix';
 
 function getScoreModal() {
   return document.querySelector<HTMLElement>('.score-edit-modal.modern-score-editor');
