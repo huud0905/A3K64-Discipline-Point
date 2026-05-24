@@ -20,7 +20,7 @@ type FilterSelectProps<T extends string | number> = {
 };
 
 type FloatingStyle = CSSProperties & Record<`--${string}`, string | number>;
-type PointerStart = { x: number; y: number; time: number; pointerId: number | null };
+type PointerStart = { x: number; y: number; time: number; pointerId: number | null; pointerType: string };
 
 const TOUCH_MOVE_THRESHOLD = 10;
 const TOUCH_CLICK_MAX_MS = 650;
@@ -34,8 +34,12 @@ function isLightThemeActive() {
   );
 }
 
-function isTouchLikePointer(event: PointerEvent<HTMLElement>) {
-  return event.pointerType === "touch" || event.pointerType === "pen";
+function isTouchLikePointer(event: PointerEvent<HTMLElement> | PointerStart | null) {
+  return event?.pointerType === "touch" || event?.pointerType === "pen";
+}
+
+function pointerStartFromEvent(event: PointerEvent<HTMLElement>): PointerStart {
+  return { x: event.clientX, y: event.clientY, time: Date.now(), pointerId: event.pointerId ?? null, pointerType: event.pointerType || "mouse" };
 }
 
 function isIntentionalTap(start: PointerStart | null, event: PointerEvent<HTMLElement>) {
@@ -71,6 +75,7 @@ export function FilterSelect<T extends string | number>({
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const pointerStartRef = useRef<PointerStart | null>(null);
   const optionPointerStartRef = useRef<PointerStart | null>(null);
+  const suppressNextClickRef = useRef(false);
   const current = options.find((option) => option.value === value) || options[0];
 
   const updateFloatingPosition = () => {
@@ -115,9 +120,10 @@ export function FilterSelect<T extends string | number>({
 
   const handleButtonPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    pointerStartRef.current = { x: event.clientX, y: event.clientY, time: Date.now(), pointerId: event.pointerId ?? null };
+    pointerStartRef.current = pointerStartFromEvent(event);
     if (isTouchLikePointer(event)) return;
     event.preventDefault();
+    suppressNextClickRef.current = true;
     toggleOpen();
   };
 
@@ -126,6 +132,7 @@ export function FilterSelect<T extends string | number>({
     if (!isTouchLikePointer(event)) return;
     if (!isIntentionalTap(pointerStartRef.current, event)) return;
     event.preventDefault();
+    suppressNextClickRef.current = true;
     toggleOpen();
   };
 
@@ -188,16 +195,23 @@ export function FilterSelect<T extends string | number>({
           className={`filter-select-option ${option.value === value ? "active" : ""}`}
           onPointerDown={(event) => {
             event.stopPropagation();
-            optionPointerStartRef.current = { x: event.clientX, y: event.clientY, time: Date.now(), pointerId: event.pointerId ?? null };
+            optionPointerStartRef.current = pointerStartFromEvent(event);
           }}
           onPointerUp={(event) => {
             event.stopPropagation();
-            if (isTouchLikePointer(event) && !isIntentionalTap(optionPointerStartRef.current, event)) return;
+            if (!isTouchLikePointer(event)) return;
+            if (!isIntentionalTap(optionPointerStartRef.current, event)) return;
+            event.preventDefault();
+            suppressNextClickRef.current = true;
             chooseOption(option);
           }}
           onClick={(event) => {
             event.stopPropagation();
-            if (isTouchLikePointer(event as unknown as PointerEvent<HTMLButtonElement>)) return;
+            if (suppressNextClickRef.current) {
+              suppressNextClickRef.current = false;
+              return;
+            }
+            if (isTouchLikePointer(optionPointerStartRef.current)) return;
             chooseOption(option);
           }}
         >
@@ -218,10 +232,14 @@ export function FilterSelect<T extends string | number>({
         onPointerDown={handleButtonPointerDown}
         onPointerUp={handleButtonPointerUp}
         onPointerCancel={handleButtonPointerCancel}
-        onClick={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (suppressNextClickRef.current) suppressNextClickRef.current = false;
+        }}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
+            event.stopPropagation();
             toggleOpen();
           }
         }}
