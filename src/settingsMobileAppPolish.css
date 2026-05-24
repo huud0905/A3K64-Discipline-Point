@@ -20,6 +20,7 @@ body .settings-mobile-native {
   --settings-focus-ring: rgba(239, 68, 68, .18);
 }
 
+body .win-root.theme-dark .win-window:has(.settings-mobile-native),
 body .win-root.theme-dark .settings-app,
 body .win-root.theme-dark .settings-mobile-native,
 body .settings-app[data-theme="dark"],
@@ -41,6 +42,7 @@ body .settings-mobile-native[data-theme="dark"] {
   --settings-focus-ring: rgba(239, 68, 68, .22);
 }
 
+body .win-root.theme-light .win-window:has(.settings-mobile-native),
 body .win-root.theme-light .settings-app,
 body .win-root.theme-light .settings-mobile-native,
 body .settings-app[data-theme="light"],
@@ -62,11 +64,35 @@ body .settings-mobile-native[data-theme="light"] {
   --settings-focus-ring: rgba(239, 68, 68, .18);
 }
 
+/* Scoped reset/normalize for Settings to avoid browser/default style conflicts. */
+body .win-window:has(.settings-mobile-native),
+body .win-window:has(.settings-mobile-native) *,
 body .settings-app,
 body .settings-mobile-native,
 body .settings-app *,
 body .settings-mobile-native * {
   box-sizing: border-box !important;
+}
+
+body .settings-mobile-native button,
+body .settings-mobile-native input,
+body .settings-mobile-native select,
+body .settings-mobile-native textarea {
+  font: inherit !important;
+  color: inherit !important;
+}
+
+body .settings-mobile-native button {
+  appearance: none !important;
+  border-style: solid !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+}
+
+body .settings-mobile-native img,
+body .settings-mobile-native svg {
+  max-width: 100% !important;
+  height: auto !important;
 }
 
 body .settings-app,
@@ -88,6 +114,34 @@ body .settings-mobile-native,
 body .settings-mobile-native .settings-screen {
   background: var(--settings-bg) !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+}
+
+body .win-window:has(.settings-mobile-native),
+body .win-window:has(.settings-mobile-native) .win-body,
+body .win-window:has(.settings-mobile-native) .win-body.settings-mode {
+  color: var(--settings-text) !important;
+  background: var(--settings-bg) !important;
+  border-color: var(--settings-border) !important;
+}
+
+body .win-root.theme-dark .win-window:has(.settings-mobile-native) .win-titlebar {
+  color: #f8fafc !important;
+  background: #0b1220 !important;
+  border-bottom: 1px solid #273244 !important;
+}
+
+body .win-root.theme-light .win-window:has(.settings-mobile-native) .win-titlebar {
+  color: #0f172a !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #d7dee8 !important;
+}
+
+body .win-window:has(.settings-mobile-native) .win-titlebar {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+}
+
+body .win-window:has(.settings-mobile-native) .win-titlebar * {
+  color: inherit !important;
 }
 
 body .settings-mobile-native .settings-list-card,
@@ -169,13 +223,19 @@ body .settings-mobile-native .custom-color-row {
   border-top-color: var(--settings-border) !important;
 }
 
+/* Never truncate Settings text into "..." except compact inputs/selects. */
 body .settings-mobile-native .settings-nav-row strong,
 body .settings-mobile-native .settings-nav-row span,
 body .settings-mobile-native .setting-row-left strong,
 body .settings-mobile-native .setting-row-left span,
 body .settings-mobile-native .settings-page-header p,
+body .settings-mobile-native .settings-page-header h1,
 body .settings-mobile-native .color-section-head span,
-body .settings-mobile-native .custom-color-row span {
+body .settings-mobile-native .color-section-head strong,
+body .settings-mobile-native .custom-color-row span,
+body .settings-mobile-native .custom-color-row strong,
+body .settings-mobile-native .settings-group-label,
+body .settings-mobile-native .settings-back-button span {
   white-space: normal !important;
   overflow: visible !important;
   text-overflow: clip !important;
@@ -183,19 +243,40 @@ body .settings-mobile-native .custom-color-row span {
   overflow-wrap: anywhere !important;
 }
 
+body .settings-mobile-native .settings-account-card strong,
+body .settings-mobile-native .settings-account-card span {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+}
+
 body .settings-mobile-native svg {
+  width: 24px !important;
+  height: 24px !important;
   max-width: 24px !important;
   max-height: 24px !important;
+  flex: 0 0 24px !important;
 }
 
 body .settings-mobile-native button {
   min-height: 44px !important;
-  touch-action: manipulation !important;
+}
+
+body .settings-mobile-native .settings-screen {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+body .settings-mobile-native .settings-list-card,
+body .settings-mobile-native .settings-card,
+body .settings-mobile-native .settings-account-card {
+  width: 100% !important;
+  max-width: 100% !important;
 }
 
 @media (max-width: 768px) {
   body .win-window:has(.settings-mobile-native),
-  body .win-window:has(.settings-mobile-native) .win-titlebar,
   body .win-window:has(.settings-mobile-native) .win-body,
   body .win-window:has(.settings-mobile-native) .win-body.settings-mode {
     color: var(--settings-text) !important;
@@ -225,6 +306,7 @@ body .settings-mobile-native button {
 
   body .settings-mobile-native .setting-row,
   body .settings-mobile-native .settings-nav-row {
+    width: 100% !important;
     min-height: 60px !important;
     align-items: center !important;
     position: relative !important;
@@ -304,5 +386,6 @@ body .settings-mobile-native button {
 
   body .settings-mobile-native .settings-page-header h1 {
     font-size: 30px !important;
+    line-height: 1.08 !important;
   }
 }
