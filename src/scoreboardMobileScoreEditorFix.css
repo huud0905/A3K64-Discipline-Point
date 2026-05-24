@@ -244,8 +244,9 @@
   .scoreboard-app .modern-score-editor .rule-pick-row,
   .score-edit-modal.modern-score-editor .rule-pick-row {
     display: grid !important;
-    grid-template-columns: 76px minmax(0, 1fr) 62px !important;
-    gap: 8px !important;
+    grid-template-columns: 86px minmax(0, 1fr) 78px !important;
+    gap: 10px !important;
+    align-items: center !important;
   }
 
   .scoreboard-app .modern-score-editor .subject-picker,
@@ -254,33 +255,50 @@
   .score-edit-modal.modern-score-editor .subject-picker,
   .score-edit-modal.modern-score-editor .subject-picker .filter-select,
   .score-edit-modal.modern-score-editor .subject-picker .filter-select-button {
-    width: 76px !important;
-    min-width: 76px !important;
+    width: 86px !important;
+    min-width: 86px !important;
+  }
+
+  .scoreboard-app .modern-score-editor .rule-search-box,
+  .score-edit-modal.modern-score-editor .rule-search-box {
+    min-width: 0 !important;
   }
 
   .scoreboard-app .modern-score-editor .rule-search-input,
   .score-edit-modal.modern-score-editor .rule-search-input,
   .scoreboard-app .modern-score-editor .count-box,
-  .score-edit-modal.modern-score-editor .count-box {
-    height: 40px !important;
-    min-height: 40px !important;
+  .score-edit-modal.modern-score-editor .count-box,
+  .scoreboard-app .modern-score-editor .filter-select-button,
+  .score-edit-modal.modern-score-editor .filter-select-button {
+    height: 42px !important;
+    min-height: 42px !important;
   }
 
   .scoreboard-app .modern-score-editor .count-box,
   .score-edit-modal.modern-score-editor .count-box {
-    padding: 0 6px !important;
-    gap: 4px !important;
+    padding: 0 8px !important;
+    gap: 5px !important;
+    min-width: 78px !important;
+    width: 78px !important;
+    box-sizing: border-box !important;
   }
 
   .scoreboard-app .modern-score-editor .count-box span,
   .score-edit-modal.modern-score-editor .count-box span {
     font-size: 10px !important;
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
   }
 
   .scoreboard-app .modern-score-editor .count-box input,
   .score-edit-modal.modern-score-editor .count-box input {
-    width: 30px !important;
-    font-size: 13px !important;
+    width: 38px !important;
+    min-width: 38px !important;
+    max-width: 38px !important;
+    font-size: 14px !important;
+    text-align: center !important;
+    padding: 0 2px !important;
+    overflow: visible !important;
   }
 
   .scoreboard-app .modern-score-editor .score-add-button,
