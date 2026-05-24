@@ -1,6 +1,7 @@
 import './settingsCustomColorPicker.css';
 import './settingsCustomColorPicker';
 import './accentPersistenceFix';
+import './settingsDesktopHierarchyFix.css';
 
 function getScoreModal() {
   return document.querySelector<HTMLElement>('.score-edit-modal.modern-score-editor');
