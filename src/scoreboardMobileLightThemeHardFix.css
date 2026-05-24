@@ -1,0 +1,224 @@
+/* Force a consistent light palette for the mobile scoring modal and dropdowns. */
+@media (max-width: 760px) {
+  .win-root.theme-light:has(.score-edit-backdrop),
+  .theme-light .score-edit-modal.modern-score-editor,
+  :root.light .score-edit-modal.modern-score-editor {
+    --score-mobile-bg: #f5f8fc;
+    --score-mobile-surface: #ffffff;
+    --score-mobile-surface-2: #f8fafc;
+    --score-mobile-card: #ffffff;
+    --score-mobile-text: #142033;
+    --score-mobile-muted: #64748b;
+    --score-mobile-border: #d8e3ef;
+    --score-mobile-red: #e9242a;
+    --score-mobile-red-soft: rgba(233, 36, 42, .12);
+    --score-editor-bg: #f5f8fc;
+  }
+
+  .win-root.theme-light:has(.score-edit-backdrop) .win-window,
+  .win-root.theme-light:has(.score-edit-backdrop) .win-body,
+  .win-root.theme-light:has(.score-edit-backdrop) .scoreboard-app,
+  .theme-light .score-edit-backdrop,
+  :root.light .score-edit-backdrop {
+    background: var(--score-mobile-bg) !important;
+    color: var(--score-mobile-text) !important;
+  }
+
+  .win-root.theme-light:has(.score-edit-backdrop) .win-titlebar {
+    background: #ffffff !important;
+    border-bottom: 1px solid var(--score-mobile-border) !important;
+    color: var(--score-mobile-text) !important;
+  }
+
+  .theme-light .score-edit-modal.modern-score-editor,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-edit-modal.modern-score-editor,
+  :root.light .score-edit-modal.modern-score-editor {
+    background: var(--score-mobile-surface) !important;
+    color: var(--score-mobile-text) !important;
+    border-color: var(--score-mobile-border) !important;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, .16) !important;
+  }
+
+  .theme-light .score-edit-header,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-edit-header,
+  :root.light .score-edit-header,
+  .theme-light .score-edit-body,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-edit-body,
+  :root.light .score-edit-body,
+  .theme-light .score-edit-left,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-edit-left,
+  :root.light .score-edit-left {
+    background: var(--score-mobile-surface) !important;
+    color: var(--score-mobile-text) !important;
+  }
+
+  .theme-light .score-edit-header,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-edit-header,
+  :root.light .score-edit-header {
+    border-bottom: 1px solid var(--score-mobile-border) !important;
+  }
+
+  .theme-light .score-edit-header h2,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-edit-header h2,
+  :root.light .score-edit-header h2 {
+    color: var(--score-mobile-text) !important;
+  }
+
+  .theme-light .score-edit-close,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-edit-close,
+  :root.light .score-edit-close {
+    background: #ffffff !important;
+    color: var(--score-mobile-text) !important;
+    border-color: var(--score-mobile-border) !important;
+  }
+
+  .theme-light .score-mobile-mode-tabs,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-mobile-mode-tabs,
+  :root.light .score-mobile-mode-tabs,
+  .theme-light .mobile-review-day-switch-row,
+  .win-root.theme-light:has(.score-edit-backdrop) .mobile-review-day-switch-row,
+  :root.light .mobile-review-day-switch-row {
+    background: var(--score-mobile-surface) !important;
+    color: var(--score-mobile-text) !important;
+  }
+
+  .theme-light .score-mobile-mode-tabs button:not(.active),
+  .win-root.theme-light:has(.score-edit-backdrop) .score-mobile-mode-tabs button:not(.active),
+  :root.light .score-mobile-mode-tabs button:not(.active),
+  .theme-light .mobile-review-day-switch-row .day-tabs button:not(.active),
+  .win-root.theme-light:has(.score-edit-backdrop) .mobile-review-day-switch-row .day-tabs button:not(.active),
+  :root.light .mobile-review-day-switch-row .day-tabs button:not(.active) {
+    background: #ffffff !important;
+    color: var(--score-mobile-text) !important;
+    border-color: var(--score-mobile-border) !important;
+  }
+
+  .theme-light .score-mobile-mode-tabs button.active,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-mobile-mode-tabs button.active,
+  :root.light .score-mobile-mode-tabs button.active,
+  .theme-light .mobile-review-day-switch-row .day-tabs button.active,
+  .win-root.theme-light:has(.score-edit-backdrop) .mobile-review-day-switch-row .day-tabs button.active,
+  :root.light .mobile-review-day-switch-row .day-tabs button.active {
+    background: var(--score-mobile-red) !important;
+    color: #ffffff !important;
+    border-color: var(--score-mobile-red) !important;
+  }
+
+  .theme-light .score-custom-form,
+  .theme-light .rule-select-form,
+  .theme-light .special-score-form,
+  .theme-light .bulk-score-box,
+  .theme-light .day-record-panel,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-custom-form,
+  .win-root.theme-light:has(.score-edit-backdrop) .rule-select-form,
+  .win-root.theme-light:has(.score-edit-backdrop) .special-score-form,
+  .win-root.theme-light:has(.score-edit-backdrop) .bulk-score-box,
+  .win-root.theme-light:has(.score-edit-backdrop) .day-record-panel,
+  :root.light .score-custom-form,
+  :root.light .rule-select-form,
+  :root.light .special-score-form,
+  :root.light .bulk-score-box,
+  :root.light .day-record-panel {
+    background: var(--score-mobile-card) !important;
+    color: var(--score-mobile-text) !important;
+    border-color: var(--score-mobile-border) !important;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, .06) !important;
+  }
+
+  .theme-light .score-custom-form input,
+  .theme-light .score-custom-form textarea,
+  .theme-light .bulk-score-box textarea,
+  .theme-light .rule-search-input,
+  .theme-light .filter-select-button,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-custom-form input,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-custom-form textarea,
+  .win-root.theme-light:has(.score-edit-backdrop) .bulk-score-box textarea,
+  .win-root.theme-light:has(.score-edit-backdrop) .rule-search-input,
+  .win-root.theme-light:has(.score-edit-backdrop) .filter-select-button,
+  :root.light .score-custom-form input,
+  :root.light .score-custom-form textarea,
+  :root.light .bulk-score-box textarea,
+  :root.light .rule-search-input,
+  :root.light .filter-select-button {
+    background: #ffffff !important;
+    color: var(--score-mobile-text) !important;
+    border-color: var(--score-mobile-border) !important;
+  }
+
+  .theme-light .score-custom-form input::placeholder,
+  .theme-light .score-custom-form textarea::placeholder,
+  .theme-light .rule-search-input::placeholder,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-custom-form input::placeholder,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-custom-form textarea::placeholder,
+  .win-root.theme-light:has(.score-edit-backdrop) .rule-search-input::placeholder,
+  :root.light .score-custom-form input::placeholder,
+  :root.light .score-custom-form textarea::placeholder,
+  :root.light .rule-search-input::placeholder {
+    color: var(--score-mobile-muted) !important;
+  }
+
+  .theme-light .filter-select-menu,
+  .theme-light .filter-select-menu.portal-menu,
+  .theme-light .filter-select-menu.light-portal-menu,
+  .win-root.theme-light:has(.score-edit-backdrop) .filter-select-menu,
+  .filter-select-menu.light-portal-menu,
+  :root.light .filter-select-menu {
+    background: #ffffff !important;
+    color: var(--score-mobile-text, #142033) !important;
+    border: 1px solid var(--score-mobile-border, #d8e3ef) !important;
+    box-shadow: 0 18px 44px rgba(15, 23, 42, .18) !important;
+  }
+
+  .theme-light .filter-select-option,
+  .win-root.theme-light:has(.score-edit-backdrop) .filter-select-option,
+  .filter-select-menu.light-portal-menu .filter-select-option,
+  :root.light .filter-select-option {
+    background: #ffffff !important;
+    color: var(--score-mobile-text, #142033) !important;
+  }
+
+  .theme-light .filter-select-option.active,
+  .theme-light .filter-select-option:hover,
+  .win-root.theme-light:has(.score-edit-backdrop) .filter-select-option.active,
+  .win-root.theme-light:has(.score-edit-backdrop) .filter-select-option:hover,
+  .filter-select-menu.light-portal-menu .filter-select-option.active,
+  .filter-select-menu.light-portal-menu .filter-select-option:hover,
+  :root.light .filter-select-option.active,
+  :root.light .filter-select-option:hover {
+    background: #e8eef7 !important;
+    color: var(--score-mobile-text, #142033) !important;
+  }
+
+  .theme-light .score-edit-footer,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-edit-footer,
+  :root.light .score-edit-footer {
+    background: #eef4fb !important;
+    border-top: 1px solid var(--score-mobile-border) !important;
+  }
+
+  .theme-light .score-edit-footer strong,
+  .win-root.theme-light:has(.score-edit-backdrop) .score-edit-footer strong,
+  :root.light .score-edit-footer strong {
+    background: #ffffff !important;
+    color: var(--score-mobile-text) !important;
+    border-color: var(--score-mobile-border) !important;
+  }
+
+  .theme-light .day-event-list,
+  .win-root.theme-light:has(.score-edit-backdrop) .day-event-list,
+  :root.light .day-event-list {
+    background: #ffffff !important;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .filter-select-option:hover {
+    filter: brightness(1.03);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .filter-select-option:hover {
+    filter: none !important;
+  }
+}
