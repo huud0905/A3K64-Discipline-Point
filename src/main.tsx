@@ -8,7 +8,6 @@ import './desktopInteractionFix';
 import './profileWeekTableFix';
 import './taskViewEnhancer';
 import './startMenuListEnhancer';
-import './mobileAppShell';
 import './scoreboardMobilePolish';
 import './scoreboardMobileFinalFix';
 import './scoreboardMobileOcdFix';
