@@ -122,9 +122,9 @@ const CSS = `
 
   .win-window {
     position: fixed !important;
-    inset: 0 0 76px 0 !important;
+    inset: 0 0 70px 0 !important;
     width: 100vw !important;
-    height: calc(100svh - 76px) !important;
+    height: calc(100svh - 70px) !important;
     min-width: 0 !important;
     max-width: none !important;
     border-radius: 0 !important;
