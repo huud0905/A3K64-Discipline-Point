@@ -32,6 +32,7 @@ type RemotePrefsResult = { exists: boolean; prefs: Partial<PersonalizationPayloa
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const SESSION_KEY = "a3k64-login-session-v1";
 const LOGIN_LOOK_DIRTY_KEY = "a3k64-login-look-dirty-v1";
+const LOCAL_UPDATED_KEY = "a3k64-personalization-local-updated-at";
 const QUIET_UNTIL_KEY = "a3k64-personalization-quiet-until";
 const JSONP_TIMEOUT_MS = 45000;
 
@@ -109,6 +110,20 @@ function stablePrefsJson(value: Partial<PersonalizationPayload>) {
   return JSON.stringify(stable);
 }
 
+function localUpdatedAtMs() {
+  return Number(localStorage.getItem(LOCAL_UPDATED_KEY) || 0);
+}
+
+function remoteUpdatedAtMs(prefs?: Partial<PersonalizationPayload> | null) {
+  const parsed = Date.parse(String(prefs?.updatedAt || ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function markLocalChanged(setItem: (key: string, value: string) => void) {
+  setItem(LOCAL_UPDATED_KEY, String(Date.now()));
+  setItem(LOGIN_LOOK_DIRTY_KEY, "1");
+}
+
 function quietForAWhile() {
   remoteDisabled = true;
   localStorage.setItem(QUIET_UNTIL_KEY, String(Date.now() + 10 * 60 * 1000));
@@ -144,16 +159,18 @@ function loginLook(): Partial<PersonalizationPayload> {
   const accentKey = normAccent(localStorage.getItem("login-accent")) || normAccent(localStorage.getItem("accent"));
   const customAccent = localStorage.getItem("login-custom-accent") || localStorage.getItem("desktop-custom-accent") || undefined;
   const named = accentKey && accentKey !== "custom" ? ACCENT_COLORS[accentKey] : undefined;
-  const accentColor = [localStorage.getItem("login-accent-color"), customAccent, localStorage.getItem("desktop-accent"), named].find(isHex);
+  const accentColor = [localStorage.getItem("login-accent-color"), customAccent, localStorage.getItem("desktop-accent"), localStorage.getItem("accent-color"), named].find(isHex);
+  const normalizedKey = accentKey || (accentColor ? "custom" : undefined);
   return {
     ...(theme ? { theme } : {}),
-    ...(accentKey ? { accentKey } : {}),
+    ...(normalizedKey ? { accentKey: normalizedKey } : {}),
     ...(accentColor ? { accentColor } : {}),
-    ...(customAccent && isHex(customAccent) ? { customAccent } : {}),
+    ...(accentColor ? { customAccent: accentColor } : customAccent && isHex(customAccent) ? { customAccent } : {}),
   };
 }
 
 function collectPrefs(): PersonalizationPayload {
+  const updatedAt = new Date(localUpdatedAtMs() || Date.now()).toISOString();
   return {
     version: 2,
     ...loginLook(),
@@ -163,6 +180,7 @@ function collectPrefs(): PersonalizationPayload {
     desktopTransparency: localStorage.getItem("desktop-transparency") === "off" ? "off" : "on",
     accentTaskbar: localStorage.getItem("accent-taskbar") === "on" ? "on" : "off",
     accentBorders: localStorage.getItem("accent-borders") === "on" ? "on" : "off",
+    updatedAt,
   };
 }
 
@@ -192,6 +210,9 @@ function applyPrefs(prefs?: Partial<PersonalizationPayload> | null) {
       setLocal("desktop-accent-color", color);
       setLocal("login-accent-color", color);
       setLocal("login-custom-accent", color);
+      setLocal("custom-accent", color);
+      setLocal("customAccent", color);
+      setLocal("desktop-custom-accent", color);
       setLocal("accent-color", color);
     }
     if (prefs.taskbarSettings) setLocal("taskbar-settings", prefs.taskbarSettings);
@@ -200,6 +221,7 @@ function applyPrefs(prefs?: Partial<PersonalizationPayload> | null) {
     if (prefs.desktopTransparency) setLocal("desktop-transparency", prefs.desktopTransparency);
     if (prefs.accentTaskbar) setLocal("accent-taskbar", prefs.accentTaskbar);
     if (prefs.accentBorders) setLocal("accent-borders", prefs.accentBorders);
+    if (prefs.updatedAt) setLocal(LOCAL_UPDATED_KEY, String(remoteUpdatedAtMs(prefs) || Date.now()));
 
     window.dispatchEvent(new Event("desktop-theme-change"));
     window.dispatchEvent(new Event("login-theme-change"));
@@ -309,12 +331,29 @@ async function syncForSession(user: SessionUser) {
   activeAccount = account;
   initializedAccount = "";
 
+  const localBeforeFetch = collectPrefs();
+  const localBeforeJson = stablePrefsJson(localBeforeFetch);
+  const localBeforeUpdated = localUpdatedAtMs();
   const remote = await fetchRemotePrefs(user);
   if (remoteDisabled || isQuiet()) return;
 
   if (remote.exists && remote.prefs) {
     const remotePrefs = { version: 2, ...remote.prefs } as PersonalizationPayload;
-    lastSavedJson = stablePrefsJson(remotePrefs);
+    const remoteJson = stablePrefsJson(remotePrefs);
+    const remoteUpdated = remoteUpdatedAtMs(remotePrefs);
+    const localChanged = Boolean(localStorage.getItem(LOGIN_LOOK_DIRTY_KEY));
+    const localIsNewer = localBeforeUpdated > 0 && (!remoteUpdated || localBeforeUpdated > remoteUpdated + 1000);
+
+    if ((localChanged || localIsNewer) && localBeforeJson !== remoteJson) {
+      lastSavedJson = localBeforeJson;
+      initializedAccount = account;
+      const ok = await saveRemotePrefs(user, localBeforeFetch);
+      if (!ok) quietForAWhile();
+      clearLoginLookChanged();
+      return;
+    }
+
+    lastSavedJson = remoteJson;
     applyPrefs(remotePrefs);
     initializedAccount = account;
     clearLoginLookChanged();
@@ -338,7 +377,10 @@ function installStorageHook() {
       if (session?.user) void syncForSession(session.user);
       return;
     }
-    if (this === localStorage && PERSONALIZATION_KEYS.has(key)) scheduleSave();
+    if (this === localStorage && PERSONALIZATION_KEYS.has(key)) {
+      if (!suppressCapture) markLocalChanged((markKey, markValue) => originalSetItem.call(this, markKey, markValue));
+      scheduleSave();
+    }
   };
   Storage.prototype.removeItem = function patchedRemoveItem(key: string) {
     originalRemoveItem.call(this, key);
@@ -346,7 +388,10 @@ function installStorageHook() {
       activeAccount = "";
       initializedAccount = "";
     }
-    if (this === localStorage && PERSONALIZATION_KEYS.has(key)) scheduleSave();
+    if (this === localStorage && PERSONALIZATION_KEYS.has(key)) {
+      if (!suppressCapture) markLocalChanged((markKey, markValue) => originalSetItem.call(this, markKey, markValue));
+      scheduleSave();
+    }
   };
 }
 
