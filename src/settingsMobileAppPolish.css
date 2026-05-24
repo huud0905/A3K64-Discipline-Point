@@ -1,17 +1,211 @@
-/* Settings mobile hard-fix: prevent clipped text and broken dropdown buttons. */
+/* Settings theme/layout hard-fix: variables + responsive sizing for PC and mobile. */
 
-@media (max-width: 600px) {
+:root,
+body .settings-app,
+body .settings-mobile-native {
+  --settings-bg: #f8fafc;
+  --settings-surface: #ffffff;
+  --settings-surface-soft: #f1f5f9;
+  --settings-picker-bg: #ffffff;
+  --settings-input-bg: #ffffff;
+  --settings-text: #0f172a;
+  --settings-muted: #64748b;
+  --settings-border: #d7dee8;
+  --settings-border-strong: #cbd5e1;
+  --settings-shadow: 0 10px 24px rgba(15, 23, 42, .045);
+  --settings-preview-ring: rgba(255,255,255,.88);
+  --settings-active-ring: rgba(15,23,42,.18);
+  --settings-swatch-border: rgba(15,23,42,.16);
+  --settings-sv-ring: rgba(15,23,42,.16);
+  --settings-focus-ring: rgba(239, 68, 68, .18);
+}
+
+body .win-root.theme-dark .settings-app,
+body .win-root.theme-dark .settings-mobile-native,
+body .settings-app[data-theme="dark"],
+body .settings-mobile-native[data-theme="dark"] {
+  --settings-bg: #050914;
+  --settings-surface: #0b1220;
+  --settings-surface-soft: #111827;
+  --settings-picker-bg: linear-gradient(180deg, #111827, #0b1220);
+  --settings-input-bg: #020617;
+  --settings-text: #f8fafc;
+  --settings-muted: #94a3b8;
+  --settings-border: #273244;
+  --settings-border-strong: #334155;
+  --settings-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 16px 34px rgba(0, 0, 0, .28);
+  --settings-preview-ring: rgba(255,255,255,.78);
+  --settings-active-ring: rgba(255,255,255,.86);
+  --settings-swatch-border: rgba(255,255,255,.18);
+  --settings-sv-ring: rgba(255,255,255,.16);
+  --settings-focus-ring: rgba(239, 68, 68, .22);
+}
+
+body .win-root.theme-light .settings-app,
+body .win-root.theme-light .settings-mobile-native,
+body .settings-app[data-theme="light"],
+body .settings-mobile-native[data-theme="light"] {
+  --settings-bg: #f8fafc;
+  --settings-surface: #ffffff;
+  --settings-surface-soft: #f1f5f9;
+  --settings-picker-bg: #ffffff;
+  --settings-input-bg: #ffffff;
+  --settings-text: #0f172a;
+  --settings-muted: #64748b;
+  --settings-border: #d7dee8;
+  --settings-border-strong: #cbd5e1;
+  --settings-shadow: 0 10px 24px rgba(15, 23, 42, .045);
+  --settings-preview-ring: rgba(255,255,255,.88);
+  --settings-active-ring: rgba(15,23,42,.18);
+  --settings-swatch-border: rgba(15,23,42,.16);
+  --settings-sv-ring: rgba(15,23,42,.16);
+  --settings-focus-ring: rgba(239, 68, 68, .18);
+}
+
+body .settings-app,
+body .settings-mobile-native,
+body .settings-app *,
+body .settings-mobile-native * {
+  box-sizing: border-box !important;
+}
+
+body .settings-app,
+body .settings-mobile-native,
+body .settings-mobile-native .settings-screen,
+body .settings-mobile-native .settings-page-header,
+body .settings-mobile-native .settings-group,
+body .settings-mobile-native .settings-list-card,
+body .settings-mobile-native .settings-card,
+body .settings-mobile-native .settings-account-card,
+body .settings-mobile-native .setting-row,
+body .settings-mobile-native .settings-nav-row {
+  color: var(--settings-text) !important;
+  border-color: var(--settings-border) !important;
+}
+
+body .settings-app,
+body .settings-mobile-native,
+body .settings-mobile-native .settings-screen {
+  background: var(--settings-bg) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+}
+
+body .settings-mobile-native .settings-list-card,
+body .settings-mobile-native .settings-card,
+body .settings-mobile-native .settings-account-card,
+body .settings-mobile-native .settings-nav-row,
+body .settings-mobile-native .setting-row,
+body .settings-mobile-native .select-button,
+body .settings-mobile-native .soft-button {
+  background: var(--settings-surface) !important;
+  color: var(--settings-text) !important;
+}
+
+body .settings-mobile-native .settings-list-card,
+body .settings-mobile-native .settings-card,
+body .settings-mobile-native .settings-account-card {
+  box-shadow: var(--settings-shadow) !important;
+}
+
+body .settings-mobile-native .settings-page-header p,
+body .settings-mobile-native .settings-group-label,
+body .settings-mobile-native .settings-nav-row span,
+body .settings-mobile-native .setting-row-left span,
+body .settings-mobile-native .settings-account-card span,
+body .settings-mobile-native .color-section-head span,
+body .settings-mobile-native .custom-color-row span {
+  color: var(--settings-muted) !important;
+}
+
+body .settings-mobile-native .settings-nav-row strong,
+body .settings-mobile-native .setting-row-left strong,
+body .settings-mobile-native .settings-account-card strong,
+body .settings-mobile-native .settings-page-header h1,
+body .settings-mobile-native .color-section-head strong,
+body .settings-mobile-native .custom-color-row strong {
+  color: var(--settings-text) !important;
+}
+
+body .settings-mobile-native .settings-nav-row:hover,
+body .settings-mobile-native .settings-nav-row:active,
+body .settings-mobile-native .settings-back-button:hover,
+body .settings-mobile-native .select-menu button:hover,
+body .settings-mobile-native .select-menu button.active {
+  background: var(--settings-surface-soft) !important;
+}
+
+body .settings-mobile-native .select-button,
+body .settings-mobile-native .select-menu,
+body .settings-mobile-native .soft-button,
+body .settings-mobile-native .toggle,
+body .settings-mobile-native .background-preview {
+  border-color: var(--settings-border-strong) !important;
+}
+
+body .settings-mobile-native .select-menu {
+  color: var(--settings-text) !important;
+  background: var(--settings-surface) !important;
+  box-shadow: var(--settings-shadow) !important;
+}
+
+body .settings-mobile-native .select-menu button {
+  color: var(--settings-text) !important;
+}
+
+body .settings-mobile-native .toggle {
+  background: var(--settings-surface-soft) !important;
+}
+
+body .settings-mobile-native .toggle.on {
+  background: var(--desktop-accent, #ef4444) !important;
+}
+
+body .settings-mobile-native .background-preview {
+  color: var(--settings-text) !important;
+  background: var(--settings-surface-soft) !important;
+}
+
+body .settings-mobile-native .custom-color-row {
+  border-top-color: var(--settings-border) !important;
+}
+
+body .settings-mobile-native .settings-nav-row strong,
+body .settings-mobile-native .settings-nav-row span,
+body .settings-mobile-native .setting-row-left strong,
+body .settings-mobile-native .setting-row-left span,
+body .settings-mobile-native .settings-page-header p,
+body .settings-mobile-native .color-section-head span,
+body .settings-mobile-native .custom-color-row span {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+}
+
+body .settings-mobile-native svg {
+  max-width: 24px !important;
+  max-height: 24px !important;
+}
+
+body .settings-mobile-native button {
+  min-height: 44px !important;
+  touch-action: manipulation !important;
+}
+
+@media (max-width: 768px) {
   body .win-window:has(.settings-mobile-native),
   body .win-window:has(.settings-mobile-native) .win-titlebar,
   body .win-window:has(.settings-mobile-native) .win-body,
-  body .win-window:has(.settings-mobile-native) .win-body.settings-mode,
-  body .settings-mobile-native,
-  body .settings-mobile-native .settings-screen {
-    color: #0f172a !important;
-    background: #f8fafc !important;
-    border-color: #d7dee8 !important;
+  body .win-window:has(.settings-mobile-native) .win-body.settings-mode {
+    color: var(--settings-text) !important;
+    background: var(--settings-bg) !important;
+    border-color: var(--settings-border) !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
-    box-sizing: border-box !important;
+  }
+
+  body .win-window:has(.settings-mobile-native) .win-titlebar {
+    border-bottom: 1px solid var(--settings-border) !important;
   }
 
   body .settings-mobile-native .settings-screen {
@@ -20,22 +214,13 @@
     padding-bottom: 96px !important;
   }
 
-  body .settings-mobile-native .settings-group,
   body .settings-mobile-native .settings-list-card,
-  body .settings-mobile-native .settings-card,
-  body .settings-mobile-native .settings-account-card,
-  body .settings-mobile-native .setting-row,
-  body .settings-mobile-native .settings-nav-row {
-    box-sizing: border-box !important;
+  body .settings-mobile-native .settings-account-card {
+    overflow: hidden !important;
   }
 
   body .settings-mobile-native .settings-card {
     overflow: visible !important;
-  }
-
-  body .settings-mobile-native .settings-list-card,
-  body .settings-mobile-native .settings-account-card {
-    overflow: hidden !important;
   }
 
   body .settings-mobile-native .setting-row,
@@ -43,41 +228,14 @@
     min-height: 60px !important;
     align-items: center !important;
     position: relative !important;
+    padding: 10px 14px !important;
   }
 
   body .settings-mobile-native .setting-row-left,
-  body .settings-mobile-native .settings-nav-row > div {
-    min-width: 0 !important;
-    max-width: 100% !important;
-  }
-
+  body .settings-mobile-native .settings-nav-row > div,
   body .settings-mobile-native .setting-row-left > div {
     min-width: 0 !important;
     max-width: 100% !important;
-  }
-
-  body .settings-mobile-native .settings-nav-row strong,
-  body .settings-mobile-native .settings-nav-row span,
-  body .settings-mobile-native .setting-row-left strong,
-  body .settings-mobile-native .setting-row-left span,
-  body .settings-mobile-native .settings-page-header p,
-  body .settings-mobile-native .color-section-head span,
-  body .settings-mobile-native .custom-color-row span {
-    white-space: normal !important;
-    overflow: visible !important;
-    text-overflow: clip !important;
-    word-break: break-word !important;
-    overflow-wrap: anywhere !important;
-  }
-
-  body .settings-mobile-native .settings-nav-row strong,
-  body .settings-mobile-native .setting-row-left strong {
-    line-height: 1.2 !important;
-  }
-
-  body .settings-mobile-native .settings-nav-row span,
-  body .settings-mobile-native .setting-row-left span {
-    line-height: 1.3 !important;
   }
 
   body .settings-mobile-native .setting-row:has(.select-wrap) {
@@ -93,6 +251,7 @@
 
   body .settings-mobile-native .select-button {
     height: 42px !important;
+    min-height: 42px !important;
     min-width: 126px !important;
     max-width: 156px !important;
     padding: 0 12px !important;
@@ -100,10 +259,8 @@
     align-items: center !important;
     justify-content: space-between !important;
     gap: 8px !important;
-    border: 2px solid #111827 !important;
+    border: 2px solid var(--settings-border-strong) !important;
     border-radius: 12px !important;
-    color: #0f172a !important;
-    background: #ffffff !important;
     box-sizing: border-box !important;
     position: relative !important;
     z-index: 101 !important;
@@ -124,12 +281,8 @@
     min-width: 190px !important;
     max-width: min(260px, calc(100vw - 32px)) !important;
     padding: 6px !important;
-    border: 1px solid #cbd5e1 !important;
+    border: 1px solid var(--settings-border-strong) !important;
     border-radius: 12px !important;
-    color: #0f172a !important;
-    background: #ffffff !important;
-    box-shadow: 0 18px 50px rgba(15, 23, 42, .18) !important;
-    box-sizing: border-box !important;
   }
 
   body .settings-mobile-native .select-menu button {
@@ -138,13 +291,7 @@
     display: flex !important;
     align-items: center !important;
     border-radius: 8px !important;
-    box-sizing: border-box !important;
     white-space: normal !important;
-  }
-
-  body .settings-mobile-native .toggle {
-    flex: 0 0 auto !important;
-    box-sizing: border-box !important;
   }
 
   body .settings-mobile-native .soft-button {
@@ -153,6 +300,9 @@
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    box-sizing: border-box !important;
+  }
+
+  body .settings-mobile-native .settings-page-header h1 {
+    font-size: 30px !important;
   }
 }
