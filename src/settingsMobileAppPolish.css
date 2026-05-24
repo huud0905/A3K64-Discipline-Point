@@ -1,0 +1,453 @@
+/* Mobile-first polish for the Settings app.
+   Viewport meta is already present in index.html; this file fixes the in-app mobile layout. */
+
+@media (max-width: 600px) {
+  .settings-app {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    color: #0f172a !important;
+    background: #f8fafc !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .settings-layout {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+    background: #f8fafc !important;
+  }
+
+  .settings-sidebar {
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 12px 16px 18px !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid #d7dee8 !important;
+    color: #0f172a !important;
+    background: #f1f5f9 !important;
+    box-sizing: border-box !important;
+  }
+
+  .settings-topline {
+    height: 32px !important;
+    margin-bottom: 12px !important;
+    gap: 10px !important;
+    font-size: 14px !important;
+  }
+
+  .settings-topline svg,
+  .windows-settings-nav button svg,
+  .settings-card-title svg,
+  .setting-row-left svg,
+  .personal-card > svg:first-child {
+    width: 24px !important;
+    height: 24px !important;
+    flex: 0 0 24px !important;
+  }
+
+  .profile-card {
+    min-height: 78px !important;
+    margin: 0 0 14px !important;
+    padding: 10px !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    border-radius: 14px !important;
+    border-color: #d7dee8 !important;
+    background: #ffffff !important;
+    box-sizing: border-box !important;
+  }
+
+  .profile-avatar {
+    width: 56px !important;
+    height: 56px !important;
+  }
+
+  .profile-avatar svg {
+    width: 30px !important;
+    height: 30px !important;
+  }
+
+  .profile-card strong {
+    font-size: 14px !important;
+    line-height: 1.2 !important;
+  }
+
+  .profile-card span {
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+  }
+
+  .windows-settings-nav {
+    gap: 8px !important;
+  }
+
+  .windows-settings-nav button {
+    width: 100% !important;
+    min-height: 44px !important;
+    padding: 0 12px !important;
+    border-radius: 8px !important;
+    gap: 12px !important;
+    font-size: 14px !important;
+    color: #0f172a !important;
+    background: transparent !important;
+  }
+
+  .windows-settings-nav button.active,
+  .windows-settings-nav button:hover {
+    background: #e2e8f0 !important;
+  }
+
+  .settings-content {
+    width: 100% !important;
+    min-width: 0 !important;
+    overflow: visible !important;
+    padding: 0 0 92px !important;
+    color: #0f172a !important;
+    background: #f8fafc !important;
+    box-sizing: border-box !important;
+  }
+
+  .settings-breadcrumb {
+    position: sticky !important;
+    top: 0 !important;
+    min-height: 48px !important;
+    margin: 0 0 18px !important;
+    padding: 12px 16px !important;
+    gap: 6px !important;
+    font-size: 13px !important;
+    color: #475569 !important;
+    background: rgba(248, 250, 252, .96) !important;
+    border-bottom: 1px solid #d7dee8 !important;
+    backdrop-filter: blur(12px) !important;
+    box-sizing: border-box !important;
+  }
+
+  .settings-breadcrumb button {
+    color: #475569 !important;
+  }
+
+  .settings-breadcrumb span,
+  .settings-breadcrumb button:hover {
+    color: #0f172a !important;
+  }
+
+  .settings-breadcrumb svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .settings-content > h1 {
+    margin: 0 0 22px !important;
+    padding: 0 16px !important;
+    font-size: 30px !important;
+    line-height: 1.05 !important;
+    letter-spacing: -.04em !important;
+    color: #0f172a !important;
+  }
+
+  .personalization-grid {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    padding: 0 16px 22px !important;
+    box-sizing: border-box !important;
+  }
+
+  .personal-card {
+    width: 100% !important;
+    min-height: 66px !important;
+    display: grid !important;
+    grid-template-columns: 28px minmax(0, 1fr) 24px !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 12px 14px !important;
+    border-radius: 14px !important;
+    border: 1px solid #d7dee8 !important;
+    color: #0f172a !important;
+    background: #ffffff !important;
+    box-sizing: border-box !important;
+  }
+
+  .personal-card:hover {
+    background: #f1f5f9 !important;
+  }
+
+  .personal-card strong {
+    font-size: 14.5px !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .personal-card span {
+    margin-top: 3px !important;
+    font-size: 12.5px !important;
+    line-height: 1.25 !important;
+    color: #64748b !important;
+  }
+
+  .personal-card > svg:last-child {
+    width: 20px !important;
+    height: 20px !important;
+    justify-self: end !important;
+  }
+
+  .settings-card {
+    width: 100% !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    color: #0f172a !important;
+    background: transparent !important;
+    box-sizing: border-box !important;
+  }
+
+  .settings-card-title,
+  .settings-card-title.pinned-title {
+    position: static !important;
+    top: auto !important;
+    min-height: 58px !important;
+    padding: 12px 16px !important;
+    gap: 10px !important;
+    border-top: 1px solid #d7dee8 !important;
+    border-bottom: 1px solid #d7dee8 !important;
+    color: #0f172a !important;
+    background: #ffffff !important;
+    box-sizing: border-box !important;
+  }
+
+  .settings-card-title h2 {
+    font-size: 18px !important;
+    line-height: 1.2 !important;
+  }
+
+  .settings-card-title p {
+    margin-top: 3px !important;
+    font-size: 12px !important;
+    line-height: 1.3 !important;
+    color: #64748b !important;
+  }
+
+  .setting-row {
+    width: 100% !important;
+    min-height: 52px !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 12px 16px !important;
+    border-bottom: 1px solid #d7dee8 !important;
+    color: #0f172a !important;
+    background: #ffffff !important;
+    box-sizing: border-box !important;
+  }
+
+  .setting-row-left {
+    min-width: 0 !important;
+    gap: 12px !important;
+  }
+
+  .setting-row-left > div {
+    min-width: 0 !important;
+  }
+
+  .setting-row-left strong {
+    font-size: 14.5px !important;
+    line-height: 1.2 !important;
+    color: #0f172a !important;
+    white-space: normal !important;
+  }
+
+  .setting-row-left span {
+    margin-top: 3px !important;
+    font-size: 12px !important;
+    line-height: 1.3 !important;
+    color: #64748b !important;
+  }
+
+  .setting-row-right {
+    min-width: max-content !important;
+    justify-content: flex-end !important;
+    justify-self: end !important;
+    align-items: center !important;
+  }
+
+  .toggle {
+    width: 48px !important;
+    height: 28px !important;
+    padding: 3px !important;
+    border-color: #cbd5e1 !important;
+    background: #e2e8f0 !important;
+    flex: 0 0 auto !important;
+  }
+
+  .toggle span {
+    width: 20px !important;
+    height: 20px !important;
+    background: #ffffff !important;
+    box-shadow: 0 1px 3px rgba(15,23,42,.18) !important;
+  }
+
+  .toggle.on {
+    background: var(--desktop-accent) !important;
+    border-color: transparent !important;
+  }
+
+  .toggle.on span {
+    transform: translateX(20px) !important;
+  }
+
+  .select-wrap {
+    max-width: 150px !important;
+  }
+
+  .select-button {
+    min-width: 126px !important;
+    max-width: 150px !important;
+    height: 40px !important;
+    padding: 0 10px !important;
+    border-radius: 10px !important;
+    border-color: #d7dee8 !important;
+    color: #0f172a !important;
+    background: #ffffff !important;
+    font-size: 13px !important;
+  }
+
+  .select-button span {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .select-menu {
+    right: 0 !important;
+    min-width: 190px !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+    background: #ffffff !important;
+  }
+
+  .select-menu button {
+    min-height: 40px !important;
+    color: #0f172a !important;
+    font-size: 13px !important;
+  }
+
+  .select-menu button:hover,
+  .select-menu button.active {
+    background: #e2e8f0 !important;
+  }
+
+  .taskbar-group {
+    border-bottom: 1px solid #d7dee8 !important;
+    background: #ffffff !important;
+  }
+
+  .taskbar-group-head {
+    padding: 14px 16px 8px !important;
+    background: #f8fafc !important;
+  }
+
+  .taskbar-group-head strong {
+    font-size: 14.5px !important;
+    line-height: 1.2 !important;
+    color: #0f172a !important;
+  }
+
+  .taskbar-group-head span {
+    margin-top: 3px !important;
+    font-size: 12px !important;
+    line-height: 1.3 !important;
+    color: #64748b !important;
+  }
+
+  .color-section {
+    padding: 14px 16px !important;
+    border-bottom: 1px solid #d7dee8 !important;
+    background: #ffffff !important;
+    box-sizing: border-box !important;
+  }
+
+  .color-section-head,
+  .custom-color-row {
+    gap: 12px !important;
+  }
+
+  .color-section-head strong,
+  .custom-color-row strong {
+    font-size: 14.5px !important;
+    line-height: 1.2 !important;
+  }
+
+  .color-section-head span,
+  .custom-color-row span {
+    font-size: 12px !important;
+    line-height: 1.3 !important;
+    color: #64748b !important;
+  }
+
+  .color-label {
+    margin: 16px 0 10px !important;
+    font-size: 12.5px !important;
+    color: #475569 !important;
+  }
+
+  .recent-colors,
+  .windows-color-grid {
+    gap: 8px !important;
+  }
+
+  .recent-colors button,
+  .windows-color-grid button {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 8px !important;
+  }
+
+  .windows-color-grid {
+    max-width: none !important;
+  }
+
+  .custom-color-row {
+    margin-top: 16px !important;
+    padding-top: 14px !important;
+    border-top: 1px solid #d7dee8 !important;
+  }
+
+  .custom-color-actions {
+    flex: 0 0 auto !important;
+    gap: 8px !important;
+  }
+
+  .custom-color-actions input {
+    width: 44px !important;
+    height: 40px !important;
+  }
+
+  .soft-button {
+    min-height: 40px !important;
+    padding: 0 12px !important;
+    border-radius: 10px !important;
+    border-color: #d7dee8 !important;
+    color: #0f172a !important;
+    background: #ffffff !important;
+    font-size: 13px !important;
+  }
+
+  .background-preview {
+    height: 150px !important;
+    margin: 14px 16px !important;
+    border-radius: 16px !important;
+    border-color: #d7dee8 !important;
+    color: #0f172a !important;
+    background: #e2e8f0 !important;
+  }
+}
