@@ -44,10 +44,9 @@ function readSavedSessionUser() { try { const session = JSON.parse(localStorage.
 function readSavedUserGroup() { const user = readSavedSessionUser(); return parseGroup(user?.group as string | number | null) || parseGroup(user?.to as string | number | null); }
 function readSavedUserName() { const user = readSavedSessionUser(); return String(user?.displayName || user?.hoten || user?.name || "").trim(); }
 function isScoreboardForeground(root: HTMLDivElement | null) { if (!root || typeof window === "undefined") return false; const win = root.closest<HTMLElement>(".win-window"); if (!win) return document.visibilityState === "visible"; const minimized = win.classList.contains("minimized"); const hidden = win.offsetParent === null || getComputedStyle(win).display === "none" || getComputedStyle(win).visibility === "hidden"; return document.visibilityState === "visible" && !minimized && !hidden; }
-function remoteContainsSavedChanges(remoteEvents: ScoreEvent[], guard: ScoreSaveGuard) { const signatures = new Set(remoteEvents.map(scoreContentSignature)); const addedOk = guard.additions.every((event) => signatures.has(scoreContentSignature(event))); const deletedOk = [...guard.deletions].every((id) => !remoteEvents.some((event) => event.id === id)); return addedOk && deletedOk; }
-function dedupeScoreEvents(scoreEvents: ScoreEvent[]) { const seenIds = new Set<string>(); const seenContent = new Set<string>(); return scoreEvents.filter((event) => { if (event.id && seenIds.has(event.id)) return false; if (event.id) seenIds.add(event.id); const signature = scoreContentSignature(event); if (seenContent.has(signature)) return false; seenContent.add(signature); return true; }); }
-function dedupeScoreAdditions<T extends Omit<ScoreEvent, "id">>(additions: T[]) { const seen = new Set<string>(); return additions.filter((event) => { const signature = scoreContentSignature(event); if (seen.has(signature)) return false; seen.add(signature); return true; }); }
-function mergeGuardedEvents(remoteEvents: ScoreEvent[], guard: ScoreSaveGuard) { const signatures = new Set(remoteEvents.map(scoreContentSignature)); const guarded = remoteEvents.filter((event) => !guard.deletions.has(event.id)); guard.additions.forEach((event) => { const signature = scoreContentSignature(event); if (!signatures.has(signature)) { guarded.unshift(event); signatures.add(signature); } }); return dedupeScoreEvents(guarded); }
+function scoreContentCounts(scoreEvents: Array<Pick<ScoreEvent, "studentId" | "week" | "title" | "points" | "type" | "category" | "note">>) { const counts = new Map<string, number>(); scoreEvents.forEach((event) => { const key = scoreContentSignature(event); counts.set(key, (counts.get(key) || 0) + 1); }); return counts; }
+function remoteContainsSavedChanges(remoteEvents: ScoreEvent[], guard: ScoreSaveGuard) { const counts = scoreContentCounts(remoteEvents); const addedOk = guard.additions.every((event) => { const key = scoreContentSignature(event); const left = counts.get(key) || 0; if (left <= 0) return false; counts.set(key, left - 1); return true; }); const deletedOk = [...guard.deletions].every((id) => !remoteEvents.some((event) => event.id === id)); return addedOk && deletedOk; }
+function mergeGuardedEvents(remoteEvents: ScoreEvent[], guard: ScoreSaveGuard) { const counts = scoreContentCounts(remoteEvents); const guarded = remoteEvents.filter((event) => !guard.deletions.has(event.id)); const missing: ScoreEvent[] = []; guard.additions.forEach((event) => { const key = scoreContentSignature(event); const left = counts.get(key) || 0; if (left > 0) counts.set(key, left - 1); else missing.push(event); }); return [...missing, ...guarded]; }
 
 export default function ScoreboardApp({ userRole, userGroup }: ScoreboardAppProps) {
   const [activeTab, setActiveTab] = useState<ScoreboardTab>("overview");
@@ -105,7 +104,7 @@ export default function ScoreboardApp({ userRole, userGroup }: ScoreboardAppProp
   const applyRemoteData = useCallback((remoteData: NonNullable<Awaited<ReturnType<typeof fetchScoreboardFromGas>>>, options?: { silent?: boolean; notify?: boolean }) => {
     const nextStudents = remoteData.students;
     const guard = pendingSaveGuardRef.current;
-    let nextEvents = dedupeScoreEvents(remoteData.events);
+    let nextEvents = remoteData.events;
     if (guard) {
       if (guard.expiresAt < Date.now()) pendingSaveGuardRef.current = null;
       else if (remoteContainsSavedChanges(nextEvents, guard)) pendingSaveGuardRef.current = null;
@@ -150,7 +149,7 @@ export default function ScoreboardApp({ userRole, userGroup }: ScoreboardAppProp
     const remoteData = await fetchScoreboardFromGas({ force });
     if (!remoteData) {
       const localStudents = mockStudents;
-      const localEvents = dedupeScoreEvents(readLocalEvents());
+      const localEvents = readLocalEvents();
       const localWeeks = readLocalWeeks();
       setStudents(localStudents);
       setEvents(localEvents);
@@ -218,10 +217,10 @@ export default function ScoreboardApp({ userRole, userGroup }: ScoreboardAppProp
 
   const saveScoreChanges = useCallback((changes: ScoreChanges) => {
     const deletionSet = new Set(changes.deletions);
-    const allowedAdditions = dedupeScoreAdditions(changes.additions.filter((event) => {
+    const allowedAdditions = changes.additions.filter((event) => {
       const targetStudent = rawSummaries.find((student) => student.id === event.studentId);
       return targetStudent && canEditStudent(targetStudent);
-    }));
+    });
     const optimisticAdditions: ScoreEvent[] = allowedAdditions.map((event, index) => ({
       ...event,
       id: `local-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
@@ -229,7 +228,7 @@ export default function ScoreboardApp({ userRole, userGroup }: ScoreboardAppProp
     }));
     if (!optimisticAdditions.length && !deletionSet.size) return;
     const previousEvents = events;
-    const nextEvents = dedupeScoreEvents([...optimisticAdditions, ...events.filter((event) => !deletionSet.has(event.id))]);
+    const nextEvents = [...optimisticAdditions, ...events.filter((event) => !deletionSet.has(event.id))];
     pendingSaveGuardRef.current = { additions: optimisticAdditions, deletions: deletionSet, expiresAt: Date.now() + SAVE_GUARD_MS };
     setEvents(nextEvents);
     setSyncMessage("");
@@ -275,7 +274,7 @@ export default function ScoreboardApp({ userRole, userGroup }: ScoreboardAppProp
     }
   };
   const requestCreateWeek = () => { if (!canCreateWeek || isCreatingWeek) return; setCreateWeekConfirmOpen(true); };
-  const resetLocalData = () => { pendingSaveGuardRef.current = null; localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(WEEK_STORAGE_KEY); if (dataSource === "gas") { void loadScoreboardData(true); return; } setStudents(mockStudents); setEvents(dedupeScoreEvents(mockScoreEvents)); setWeeks(SCORE_WEEKS); setWeek(1); setWeekSettings([]); seenSignaturesRef.current = new Set(mockScoreEvents.map(eventSignature)); liveStartedAtRef.current = Date.now(); };
+  const resetLocalData = () => { pendingSaveGuardRef.current = null; localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(WEEK_STORAGE_KEY); if (dataSource === "gas") { void loadScoreboardData(true); return; } setStudents(mockStudents); setEvents(mockScoreEvents); setWeeks(SCORE_WEEKS); setWeek(1); setWeekSettings([]); seenSignaturesRef.current = new Set(mockScoreEvents.map(eventSignature)); liveStartedAtRef.current = Date.now(); };
   const overviewPermissionCheck = canUseScoringTab ? canEditStudent : undefined;
   const renderOverviewContent = () => viewMode === "students"
     ? <StudentTable title="Danh sách cá nhân" students={summaries} compact onOpenStudent={canUseScoringTab ? openStudent : undefined} canEditStudent={overviewPermissionCheck} highlightStudentName={highlightStudentName} />
