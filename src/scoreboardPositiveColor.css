@@ -15,10 +15,16 @@
 .scoreboard-app .student-profile .event-plus,
 .scoreboard-app .profile-page .score-positive,
 .scoreboard-app .profile-page .event-plus,
-.scoreboard-app .group-stats-v2-bar.positive span,
 .scoreboard-app [class*="score-positive"],
 .scoreboard-app [class*="event-plus"] {
   color: var(--color-positive) !important;
+}
+
+/* Keep chart value labels consistent and readable on both positive and negative bars. */
+.scoreboard-app .group-stats-v2-bar span,
+.scoreboard-app .group-stats-v2-bar.positive span,
+.scoreboard-app .group-stats-v2-bar.negative span {
+  color: #ffffff !important;
 }
 
 .scoreboard-app svg [fill="#10b981"],
