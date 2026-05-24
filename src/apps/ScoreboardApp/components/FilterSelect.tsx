@@ -20,6 +20,10 @@ type FilterSelectProps<T extends string | number> = {
 };
 
 type FloatingStyle = CSSProperties & Record<`--${string}`, string | number>;
+type PointerStart = { x: number; y: number; time: number; pointerId: number | null };
+
+const TOUCH_MOVE_THRESHOLD = 10;
+const TOUCH_CLICK_MAX_MS = 650;
 
 function isLightThemeActive() {
   if (typeof document === "undefined") return false;
@@ -28,6 +32,18 @@ function isLightThemeActive() {
     document.body.classList.contains("light") ||
     document.querySelector(".theme-light, .win-root.theme-light, .light")
   );
+}
+
+function isTouchLikePointer(event: PointerEvent<HTMLElement>) {
+  return event.pointerType === "touch" || event.pointerType === "pen";
+}
+
+function isIntentionalTap(start: PointerStart | null, event: PointerEvent<HTMLElement>) {
+  if (!start) return false;
+  const dx = Math.abs(event.clientX - start.x);
+  const dy = Math.abs(event.clientY - start.y);
+  const dt = Date.now() - start.time;
+  return dx <= TOUCH_MOVE_THRESHOLD && dy <= TOUCH_MOVE_THRESHOLD && dt <= TOUCH_CLICK_MAX_MS;
 }
 
 function estimateMenuHeight(optionCount: number, menuClassName: string, menuMaxHeight: number | "none" | undefined) {
@@ -53,6 +69,8 @@ export function FilterSelect<T extends string | number>({
   const [lightPortal, setLightPortal] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const pointerStartRef = useRef<PointerStart | null>(null);
+  const optionPointerStartRef = useRef<PointerStart | null>(null);
   const current = options.find((option) => option.value === value) || options[0];
 
   const updateFloatingPosition = () => {
@@ -96,9 +114,23 @@ export function FilterSelect<T extends string | number>({
   };
 
   const handleButtonPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
-    event.preventDefault();
     event.stopPropagation();
+    pointerStartRef.current = { x: event.clientX, y: event.clientY, time: Date.now(), pointerId: event.pointerId ?? null };
+    if (isTouchLikePointer(event)) return;
+    event.preventDefault();
     toggleOpen();
+  };
+
+  const handleButtonPointerUp = (event: PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (!isTouchLikePointer(event)) return;
+    if (!isIntentionalTap(pointerStartRef.current, event)) return;
+    event.preventDefault();
+    toggleOpen();
+  };
+
+  const handleButtonPointerCancel = () => {
+    pointerStartRef.current = null;
   };
 
   useLayoutEffect(() => {
@@ -120,7 +152,7 @@ export function FilterSelect<T extends string | number>({
   }, [open, placement, portal, menuMaxHeight, options.length, menuClassName]);
 
   useEffect(() => {
-    const close = (event: MouseEvent | PointerEvent) => {
+    const close = (event: MouseEvent | globalThis.PointerEvent) => {
       const target = event.target as Node;
       if (!ref.current?.contains(target) && !(target instanceof Element && target.closest(".filter-select-menu.portal-menu"))) {
         setOpen(false);
@@ -139,6 +171,11 @@ export function FilterSelect<T extends string | number>({
     };
   }, []);
 
+  const chooseOption = (option: FilterSelectOption<T>) => {
+    onChange(option.value);
+    setOpen(false);
+  };
+
   const menu = open && !disabled ? (
     <div
       className={`filter-select-menu ${portal ? "portal-menu" : ""} ${portal && lightPortal ? "light-portal-menu" : ""} ${placement === "top" ? "menu-top" : ""} ${menuClassName}`}
@@ -151,10 +188,17 @@ export function FilterSelect<T extends string | number>({
           className={`filter-select-option ${option.value === value ? "active" : ""}`}
           onPointerDown={(event) => {
             event.stopPropagation();
+            optionPointerStartRef.current = { x: event.clientX, y: event.clientY, time: Date.now(), pointerId: event.pointerId ?? null };
           }}
-          onClick={() => {
-            onChange(option.value);
-            setOpen(false);
+          onPointerUp={(event) => {
+            event.stopPropagation();
+            if (isTouchLikePointer(event) && !isIntentionalTap(optionPointerStartRef.current, event)) return;
+            chooseOption(option);
+          }}
+          onClick={(event) => {
+            event.stopPropagation();
+            if (isTouchLikePointer(event as unknown as PointerEvent<HTMLButtonElement>)) return;
+            chooseOption(option);
           }}
         >
           {option.label}
@@ -172,6 +216,8 @@ export function FilterSelect<T extends string | number>({
         disabled={disabled}
         title={title}
         onPointerDown={handleButtonPointerDown}
+        onPointerUp={handleButtonPointerUp}
+        onPointerCancel={handleButtonPointerCancel}
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
