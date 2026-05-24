@@ -106,6 +106,26 @@ function saveAccent(color: string) {
   window.dispatchEvent(new Event('appearance-change'));
 }
 
+function placePicker(nativeInput: HTMLInputElement, picker: HTMLElement) {
+  const colorSection = nativeInput.closest('.color-section');
+  const colorCard = nativeInput.closest('.color-card') || nativeInput.closest('.settings-card') || nativeInput.parentElement;
+  const recentColors = colorSection?.querySelector('.recent-colors');
+  const legacyGrid = colorSection?.querySelector('.windows-color-grid') || colorCard?.querySelector('.windows-color-grid');
+  const legacyLabel = legacyGrid?.previousElementSibling;
+
+  legacyGrid?.classList.add('a3-native-palette-hidden');
+  if (legacyLabel?.classList.contains('color-label')) legacyLabel.classList.add('a3-native-palette-hidden');
+
+  picker.classList.add('a3-color-picker-near-recent');
+
+  if (recentColors?.parentElement) {
+    recentColors.insertAdjacentElement('afterend', picker);
+    return;
+  }
+
+  colorSection?.appendChild(picker) || colorCard?.appendChild(picker);
+}
+
 function makePicker(nativeInput: HTMLInputElement) {
   if (nativeInput.dataset.a3PickerReady === '1') return;
   nativeInput.dataset.a3PickerReady = '1';
@@ -137,10 +157,7 @@ function makePicker(nativeInput: HTMLInputElement) {
     </div>
   `;
 
-  const colorCard = nativeInput.closest('.color-card') || nativeInput.closest('.settings-card') || nativeInput.parentElement;
-  colorCard?.appendChild(picker);
-  const legacyGrid = colorCard?.querySelector('.windows-color-grid');
-  legacyGrid?.classList.add('a3-native-palette-hidden');
+  placePicker(nativeInput, picker);
 
   const palette = picker.querySelector<HTMLElement>('.a3-palette-grid')!;
   const preview = picker.querySelector<HTMLElement>('.a3-picker-preview')!;
