@@ -63,7 +63,16 @@ function getUserInfo(settingsApp: HTMLElement) {
   };
 }
 
+function signature(settingsApp: HTMLElement) {
+  const { name, email, img } = getUserInfo(settingsApp);
+  return `${name}|${email}|${img}|${isRealMobile() ? 'mobile' : 'desktop'}`;
+}
+
 function fillHome(settingsApp: HTMLElement, home: HTMLElement) {
+  const sig = signature(settingsApp);
+  if (home.dataset.a3Sig === sig && home.childElementCount > 0) return;
+  home.dataset.a3Sig = sig;
+
   const { name, email, img } = getUserInfo(settingsApp);
   home.replaceChildren();
   home.append(el('h1', 'a3-mobile-page-title', 'Cài đặt'));
@@ -98,11 +107,6 @@ function fillHome(settingsApp: HTMLElement, home: HTMLElement) {
   row.append(rowText, el('span', 'a3-mobile-chevron', '›'));
   list.append(row);
   home.append(list);
-
-  row.addEventListener('click', () => {
-    settingsApp.classList.add(SHOW_CONTENT_CLASS);
-    settingsApp.querySelector<HTMLButtonElement>('.windows-settings-nav button')?.click();
-  });
 }
 
 function ensureMobileHome(settingsApp: HTMLElement) {
@@ -114,22 +118,28 @@ function ensureMobileHome(settingsApp: HTMLElement) {
   fillHome(settingsApp, home);
 }
 
-function wireBackToHome(settingsApp: HTMLElement) {
-  settingsApp.querySelectorAll<HTMLButtonElement>('.settings-breadcrumb button').forEach((button) => {
-    if (button.dataset.a3MobileBackHome === '1') return;
-    button.dataset.a3MobileBackHome = '1';
-    button.addEventListener('click', (event) => {
-      const label = button.textContent?.trim().toLowerCase() || '';
-      if (label === 'cài đặt') {
-        event.preventDefault();
-        event.stopPropagation();
-        settingsApp.classList.remove(SHOW_CONTENT_CLASS);
-      }
-    }, true);
-  });
+function wireSettingsApp(settingsApp: HTMLElement) {
+  if (settingsApp.dataset.a3MobileWired === '1') return;
+  settingsApp.dataset.a3MobileWired = '1';
+  settingsApp.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+    if (target.closest('[data-a3-mobile-open-personalization]')) {
+      settingsApp.classList.add(SHOW_CONTENT_CLASS);
+      settingsApp.querySelector<HTMLButtonElement>('.windows-settings-nav button')?.click();
+      return;
+    }
+    const back = target.closest<HTMLButtonElement>('.settings-breadcrumb button');
+    const label = back?.textContent?.trim().toLowerCase() || '';
+    if (back && label === 'cài đặt') {
+      event.preventDefault();
+      event.stopPropagation();
+      settingsApp.classList.remove(SHOW_CONTENT_CLASS);
+    }
+  }, true);
 }
 
-function applyMobileSplit() {
+function applyMobileSplitNow() {
   document.querySelectorAll<HTMLElement>('.settings-app').forEach((settingsApp) => {
     if (!isRealMobile()) {
       settingsApp.classList.remove(SHOW_CONTENT_CLASS, 'settings-mobile-native');
@@ -137,18 +147,33 @@ function applyMobileSplit() {
       return;
     }
     settingsApp.classList.add('settings-mobile-native');
+    wireSettingsApp(settingsApp);
     ensureMobileHome(settingsApp);
-    wireBackToHome(settingsApp);
+  });
+}
+
+let rafId = 0;
+function scheduleApply() {
+  if (rafId) return;
+  rafId = window.requestAnimationFrame(() => {
+    rafId = 0;
+    applyMobileSplitNow();
   });
 }
 
 installStyle();
-applyMobileSplit();
+scheduleApply();
 
-const observer = new MutationObserver(() => applyMobileSplit());
-observer.observe(document.documentElement, { childList: true, subtree: true });
-window.addEventListener('resize', applyMobileSplit);
-window.addEventListener('orientationchange', applyMobileSplit);
-window.addEventListener('appearance-change', applyMobileSplit);
+const observer = new MutationObserver((mutations) => {
+  const shouldRun = mutations.some((mutation) => {
+    if (mutation.type !== 'childList') return false;
+    return Array.from(mutation.addedNodes).some((node) => node instanceof HTMLElement && !node.closest(`.${HOME_CLASS}`));
+  });
+  if (shouldRun) scheduleApply();
+});
+observer.observe(document.body, { childList: true, subtree: true });
+window.addEventListener('resize', scheduleApply);
+window.addEventListener('orientationchange', scheduleApply);
+window.addEventListener('appearance-change', scheduleApply);
 
 export {};
