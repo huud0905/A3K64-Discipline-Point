@@ -4,6 +4,7 @@ import './gasFetchCompat';
 import './gasSaveJsonpChunkPatch';
 import App from './App';
 import './personalizationSync';
+import './appDataPreloader';
 import './desktopInteractionFix';
 import './profileWeekTableFix';
 import './taskViewEnhancer';
