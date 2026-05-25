@@ -1,0 +1,91 @@
+/* Phone Settings light-mode fix: prevent dark mobile background/card colors from overriding light theme. */
+@media (max-width: 760px) {
+  .win-root.theme-light .settings-phone-only,
+  .win-root.theme-light .settings-phone-only .phone-screen {
+    color: #0f172a !important;
+    background: #f8fafc !important;
+  }
+
+  .win-root.theme-light .settings-phone-only .phone-header h1 {
+    color: #0f172a !important;
+  }
+
+  .win-root.theme-light .settings-phone-only .phone-header p,
+  .win-root.theme-light .settings-phone-only .phone-label,
+  .win-root.theme-light .settings-phone-only .phone-back,
+  .win-root.theme-light .settings-phone-only .profile-card span,
+  .win-root.theme-light .settings-phone-only .personal-card span,
+  .win-root.theme-light .settings-phone-only .settings-card-title p,
+  .win-root.theme-light .settings-phone-only .setting-row-left span,
+  .win-root.theme-light .settings-phone-only .color-section-head span,
+  .win-root.theme-light .settings-phone-only .custom-color-row span,
+  .win-root.theme-light .settings-phone-only .taskbar-group-head span {
+    color: #64748b !important;
+  }
+
+  .win-root.theme-light .settings-phone-only .profile-card,
+  .win-root.theme-light .settings-phone-only .phone-list,
+  .win-root.theme-light .settings-phone-only .personal-card,
+  .win-root.theme-light .settings-phone-only .settings-card,
+  .win-root.theme-light .settings-phone-only .settings-card-title,
+  .win-root.theme-light .settings-phone-only .setting-row,
+  .win-root.theme-light .settings-phone-only .select-button,
+  .win-root.theme-light .settings-phone-only .soft-button {
+    color: #0f172a !important;
+    background: #ffffff !important;
+    border-color: #d7dee8 !important;
+  }
+
+  .win-root.theme-light .settings-phone-only .personal-card strong,
+  .win-root.theme-light .settings-phone-only .profile-card strong,
+  .win-root.theme-light .settings-phone-only .settings-card-title h2,
+  .win-root.theme-light .settings-phone-only .setting-row-left strong,
+  .win-root.theme-light .settings-phone-only .color-section-head strong,
+  .win-root.theme-light .settings-phone-only .custom-color-row strong,
+  .win-root.theme-light .settings-phone-only .taskbar-group-head strong {
+    color: #0f172a !important;
+  }
+
+  .win-root.theme-light .settings-phone-only .phone-list {
+    overflow: hidden !important;
+  }
+
+  .win-root.theme-light .settings-phone-only .phone-list .personal-card {
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  .win-root.theme-light .settings-phone-only .personal-card:hover,
+  .win-root.theme-light .settings-phone-only .phone-back:hover,
+  .win-root.theme-light .settings-phone-only .soft-button:hover {
+    background: #f1f5f9 !important;
+  }
+
+  .win-root.theme-light .settings-phone-only .setting-row,
+  .win-root.theme-light .settings-phone-only .settings-card-title,
+  .win-root.theme-light .settings-phone-only .color-section,
+  .win-root.theme-light .settings-phone-only .custom-color-row,
+  .win-root.theme-light .settings-phone-only .taskbar-group {
+    border-color: #d7dee8 !important;
+  }
+
+  .win-root.theme-light .settings-phone-only .toggle {
+    background: #e2e8f0 !important;
+    border-color: #cbd5e1 !important;
+  }
+
+  .win-root.theme-light .settings-phone-only .toggle span {
+    background: #ffffff !important;
+  }
+
+  .win-root.theme-light .settings-phone-only .toggle.on {
+    background: var(--desktop-accent, #ec4899) !important;
+    border-color: transparent !important;
+  }
+
+  .win-root.theme-light .settings-phone-only .background-preview {
+    color: #0f172a !important;
+    background: #e2e8f0 !important;
+    border-color: #cbd5e1 !important;
+  }
+}
