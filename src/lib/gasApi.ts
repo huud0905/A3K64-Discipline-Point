@@ -68,7 +68,8 @@ const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const JSONP_TIMEOUT_MS = 45000;
 const FORM_POST_WAIT_MS = 2500;
 const JSONP_URL_SOFT_LIMIT = 11000;
-let cachedScoreboard: GasScoreboardPayload | null = null;
+const PERSISTENT_SCOREBOARD_CACHE_KEY = "a3k64-scoreboard-preload-cache-v1";
+let cachedScoreboard: GasScoreboardPayload | null = readPersistentScoreboardCache();
 let scoreboardRequest: Promise<GasScoreboardPayload | null> | null = null;
 let activeMutations = 0;
 
@@ -202,7 +203,30 @@ function normalizePayload(data: GasResponseData): GasScoreboardPayload {
   if (quickScoreReasons.length && typeof globalThis !== "undefined") {
     (globalThis as GlobalRuleCache).__A3K64_SCORE_RULES = quickScoreReasons;
   }
-  return { students, events, weeks, quickScoreReasons, weekSettings, updatedAt: asText(data.updatedAt) || undefined };
+  return { students, events, weeks, quickScoreReasons, weekSettings, updatedAt: asText(data.updatedAt) || new Date().toISOString() };
+}
+
+function readPersistentScoreboardCache(): GasScoreboardPayload | null {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(PERSISTENT_SCOREBOARD_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as GasScoreboardPayload;
+    return parsed?.students?.length ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePersistentScoreboardCache(payload: GasScoreboardPayload | null) {
+  if (typeof localStorage === "undefined" || !payload?.students?.length) return;
+  try {
+    localStorage.setItem(PERSISTENT_SCOREBOARD_CACHE_KEY, JSON.stringify(payload));
+    localStorage.setItem("scoreboard-local-events-v1", JSON.stringify(payload.events || []));
+    localStorage.setItem("scoreboard-local-weeks-v1", JSON.stringify(payload.weeks || []));
+  } catch {
+    // Ignore storage quota/private mode errors.
+  }
 }
 
 function emitScoreboardCacheEvent(payload: GasScoreboardPayload | null) {
@@ -212,17 +236,19 @@ function emitScoreboardCacheEvent(payload: GasScoreboardPayload | null) {
 
 function setScoreboardCache(payload: GasScoreboardPayload | null) {
   cachedScoreboard = payload;
+  writePersistentScoreboardCache(payload);
   emitScoreboardCacheEvent(payload);
   return payload;
 }
 
 export function getCachedScoreboardFromGas() {
-  return cachedScoreboard;
+  return cachedScoreboard || readPersistentScoreboardCache();
 }
 
 export function invalidateScoreboardCache() {
   cachedScoreboard = null;
   scoreboardRequest = null;
+  if (typeof localStorage !== "undefined") localStorage.removeItem(PERSISTENT_SCOREBOARD_CACHE_KEY);
   emitScoreboardCacheEvent(null);
 }
 
@@ -460,6 +486,7 @@ async function saveScoreChangesByChunks(payload: SaveScoreChangesPayload) {
 
 export async function fetchScoreboardFromGas(options: { force?: boolean } = {}): Promise<GasScoreboardPayload | null> {
   if (!GAS_URL) return cachedScoreboard;
+  if (!options.force && cachedScoreboard) return cachedScoreboard;
   if (!options.force && scoreboardRequest) return scoreboardRequest;
   scoreboardRequest = (async () => {
     try {
@@ -476,7 +503,9 @@ export async function fetchScoreboardFromGas(options: { force?: boolean } = {}):
 }
 
 export function preloadScoreboardFromGas() {
-  return fetchScoreboardFromGas();
+  if (!GAS_URL) return Promise.resolve(cachedScoreboard);
+  if (scoreboardRequest) return scoreboardRequest;
+  return fetchScoreboardFromGas({ force: true });
 }
 
 export async function refreshScoreboardFromGas() {
