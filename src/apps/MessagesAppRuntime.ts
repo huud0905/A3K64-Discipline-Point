@@ -14,6 +14,13 @@ const STYLE_ID = 'a3k64-messages-runtime-style';
 const WINDOW_ID = 'a3k64-messages-window';
 const SHORTCUT_ID = 'a3k64-messages-shortcut';
 const TASK_ID = 'a3k64-messages-task';
+const MESSAGE_ICON_SVG = `
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M7 10h10" />
+    <path d="M7 14h6" />
+    <path d="M21 11.5c0 4.142-4.03 7.5-9 7.5a10.5 10.5 0 0 1-3.2-.49L4 20l1.42-3.32C4.52 15.34 4 13.47 4 11.5 4 7.36 8.03 4 13 4s8 3.36 8 7.5Z" />
+  </svg>
+`;
 
 let open = false;
 let minimized = false;
@@ -25,6 +32,7 @@ let presenceTimer = 0;
 
 const css = `
   .a3-messages-shortcut .desktop-shortcut-icon{color:var(--desktop-accent,#2563eb)}
+  .a3-message-symbol{display:grid;place-items:center}.a3-message-symbol svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.desktop-shortcut-icon.a3-message-symbol svg{width:30px;height:30px}.a3-msg-icon.a3-message-symbol svg{width:18px;height:18px;color:#fff}.task-icon .a3-message-symbol svg{width:18px;height:18px}
   .a3-msg-window{position:absolute;left:calc(50% - 520px);top:34px;width:min(1040px,calc(100vw - 180px));height:min(670px,calc(100vh - 110px));min-height:540px;border:1px solid #273244;border-radius:22px;overflow:hidden;background:#0b1220;color:#f8fafc;box-shadow:0 34px 100px rgba(0,0,0,.46);z-index:90;font-family:"Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Arial,sans-serif}
   .a3-msg-window.minimized{display:none}.a3-msg-titlebar{height:46px;display:grid;grid-template-columns:1fr auto;align-items:center;border-bottom:1px solid #273244;background:#0b1220}.a3-msg-title-left{display:flex;align-items:center;gap:10px;padding-left:14px;font-weight:900}.a3-msg-icon{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;color:#fff;background:var(--desktop-accent,#2563eb)}.a3-msg-actions{height:100%;display:flex}.a3-msg-actions button{width:46px;border:0;background:transparent;color:#e2e8f0;display:grid;place-items:center;font:inherit;cursor:pointer}.a3-msg-actions button:hover{background:#172033}.a3-msg-actions .close{margin:7px 8px 7px 0;width:32px;height:32px;border-radius:9px;background:rgba(239,68,68,.92)}
   .a3-msg-body{height:calc(100% - 46px);display:grid;grid-template-columns:300px minmax(0,1fr);min-height:0}.a3-msg-sidebar{border-right:1px solid #273244;background:#050914;display:flex;flex-direction:column;min-height:0}.a3-msg-user{padding:14px;border-bottom:1px solid #273244}.a3-msg-user strong{display:block}.a3-msg-user span{display:block;color:#94a3b8;font-size:12px;margin-top:3px}.a3-msg-compose-top{display:grid;gap:8px;padding:12px;border-bottom:1px solid #273244}.a3-msg-input{height:36px;border:1px solid #273244;border-radius:11px;color:#f8fafc;background:#0b1220;padding:0 11px;font:inherit;min-width:0}.a3-msg-button{height:36px;border:0;border-radius:11px;color:#fff;background:var(--desktop-accent,#2563eb);font:inherit;font-weight:850;cursor:pointer}.a3-msg-button.ghost{border:1px solid #273244;color:#f8fafc;background:#111827}.a3-msg-thread-list{overflow:auto;padding:10px;display:grid;gap:8px}.a3-msg-thread{border:1px solid #1f2937;border-radius:14px;padding:10px;color:#f8fafc;background:#0b1220;text-align:left;font:inherit;cursor:pointer}.a3-msg-thread.active,.a3-msg-thread:hover{border-color:color-mix(in srgb,var(--desktop-accent,#2563eb) 55%,#273244);background:#111827}.a3-msg-thread-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.a3-msg-thread strong{font-size:13px}.a3-msg-thread p{margin:5px 0 0;color:#94a3b8;font-size:12px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.a3-msg-dot{width:9px;height:9px;border-radius:999px;background:#64748b}.a3-msg-dot.online{background:#22c55e}.a3-unread{min-width:18px;height:18px;border-radius:999px;display:grid;place-items:center;color:#fff;background:#ef4444;font-size:11px;font-weight:900}
@@ -57,7 +65,7 @@ function ensureShortcut() {
   button.type = 'button';
   button.className = 'desktop-shortcut a3-messages-shortcut';
   button.title = 'Messages - bấm đúp để mở';
-  button.innerHTML = '<div class="desktop-shortcut-icon">💬</div><span>Messages</span>';
+  button.innerHTML = `<div class="desktop-shortcut-icon a3-message-symbol">${MESSAGE_ICON_SVG}</div><span>Messages</span>`;
   button.addEventListener('dblclick', () => openMessagesWindow());
   button.addEventListener('click', () => {
     if (document.querySelector('.win-root.a3-real-mobile')) openMessagesWindow();
@@ -79,7 +87,7 @@ function ensureTaskButton() {
   button.type = 'button';
   button.className = 'task-icon running-app show-badge';
   button.title = 'Messages';
-  button.textContent = '💬';
+  button.innerHTML = `<span class="a3-message-symbol">${MESSAGE_ICON_SVG}</span>`;
   button.addEventListener('click', () => {
     minimized = false;
     document.getElementById(WINDOW_ID)?.classList.remove('minimized');
@@ -126,7 +134,7 @@ function renderWindow() {
 
   win.innerHTML = `
     <header class="a3-msg-titlebar">
-      <div class="a3-msg-title-left"><div class="a3-msg-icon">💬</div><strong>Messages</strong></div>
+      <div class="a3-msg-title-left"><div class="a3-msg-icon a3-message-symbol">${MESSAGE_ICON_SVG}</div><strong>Messages</strong></div>
       <div class="a3-msg-actions"><button data-msg-min>–</button><button class="close" data-msg-close>×</button></div>
     </header>
     <div class="a3-msg-body">
