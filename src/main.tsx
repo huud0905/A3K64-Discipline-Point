@@ -10,7 +10,6 @@ import './profileWeekTableFix';
 import './taskViewEnhancer';
 import './startMenuListEnhancer';
 import './mobileAppShell';
-import './apps/MessagesAppRuntime';
 import './scoreboardMobilePolish';
 import './scoreboardMobileFinalFix';
 import './scoreboardMobileOcdFix';
