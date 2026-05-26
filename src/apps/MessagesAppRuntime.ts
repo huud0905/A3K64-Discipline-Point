@@ -24,6 +24,7 @@ const MESSAGE_ICON_SVG = `
 
 let open = false;
 let minimized = false;
+let activePanel: 'chats' | 'requests' = 'chats';
 let activeThread = '';
 let stateMessages: ChatMessage[] = [];
 let statePresence: { user: string; name: string; activeAt: string }[] = [];
@@ -31,21 +32,20 @@ let pollTimer = 0;
 let presenceTimer = 0;
 
 const css = `
-  .a3-messages-shortcut .desktop-shortcut-icon{color:var(--desktop-accent,#2563eb)}
-  .a3-message-symbol{display:grid;place-items:center}.a3-message-symbol svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.desktop-shortcut-icon.a3-message-symbol svg{width:30px;height:30px}.a3-msg-icon.a3-message-symbol svg{width:18px;height:18px;color:#fff}.task-icon .a3-message-symbol svg{width:18px;height:18px}
-  .a3-msg-window{position:absolute;left:calc(50% - 520px);top:34px;width:min(1040px,calc(100vw - 180px));height:min(670px,calc(100vh - 110px));min-height:540px;border:1px solid #273244;border-radius:22px;overflow:hidden;background:#0b1220;color:#f8fafc;box-shadow:0 34px 100px rgba(0,0,0,.46);z-index:90;font-family:"Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Arial,sans-serif}
-  .a3-msg-window.minimized{display:none}.a3-msg-titlebar{height:46px;display:grid;grid-template-columns:1fr auto;align-items:center;border-bottom:1px solid #273244;background:#0b1220}.a3-msg-title-left{display:flex;align-items:center;gap:10px;padding-left:14px;font-weight:900}.a3-msg-icon{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;color:#fff;background:var(--desktop-accent,#2563eb)}.a3-msg-actions{height:100%;display:flex}.a3-msg-actions button{width:46px;border:0;background:transparent;color:#e2e8f0;display:grid;place-items:center;font:inherit;cursor:pointer}.a3-msg-actions button:hover{background:#172033}.a3-msg-actions .close{margin:7px 8px 7px 0;width:32px;height:32px;border-radius:9px;background:rgba(239,68,68,.92)}
-  .a3-msg-body{height:calc(100% - 46px);display:grid;grid-template-columns:300px minmax(0,1fr);min-height:0}.a3-msg-sidebar{border-right:1px solid #273244;background:#050914;display:flex;flex-direction:column;min-height:0}.a3-msg-user{padding:14px;border-bottom:1px solid #273244}.a3-msg-user strong{display:block}.a3-msg-user span{display:block;color:#94a3b8;font-size:12px;margin-top:3px}.a3-msg-compose-top{display:grid;gap:8px;padding:12px;border-bottom:1px solid #273244}.a3-msg-input{height:36px;border:1px solid #273244;border-radius:11px;color:#f8fafc;background:#0b1220;padding:0 11px;font:inherit;min-width:0}.a3-msg-button{height:36px;border:0;border-radius:11px;color:#fff;background:var(--desktop-accent,#2563eb);font:inherit;font-weight:850;cursor:pointer}.a3-msg-button.ghost{border:1px solid #273244;color:#f8fafc;background:#111827}.a3-msg-thread-list{overflow:auto;padding:10px;display:grid;gap:8px}.a3-msg-thread{border:1px solid #1f2937;border-radius:14px;padding:10px;color:#f8fafc;background:#0b1220;text-align:left;font:inherit;cursor:pointer}.a3-msg-thread.active,.a3-msg-thread:hover{border-color:color-mix(in srgb,var(--desktop-accent,#2563eb) 55%,#273244);background:#111827}.a3-msg-thread-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.a3-msg-thread strong{font-size:13px}.a3-msg-thread p{margin:5px 0 0;color:#94a3b8;font-size:12px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.a3-msg-dot{width:9px;height:9px;border-radius:999px;background:#64748b}.a3-msg-dot.online{background:#22c55e}.a3-unread{min-width:18px;height:18px;border-radius:999px;display:grid;place-items:center;color:#fff;background:#ef4444;font-size:11px;font-weight:900}
-  .a3-msg-main{min-width:0;min-height:0;display:flex;flex-direction:column;background:#07111f}.a3-msg-chat-head{min-height:62px;border-bottom:1px solid #273244;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#0b1220}.a3-msg-chat-head strong{display:block}.a3-msg-chat-head span{display:block;color:#94a3b8;font-size:12px;margin-top:3px}.a3-msg-permission{border-bottom:1px solid #273244;padding:10px 14px;background:#050914;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}.a3-msg-permission-fields{display:grid;grid-template-columns:100px 1fr;gap:8px}.a3-msg-feed{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:10px}.a3-msg-bubble{max-width:min(520px,82%);border:1px solid #273244;border-radius:18px;padding:10px 12px;background:#0b1220}.a3-msg-bubble.mine{align-self:flex-end;border-color:color-mix(in srgb,var(--desktop-accent,#2563eb) 55%,#273244);background:color-mix(in srgb,var(--desktop-accent,#2563eb) 20%,#0b1220)}.a3-msg-bubble.system{align-self:center;max-width:90%;background:#111827}.a3-msg-bubble p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}.a3-msg-meta{display:flex;gap:8px;margin-top:6px;color:#94a3b8;font-size:11px}.a3-msg-perm-card{border-color:#f59e0b;background:#281c07}.a3-msg-perm-actions{display:flex;gap:8px;margin-top:9px}.a3-msg-composer{min-height:62px;border-top:1px solid #273244;display:grid;grid-template-columns:1fr auto;gap:10px;padding:10px 12px;background:#0b1220}.a3-msg-textarea{min-height:42px;max-height:96px;border:1px solid #273244;border-radius:14px;color:#f8fafc;background:#050914;padding:10px 12px;font:inherit;resize:none}.a3-msg-empty{height:100%;display:grid;place-items:center;color:#94a3b8;text-align:center;padding:20px}.a3-msg-toast{position:fixed;right:20px;bottom:88px;z-index:4000;border:1px solid #273244;border-radius:16px;padding:12px 14px;color:#f8fafc;background:#0b1220;box-shadow:0 22px 60px rgba(0,0,0,.42)}
-  .win-root.theme-light .a3-msg-window,.win-root.theme-light .a3-msg-titlebar,.win-root.theme-light .a3-msg-chat-head,.win-root.theme-light .a3-msg-composer{color:#0f172a;border-color:#d7dee8;background:#fff}.win-root.theme-light .a3-msg-sidebar{border-color:#d7dee8;background:#f8fafc}.win-root.theme-light .a3-msg-main{background:#f1f5f9}.win-root.theme-light .a3-msg-thread,.win-root.theme-light .a3-msg-bubble,.win-root.theme-light .a3-msg-input,.win-root.theme-light .a3-msg-textarea,.win-root.theme-light .a3-msg-button.ghost{color:#0f172a;border-color:#d7dee8;background:#fff}.win-root.theme-light .a3-msg-thread.active,.win-root.theme-light .a3-msg-thread:hover{background:#e2e8f0}.win-root.theme-light .a3-msg-user span,.win-root.theme-light .a3-msg-thread p,.win-root.theme-light .a3-msg-chat-head span,.win-root.theme-light .a3-msg-meta{color:#64748b}.win-root.theme-light .a3-msg-permission{border-color:#d7dee8;background:#f8fafc}
-  @media(max-width:760px){.a3-msg-window{position:fixed;inset:0 0 70px 0;width:100vw;height:calc(100svh - 70px);min-height:0;border-radius:0;border:0;z-index:65}.a3-msg-body{grid-template-columns:1fr}.a3-msg-sidebar{display:none}.a3-msg-permission-fields{grid-template-columns:1fr}.a3-msg-permission{grid-template-columns:1fr}.a3-msg-feed{padding:12px}.a3-msg-bubble{max-width:92%}}
+  .a3-message-symbol{display:grid;place-items:center}.a3-message-symbol svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.desktop-shortcut-icon.a3-message-symbol svg{width:30px;height:30px}.a3-msg-icon.a3-message-symbol svg{width:18px;height:18px;color:#fff}.task-icon .a3-message-symbol svg{width:18px;height:18px}.a3-messages-shortcut .desktop-shortcut-icon{color:var(--desktop-accent,#f97316)}
+  .a3-msg-window{position:absolute;left:50%;top:26px;width:min(1120px,calc(100vw - 120px));height:min(720px,calc(100vh - 98px));min-height:560px;transform:translateX(-50%);border:1px solid #273244;border-radius:22px;overflow:hidden;background:#0b1220;color:#f8fafc;box-shadow:0 34px 100px rgba(0,0,0,.48);z-index:140;font-family:"Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Arial,sans-serif}
+  .a3-msg-window.minimized{display:none}.a3-msg-titlebar{height:48px;display:grid;grid-template-columns:1fr auto;align-items:center;border-bottom:1px solid #273244;background:#0b1220}.a3-msg-title-left{display:flex;align-items:center;gap:10px;padding-left:14px;font-weight:900}.a3-msg-icon{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;color:#fff;background:var(--desktop-accent,#f97316)}.a3-msg-actions{height:100%;display:flex}.a3-msg-actions button{width:46px;border:0;background:transparent;color:#e2e8f0;display:grid;place-items:center;font:inherit;cursor:pointer}.a3-msg-actions button:hover{background:#172033}.a3-msg-actions .close{margin:7px 8px 7px 0;width:34px;height:34px;border-radius:11px;background:rgba(239,68,68,.94);font-size:20px}
+  .a3-msg-body{height:calc(100% - 48px);display:grid;grid-template-columns:320px minmax(0,1fr);min-height:0}.a3-msg-sidebar{border-right:1px solid #273244;background:#050914;display:flex;flex-direction:column;min-height:0}.a3-msg-user{padding:14px;border-bottom:1px solid #273244}.a3-msg-user strong{display:block;font-size:15px}.a3-msg-user span{display:block;color:#94a3b8;font-size:12px;margin-top:3px}.a3-msg-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px;border-bottom:1px solid #273244}.a3-msg-tab{height:36px;border:1px solid #273244;border-radius:12px;color:#94a3b8;background:#0b1220;font:inherit;font-weight:850;cursor:pointer}.a3-msg-tab.active{color:#fff;border-color:color-mix(in srgb,var(--desktop-accent,#f97316) 60%,#273244);background:color-mix(in srgb,var(--desktop-accent,#f97316) 18%,#0b1220)}.a3-msg-compose-top{display:grid;gap:8px;padding:12px;border-bottom:1px solid #273244}.a3-msg-input{height:38px;border:1px solid #273244;border-radius:12px;color:#f8fafc;background:#0b1220;padding:0 12px;font:inherit;min-width:0}.a3-msg-input:focus,.a3-msg-textarea:focus{outline:2px solid color-mix(in srgb,var(--desktop-accent,#f97316) 42%,transparent);border-color:var(--desktop-accent,#f97316)}.a3-msg-button{height:38px;border:0;border-radius:12px;color:#fff;background:var(--desktop-accent,#f97316);font:inherit;font-weight:900;cursor:pointer}.a3-msg-button.ghost{border:1px solid #273244;color:#f8fafc;background:#111827}.a3-msg-button.danger{background:#ef4444}.a3-msg-thread-list,.a3-msg-request-list{overflow:auto;padding:10px;display:grid;gap:8px;align-content:start}.a3-msg-thread,.a3-msg-request-card{border:1px solid #1f2937;border-radius:15px;padding:11px;color:#f8fafc;background:#0b1220;text-align:left;font:inherit}.a3-msg-thread{cursor:pointer}.a3-msg-thread.active,.a3-msg-thread:hover,.a3-msg-request-card:hover{border-color:color-mix(in srgb,var(--desktop-accent,#f97316) 55%,#273244);background:#111827}.a3-msg-thread-top,.a3-msg-request-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.a3-msg-thread strong,.a3-msg-request-card strong{font-size:13px}.a3-msg-thread p,.a3-msg-request-card p{margin:5px 0 0;color:#94a3b8;font-size:12px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.a3-msg-dot{width:9px;height:9px;border-radius:999px;background:#64748b}.a3-msg-dot.online{background:#22c55e}.a3-unread{min-width:18px;height:18px;border-radius:999px;display:grid;place-items:center;color:#fff;background:#ef4444;font-size:11px;font-weight:900}.a3-status-pill{height:22px;border-radius:999px;padding:0 9px;display:inline-grid;place-items:center;font-size:11px;font-weight:900;background:#1f2937;color:#cbd5e1}.a3-status-pill.pending{background:#422006;color:#fbbf24}.a3-status-pill.approved{background:#052e16;color:#22c55e}.a3-status-pill.rejected{background:#450a0a;color:#f87171}
+  .a3-msg-main{min-width:0;min-height:0;display:flex;flex-direction:column;background:#07111f}.a3-msg-chat-head{min-height:66px;border-bottom:1px solid #273244;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:#0b1220}.a3-msg-chat-head strong{display:block;font-size:16px}.a3-msg-chat-head span{display:block;color:#94a3b8;font-size:12px;margin-top:3px}.a3-msg-head-actions{display:flex;align-items:center;gap:8px}.a3-msg-feed{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:10px}.a3-msg-bubble{max-width:min(560px,82%);border:1px solid #273244;border-radius:18px;padding:10px 12px;background:#0b1220}.a3-msg-bubble.mine{align-self:flex-end;border-color:color-mix(in srgb,var(--desktop-accent,#f97316) 56%,#273244);background:color-mix(in srgb,var(--desktop-accent,#f97316) 22%,#0b1220)}.a3-msg-bubble.system{align-self:center;max-width:90%;background:#111827}.a3-msg-bubble p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.35}.a3-msg-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;color:#94a3b8;font-size:11px}.a3-msg-perm-card{border-color:#f59e0b;background:#281c07}.a3-msg-composer{min-height:66px;border-top:1px solid #273244;display:grid;grid-template-columns:1fr auto;gap:10px;padding:10px 12px;background:#0b1220}.a3-msg-textarea{min-height:44px;max-height:100px;border:1px solid #273244;border-radius:15px;color:#f8fafc;background:#050914;padding:11px 13px;font:inherit;resize:none}.a3-msg-empty{height:100%;display:grid;place-items:center;color:#94a3b8;text-align:center;padding:20px}.a3-msg-empty strong{color:#f8fafc;font-size:18px}.a3-msg-requests-main{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr);background:#07111f}.a3-msg-permission-form{border-bottom:1px solid #273244;padding:14px 16px;background:#0b1220;display:grid;gap:12px}.a3-msg-permission-form h3{margin:0;font-size:17px}.a3-msg-permission-form p{margin:3px 0 0;color:#94a3b8;font-size:12px}.a3-msg-permission-fields{display:grid;grid-template-columns:120px 1fr auto;gap:10px}.a3-msg-request-grid{overflow:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;align-content:start}.a3-msg-request-actions{display:flex;gap:8px;margin-top:10px}.a3-msg-toast{position:fixed;right:20px;bottom:88px;z-index:4000;border:1px solid #273244;border-radius:16px;padding:12px 14px;color:#f8fafc;background:#0b1220;box-shadow:0 22px 60px rgba(0,0,0,.42)}
+  .win-root.theme-light .a3-msg-window,.win-root.theme-light .a3-msg-titlebar,.win-root.theme-light .a3-msg-chat-head,.win-root.theme-light .a3-msg-composer,.win-root.theme-light .a3-msg-permission-form{color:#0f172a;border-color:#d7dee8;background:#fff}.win-root.theme-light .a3-msg-sidebar{border-color:#d7dee8;background:#f8fafc}.win-root.theme-light .a3-msg-main,.win-root.theme-light .a3-msg-requests-main{background:#f1f5f9}.win-root.theme-light .a3-msg-thread,.win-root.theme-light .a3-msg-request-card,.win-root.theme-light .a3-msg-bubble,.win-root.theme-light .a3-msg-input,.win-root.theme-light .a3-msg-textarea,.win-root.theme-light .a3-msg-button.ghost,.win-root.theme-light .a3-msg-tab{color:#0f172a;border-color:#d7dee8;background:#fff}.win-root.theme-light .a3-msg-thread.active,.win-root.theme-light .a3-msg-thread:hover,.win-root.theme-light .a3-msg-request-card:hover,.win-root.theme-light .a3-msg-tab.active{background:#e2e8f0}.win-root.theme-light .a3-msg-user span,.win-root.theme-light .a3-msg-thread p,.win-root.theme-light .a3-msg-request-card p,.win-root.theme-light .a3-msg-chat-head span,.win-root.theme-light .a3-msg-meta,.win-root.theme-light .a3-msg-permission-form p{color:#64748b}.win-root.theme-light .a3-msg-empty strong{color:#0f172a}
+  @media(max-width:760px){.a3-msg-window{position:fixed;inset:0 0 70px 0;width:100vw;height:calc(100svh - 70px);min-height:0;border-radius:0;border:0;transform:none;left:0;top:0;z-index:65}.a3-msg-body{grid-template-columns:1fr}.a3-msg-sidebar{display:none}.a3-msg-permission-fields{grid-template-columns:1fr}.a3-msg-permission-form{padding:12px}.a3-msg-request-grid{grid-template-columns:1fr;padding:12px}.a3-msg-feed{padding:12px}.a3-msg-bubble{max-width:92%}}
 `;
 
 function htmlEscape(value: unknown) {
   return String(value ?? '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] || ch));
 }
 
-function user() {
+function currentUser() {
   return readSessionUser();
 }
 
@@ -95,8 +95,14 @@ function ensureTaskButton() {
   taskCenter.appendChild(button);
 }
 
+function targetForCurrentUser(message: ChatMessage) {
+  const me = currentUser();
+  const myGroup = Number(me.group || 0);
+  return message.from === me.email || message.to === me.email || message.to === `to${myGroup}` || message.to.startsWith('to');
+}
+
 function threadOther(threadId: string) {
-  const me = user().email;
+  const me = currentUser().email;
   const msg = stateMessages.find((item) => item.threadId === threadId);
   if (!msg) return { id: '', name: 'Cuộc trò chuyện' };
   if (msg.from === me) return { id: msg.to, name: msg.toName || msg.to };
@@ -104,15 +110,23 @@ function threadOther(threadId: string) {
 }
 
 function threads() {
-  const me = user().email;
-  const relevant = stateMessages.filter((msg) => msg.from === me || msg.to === me || msg.to.startsWith('to'));
+  const me = currentUser().email;
+  const relevant = stateMessages.filter((msg) => msg.kind === 'chat' && (msg.from === me || msg.to === me));
   const map = new Map<string, ChatMessage[]>();
   relevant.forEach((msg) => map.set(msg.threadId, [...(map.get(msg.threadId) || []), msg]));
-  return [...map.entries()].map(([threadId, messages]) => ({ threadId, messages: messages.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)) })).sort((a, b) => Date.parse(b.messages[b.messages.length - 1]?.createdAt || '') - Date.parse(a.messages[a.messages.length - 1]?.createdAt || ''));
+  return [...map.entries()]
+    .map(([threadId, messages]) => ({ threadId, messages: messages.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)) }))
+    .sort((a, b) => Date.parse(b.messages[b.messages.length - 1]?.createdAt || '') - Date.parse(a.messages[a.messages.length - 1]?.createdAt || ''));
+}
+
+function permissionRequests() {
+  return stateMessages
+    .filter((msg) => msg.kind === 'permission_request' && targetForCurrentUser(msg))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
 function unreadCount(threadMessages: ChatMessage[]) {
-  const me = user().email;
+  const me = currentUser().email;
   return threadMessages.filter((msg) => msg.to === me && msg.status !== 'read').length;
 }
 
@@ -125,8 +139,9 @@ function onlineLine(target: string) {
 function renderWindow() {
   const win = document.getElementById(WINDOW_ID);
   if (!win) return;
-  const me = user();
+  const me = currentUser();
   const allThreads = threads();
+  const requests = permissionRequests();
   if (!activeThread && allThreads[0]) activeThread = allThreads[0].threadId;
   const active = allThreads.find((item) => item.threadId === activeThread);
   const other = active ? threadOther(active.threadId) : { id: '', name: 'Chưa chọn cuộc trò chuyện' };
@@ -135,48 +150,72 @@ function renderWindow() {
   win.innerHTML = `
     <header class="a3-msg-titlebar">
       <div class="a3-msg-title-left"><div class="a3-msg-icon a3-message-symbol">${MESSAGE_ICON_SVG}</div><strong>Messages</strong></div>
-      <div class="a3-msg-actions"><button data-msg-min>–</button><button class="close" data-msg-close>×</button></div>
+      <div class="a3-msg-actions"><button data-msg-min title="Thu nhỏ">–</button><button class="close" data-msg-close title="Đóng">×</button></div>
     </header>
     <div class="a3-msg-body">
       <aside class="a3-msg-sidebar">
         <div class="a3-msg-user"><strong>${htmlEscape(me.name)}</strong><span>${htmlEscape(me.email)} · ${htmlEscape(me.role || '')}${me.group ? ` · Tổ ${htmlEscape(me.group)}` : ''}</span></div>
-        <div class="a3-msg-compose-top">
-          <input class="a3-msg-input" data-new-to placeholder="Email người nhận hoặc to1/to2..." />
-          <button class="a3-msg-button ghost" data-new-thread>Cuộc trò chuyện mới</button>
-        </div>
-        <div class="a3-msg-thread-list">
-          ${allThreads.length ? allThreads.map((thread) => {
-            const last = thread.messages[thread.messages.length - 1];
-            const target = threadOther(thread.threadId);
-            const presence = statePresence.find((item) => item.user === target.id);
-            const unread = unreadCount(thread.messages);
-            return `<button class="a3-msg-thread ${thread.threadId === activeThread ? 'active' : ''}" data-thread="${htmlEscape(thread.threadId)}"><div class="a3-msg-thread-top"><strong>${htmlEscape(target.name)}</strong><span class="a3-msg-dot ${presence && isOnline(presence.activeAt) ? 'online' : ''}"></span>${unread ? `<span class="a3-unread">${unread}</span>` : ''}</div><p>${htmlEscape(last?.body || '')}</p></button>`;
-          }).join('') : '<div class="a3-msg-empty">Chưa có tin nhắn.</div>'}
-        </div>
+        <div class="a3-msg-tabs"><button class="a3-msg-tab ${activePanel === 'chats' ? 'active' : ''}" data-panel="chats">Tin nhắn</button><button class="a3-msg-tab ${activePanel === 'requests' ? 'active' : ''}" data-panel="requests">Yêu cầu ${requests.filter((r) => r.permissionStatus === 'pending').length ? `(${requests.filter((r) => r.permissionStatus === 'pending').length})` : ''}</button></div>
+        ${activePanel === 'chats' ? renderSidebarChats(allThreads) : renderSidebarRequests(requests)}
       </aside>
-      <main class="a3-msg-main">
-        <div class="a3-msg-chat-head"><div><strong>${htmlEscape(other.name)}</strong><span>${htmlEscape(other.id ? onlineLine(other.id) : 'Tạo cuộc trò chuyện mới ở bên trái')}</span></div><button class="a3-msg-button ghost" data-refresh>Đồng bộ</button></div>
-        <div class="a3-msg-permission">
-          <div class="a3-msg-permission-fields"><input class="a3-msg-input" data-perm-group placeholder="Tổ cần xin quyền, VD: 2" /><input class="a3-msg-input" data-perm-reason placeholder="Lý do xin quyền hỗ trợ chấm" /></div>
-          <button class="a3-msg-button" data-perm-send>Xin quyền chấm tổ khác</button>
-        </div>
-        <div class="a3-msg-feed">
-          ${activeMessages.length ? activeMessages.map((msg) => renderMessage(msg)).join('') : '<div class="a3-msg-empty"><div><strong>Messages 12A3</strong><br/>Chọn hoặc tạo cuộc trò chuyện để bắt đầu.</div></div>'}
-        </div>
-        <div class="a3-msg-composer"><textarea class="a3-msg-textarea" data-body placeholder="Nhập tin nhắn..."></textarea><button class="a3-msg-button" data-send>Gửi</button></div>
-      </main>
+      ${activePanel === 'chats' ? renderChatMain(other, activeMessages) : renderRequestsMain(requests)}
     </div>`;
 }
 
-function renderMessage(msg: ChatMessage) {
-  const me = user().email;
+function renderSidebarChats(allThreads: ReturnType<typeof threads>) {
+  return `
+    <div class="a3-msg-compose-top">
+      <input class="a3-msg-input" data-new-to placeholder="Email người nhận..." />
+      <button class="a3-msg-button ghost" data-new-thread>Cuộc trò chuyện mới</button>
+    </div>
+    <div class="a3-msg-thread-list">
+      ${allThreads.length ? allThreads.map((thread) => {
+        const last = thread.messages[thread.messages.length - 1];
+        const target = threadOther(thread.threadId);
+        const presence = statePresence.find((item) => item.user === target.id);
+        const unread = unreadCount(thread.messages);
+        return `<button class="a3-msg-thread ${thread.threadId === activeThread ? 'active' : ''}" data-thread="${htmlEscape(thread.threadId)}"><div class="a3-msg-thread-top"><strong>${htmlEscape(target.name)}</strong><span class="a3-msg-dot ${presence && isOnline(presence.activeAt) ? 'online' : ''}"></span>${unread ? `<span class="a3-unread">${unread}</span>` : ''}</div><p>${htmlEscape(last?.body || '')}</p></button>`;
+      }).join('') : '<div class="a3-msg-empty">Chưa có cuộc trò chuyện.</div>'}
+    </div>`;
+}
+
+function renderSidebarRequests(requests: ChatMessage[]) {
+  return `<div class="a3-msg-request-list">${requests.length ? requests.slice(0, 20).map((msg) => `<button class="a3-msg-request-card" data-request-focus="${htmlEscape(msg.id)}"><div class="a3-msg-request-top"><strong>Tổ ${htmlEscape(msg.requesterGroup || '?')} → Tổ ${htmlEscape(msg.targetGroup || '?')}</strong><span class="a3-status-pill ${htmlEscape(msg.permissionStatus || 'pending')}">${htmlEscape(msg.permissionStatus || 'pending')}</span></div><p>${htmlEscape(msg.body)}</p></button>`).join('') : '<div class="a3-msg-empty">Chưa có yêu cầu quyền.</div>'}</div>`;
+}
+
+function renderChatMain(other: { id: string; name: string }, activeMessages: ChatMessage[]) {
+  return `
+    <main class="a3-msg-main">
+      <div class="a3-msg-chat-head"><div><strong>${htmlEscape(other.name)}</strong><span>${htmlEscape(other.id ? onlineLine(other.id) : 'Tạo cuộc trò chuyện mới ở bên trái')}</span></div><div class="a3-msg-head-actions"><button class="a3-msg-button ghost" data-panel="requests">Yêu cầu quyền</button><button class="a3-msg-button ghost" data-refresh>Đồng bộ</button></div></div>
+      <div class="a3-msg-feed">${activeMessages.length ? activeMessages.map((msg) => renderChatMessage(msg)).join('') : '<div class="a3-msg-empty"><div><strong>Messages 12A3</strong><br/>Chọn hoặc tạo cuộc trò chuyện để bắt đầu.</div></div>'}</div>
+      <div class="a3-msg-composer"><textarea class="a3-msg-textarea" data-body placeholder="Nhập tin nhắn..."></textarea><button class="a3-msg-button" data-send>Gửi</button></div>
+    </main>`;
+}
+
+function renderRequestsMain(requests: ChatMessage[]) {
+  return `
+    <main class="a3-msg-requests-main">
+      <section class="a3-msg-permission-form">
+        <div><h3>Xin quyền hỗ trợ chấm điểm</h3><p>Dùng khi tổ khác cần hỗ trợ. Người nhận có thể đồng ý hoặc từ chối trong Messages.</p></div>
+        <div class="a3-msg-permission-fields"><input class="a3-msg-input" data-perm-group placeholder="Tổ cần xin, VD: 2" /><input class="a3-msg-input" data-perm-reason placeholder="Lý do xin quyền hỗ trợ chấm" /><button class="a3-msg-button" data-perm-send>Gửi yêu cầu</button></div>
+      </section>
+      <section class="a3-msg-request-grid">${requests.length ? requests.map(renderRequestCard).join('') : '<div class="a3-msg-empty"><div><strong>Chưa có yêu cầu quyền</strong><br/>Các yêu cầu xin hỗ trợ chấm tổ khác sẽ nằm ở đây.</div></div>'}</section>
+    </main>`;
+}
+
+function renderRequestCard(msg: ChatMessage) {
+  const me = currentUser();
+  const mine = msg.from === me.email;
+  const myGroup = Number(me.group || 0);
+  const canResolve = !mine && msg.permissionStatus === 'pending' && (!msg.targetGroup || msg.targetGroup === myGroup || ['lop_truong', 'gvcn'].includes(String(me.role || '')));
+  const time = new Date(msg.createdAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+  return `<article class="a3-msg-request-card"><div class="a3-msg-request-top"><strong>${htmlEscape(msg.fromName)} xin chấm Tổ ${htmlEscape(msg.targetGroup || '')}</strong><span class="a3-status-pill ${htmlEscape(msg.permissionStatus || 'pending')}">${htmlEscape(msg.permissionStatus || 'pending')}</span></div><p>${htmlEscape(msg.body)}</p><div class="a3-msg-meta"><span>Từ Tổ ${htmlEscape(msg.requesterGroup || '?')}</span><span>${time}</span>${msg.week ? `<span>Tuần ${htmlEscape(msg.week)}</span>` : ''}</div>${canResolve ? `<div class="a3-msg-request-actions"><button class="a3-msg-button" data-approve="${htmlEscape(msg.id)}">Đồng ý</button><button class="a3-msg-button danger" data-reject="${htmlEscape(msg.id)}">Từ chối</button></div>` : ''}</article>`;
+}
+
+function renderChatMessage(msg: ChatMessage) {
+  const me = currentUser().email;
   const mine = msg.from === me;
   const time = new Date(msg.createdAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-  if (msg.kind === 'permission_request') {
-    const pending = msg.permissionStatus === 'pending';
-    const canResolve = !mine && pending;
-    return `<article class="a3-msg-bubble a3-msg-perm-card ${mine ? 'mine' : ''}"><p><strong>Yêu cầu cấp quyền chấm điểm</strong><br/>${htmlEscape(msg.fromName)} xin hỗ trợ chấm Tổ ${htmlEscape(msg.targetGroup || '')}${msg.week ? ` · Tuần ${htmlEscape(msg.week)}` : ''}<br/>${htmlEscape(msg.body)}</p><div class="a3-msg-meta"><span>${time}</span><span>${htmlEscape(msg.permissionStatus || 'pending')}</span></div>${canResolve ? `<div class="a3-msg-perm-actions"><button class="a3-msg-button" data-approve="${htmlEscape(msg.id)}">Đồng ý</button><button class="a3-msg-button ghost" data-reject="${htmlEscape(msg.id)}">Từ chối</button></div>` : ''}</article>`;
-  }
   return `<article class="a3-msg-bubble ${mine ? 'mine' : ''}"><p>${htmlEscape(msg.body)}</p><div class="a3-msg-meta"><span>${htmlEscape(msg.fromName)}</span><span>${time}</span>${mine ? `<span>${msg.status === 'read' ? 'Đã đọc' : 'Đã gửi'}</span>` : ''}</div></article>`;
 }
 
@@ -228,8 +267,15 @@ async function handleClick(event: Event) {
     document.getElementById(WINDOW_ID)?.classList.add('minimized');
     return;
   }
+  const panel = target.closest<HTMLElement>('[data-panel]');
+  if (panel?.dataset.panel === 'chats' || panel?.dataset.panel === 'requests') {
+    activePanel = panel.dataset.panel;
+    renderWindow();
+    return;
+  }
   const threadButton = target.closest<HTMLElement>('[data-thread]');
   if (threadButton) {
+    activePanel = 'chats';
     activeThread = threadButton.dataset.thread || '';
     await markThreadRead(activeThread);
     await syncMessages();
@@ -238,9 +284,10 @@ async function handleClick(event: Event) {
   if (target.closest('[data-new-thread]')) {
     const input = document.querySelector<HTMLInputElement>('#a3k64-messages-window [data-new-to]');
     const to = input?.value.trim().toLowerCase() || '';
-    if (!to) return toast('Nhập email hoặc to1/to2/to3/to4 để tạo cuộc trò chuyện.');
-    activeThread = [user().email, to].sort().join('__');
-    await sendChatMessage(to, 'Đã tạo cuộc trò chuyện.', to.startsWith('to') ? `Tổ ${to.replace(/\D/g, '')}` : to);
+    if (!to) return toast('Nhập email người nhận để tạo cuộc trò chuyện.');
+    activePanel = 'chats';
+    activeThread = [currentUser().email, to].sort().join('__');
+    await sendChatMessage(to, 'Đã tạo cuộc trò chuyện.', to);
     await syncMessages();
     return;
   }
@@ -258,6 +305,7 @@ async function handleClick(event: Event) {
     const reason = document.querySelector<HTMLInputElement>('#a3k64-messages-window [data-perm-reason]')?.value || '';
     if (![1, 2, 3, 4].includes(group)) return toast('Nhập tổ cần xin quyền từ 1 đến 4.');
     await requestGroupAccess(group, reason);
+    activePanel = 'requests';
     await syncMessages();
     return;
   }
@@ -265,6 +313,7 @@ async function handleClick(event: Event) {
   const reject = target.closest<HTMLElement>('[data-reject]');
   if (approve || reject) {
     await respondGroupAccess((approve || reject)?.dataset.approve || (approve || reject)?.dataset.reject || '', approve ? 'approved' : 'rejected');
+    activePanel = 'requests';
     await syncMessages();
     return;
   }
