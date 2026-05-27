@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { Eye, EyeOff, Lock, Mail, Monitor, Moon, Phone, ShieldCheck, Sun, User } from "lucide-react";
-import { auth } from "../lib/firebase";
+import { auth, isFirebaseAuthEnabled } from "../lib/firebase";
 import { resetPasswordWithGas, validateLoginWithGas } from "../lib/gasApi";
 import { validateGoogleLoginWithGas } from "../lib/googleAccountLogin";
 
@@ -200,11 +200,16 @@ export default function Login({ onLogin }: LoginProps) {
   const handleGoogleLogin = async () => {
     setError("");
     setSuccess("");
+    const firebaseAuth = auth as any;
+    if (!isFirebaseAuthEnabled || !firebaseAuth) {
+      setError("Firebase Google Login chưa được cấu hình trên Render. Hãy thêm đủ VITE_FIREBASE_* env rồi deploy lại.");
+      return;
+    }
     setLoadingGoogle(true);
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
-      const result = await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(firebaseAuth, provider);
       const email = result.user.email || "";
       const allowedUser = await validateGoogleLoginWithGas({
         uid: result.user.uid,
@@ -214,7 +219,7 @@ export default function Login({ onLogin }: LoginProps) {
         provider: "google",
       });
       if (!allowedUser) {
-        await auth.signOut().catch(() => undefined);
+        await firebaseAuth?.signOut?.().catch(() => undefined);
         return setError(`Gmail này chưa được cấp quyền trong ACCOUNTS: ${email || "không rõ Gmail"}`);
       }
       saveSession(allowedUser);
@@ -223,7 +228,7 @@ export default function Login({ onLogin }: LoginProps) {
     } catch (err: any) {
       const code = String(err?.code || "");
       const message = cleanErrorMessage(err?.message || "");
-      await auth.signOut().catch(() => undefined);
+      await firebaseAuth?.signOut?.().catch(() => undefined);
       if (code.includes("popup-closed-by-user")) setError("Bạn đã đóng cửa sổ đăng nhập Google.");
       else if (message.includes("origin_mismatch") || code.includes("unauthorized-domain")) setError("Google OAuth chưa cho phép domain hiện tại.");
       else setError(message || "Không đăng nhập được bằng Google. Hãy kiểm tra Apps Script đã deploy bản Api.gs mới chưa.");
