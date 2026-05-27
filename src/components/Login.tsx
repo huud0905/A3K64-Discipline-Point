@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { Eye, EyeOff, Lock, Mail, Monitor, Moon, Phone, ShieldCheck, Sun, User } from "lucide-react";
 import { auth } from "../lib/firebase";
 import { resetPasswordWithGas, validateLoginWithGas } from "../lib/gasApi";
-import { Eye, EyeOff, Lock, Mail, Menu, Monitor, Moon, Phone, ShieldCheck, Sun, User, X } from "lucide-react";
+import { validateGoogleLoginWithGas } from "../lib/googleAccountLogin";
 
 interface LoginProps {
   onLogin: (user: any) => void;
@@ -12,12 +13,7 @@ type ThemeMode = "light" | "dark" | "auto";
 type ResolvedTheme = "light" | "dark";
 type AccentKey = "blue" | "violet" | "pink" | "green" | "amber" | "red";
 type LoginTab = "login" | "forgot";
-
-type SavedSession = {
-  user: any;
-  expiresAt: number;
-  lastPath?: string;
-};
+type SavedSession = { user: any; expiresAt: number; lastPath?: string };
 
 const SESSION_KEY = "a3k64-login-session-v1";
 const RESTORE_PATH_KEY = "a3k64-restore-path";
@@ -97,7 +93,6 @@ export default function Login({ onLogin }: LoginProps) {
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loadingLocal, setLoadingLocal] = useState(false);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
   const [loadingReset, setLoadingReset] = useState(false);
@@ -108,21 +103,18 @@ export default function Login({ onLogin }: LoginProps) {
   const resolvedTheme = theme === "auto" ? systemTheme : theme;
   const isLight = resolvedTheme === "light";
 
-  const cssVars = useMemo(
-    () => ({
-      "--accent": accent.main,
-      "--accent-strong": accent.strong,
-      "--accent-soft": accent.soft,
-      "--bg": isLight ? "#eef3fb" : "#07111f",
-      "--panel": isLight ? "rgba(255,255,255,.84)" : "rgba(15,23,42,.74)",
-      "--panel-strong": isLight ? "rgba(255,255,255,.96)" : "rgba(15,23,42,.92)",
-      "--text": isLight ? "#0f172a" : "#f8fafc",
-      "--muted": isLight ? "#64748b" : "#94a3b8",
-      "--line": isLight ? "rgba(15,23,42,.12)" : "rgba(255,255,255,.13)",
-      "--input": isLight ? "rgba(255,255,255,.86)" : "rgba(2,6,23,.58)",
-    }) as React.CSSProperties,
-    [accent, isLight]
-  );
+  const cssVars = useMemo(() => ({
+    "--accent": accent.main,
+    "--accent-strong": accent.strong,
+    "--accent-soft": accent.soft,
+    "--bg": isLight ? "#eef3fb" : "#07111f",
+    "--panel": isLight ? "rgba(255,255,255,.86)" : "rgba(15,23,42,.76)",
+    "--panel-strong": isLight ? "rgba(255,255,255,.97)" : "rgba(15,23,42,.94)",
+    "--text": isLight ? "#0f172a" : "#f8fafc",
+    "--muted": isLight ? "#64748b" : "#94a3b8",
+    "--line": isLight ? "rgba(15,23,42,.12)" : "rgba(255,255,255,.13)",
+    "--input": isLight ? "rgba(255,255,255,.9)" : "rgba(2,6,23,.6)",
+  }) as React.CSSProperties, [accent, isLight]);
 
   useEffect(() => {
     const session = readSession();
@@ -155,7 +147,6 @@ export default function Login({ onLogin }: LoginProps) {
     event.preventDefault();
     setError("");
     setSuccess("");
-
     const cleanUsername = username.trim();
     if (!cleanUsername) return setError("Vui lòng nhập tên đăng nhập");
     if (!password.trim()) return setError("Vui lòng nhập mật khẩu");
@@ -178,7 +169,6 @@ export default function Login({ onLogin }: LoginProps) {
     event.preventDefault();
     setError("");
     setSuccess("");
-
     if (!fullName.trim()) return setError("Vui lòng nhập họ và tên");
     if (!phone.trim()) return setError("Vui lòng nhập số điện thoại cá nhân/bố/mẹ");
     if (!isEmail(newEmail)) return setError("Gmail mới phải đúng định dạng email");
@@ -205,47 +195,35 @@ export default function Login({ onLogin }: LoginProps) {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
       const result = await signInWithPopup(auth, provider);
-      const user = {
+      const email = result.user.email || "";
+      const allowedUser = await validateGoogleLoginWithGas({
         uid: result.user.uid,
-        displayName: result.user.displayName || result.user.email || "Google User",
-        email: result.user.email,
+        displayName: result.user.displayName || email,
+        email,
         photoURL: result.user.photoURL,
         provider: "google",
-        role: "hoc_sinh",
-      };
-      saveSession(user);
-      onLogin(user);
+      });
+      if (!allowedUser) {
+        await auth.signOut().catch(() => undefined);
+        return setError("Gmail này chưa được cấp quyền trong ACCOUNTS.");
+      }
+      saveSession(allowedUser);
+      onLogin(allowedUser);
       dispatchRestore("/desktop");
     } catch (err: any) {
       const code = String(err?.code || "");
       const message = String(err?.message || "");
       if (code.includes("popup-closed-by-user")) setError("Bạn đã đóng cửa sổ đăng nhập Google.");
       else if (message.includes("origin_mismatch") || code.includes("unauthorized-domain")) setError("Google OAuth chưa cho phép domain hiện tại.");
-      else setError("Không đăng nhập được bằng Google. Kiểm tra lại cấu hình Firebase/OAuth.");
+      else setError("Không đăng nhập được bằng Google hoặc Gmail chưa có trong ACCOUNTS.");
     } finally {
       setLoadingGoogle(false);
     }
   };
 
-  const themeTools = (
-    <div className="brand-tools" aria-label="Tuỳ chỉnh giao diện">
-      <div className="theme-toggle">
-        <button type="button" className={theme === "light" ? "active" : ""} onClick={() => setTheme("light")} title="Sáng"><Sun size={17} /></button>
-        <button type="button" className={theme === "dark" ? "active" : ""} onClick={() => setTheme("dark")} title="Tối"><Moon size={17} /></button>
-        <button type="button" className={theme === "auto" ? "active" : ""} onClick={() => setTheme("auto")} title="Tự động"><Monitor size={17} /></button>
-      </div>
-      <div className="accent-list">
-        {(Object.keys(ACCENTS) as AccentKey[]).map((key) => <button key={key} type="button" className={`accent-dot ${accentKey === key ? "active" : ""}`} style={{ "--dot": ACCENTS[key].main } as React.CSSProperties} onClick={() => setAccentKey(key)} title={ACCENTS[key].name} />)}
-      </div>
-    </div>
-  );
-
   return (
     <main className="login-root" style={cssVars}>
-      <style>{`
-        .login-root{min-height:100vh;display:grid;place-items:center;padding:28px;color:var(--text);font-family:"Segoe UI",system-ui,Arial,sans-serif;background:radial-gradient(circle at 16% 18%,var(--accent-soft),transparent 28%),radial-gradient(circle at 86% 12%,rgba(96,165,250,.2),transparent 28%),linear-gradient(135deg,var(--bg),${isLight ? "#dbeafe" : "#020617"});overflow:auto}.login-shell{width:min(1080px,100%);display:grid;grid-template-columns:minmax(0,1.03fr) minmax(320px,.75fr);gap:22px;align-items:stretch}.login-card{border:1px solid var(--line);border-radius:30px;background:var(--panel);box-shadow:0 28px 90px rgba(0,0,0,.22);backdrop-filter:blur(24px);overflow:hidden}.login-left{position:relative;padding:32px;display:grid;grid-template-rows:auto 1fr;gap:24px;min-height:590px}.brand-top{display:grid;grid-template-columns:1fr;gap:16px;align-content:start}.brand{display:flex;align-items:center;gap:13px}.brand-logo{width:50px;height:50px;border-radius:17px;display:grid;place-items:center;color:white;background:linear-gradient(135deg,var(--accent),var(--accent-strong));box-shadow:0 18px 38px color-mix(in srgb,var(--accent) 36%,transparent)}.brand h1{margin:0;font-size:24px;letter-spacing:-.04em}.brand p,.muted{margin:4px 0 0;color:var(--muted)}.brand-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.theme-toggle,.accent-list{display:flex;gap:7px;padding:6px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.08)}.theme-toggle button,.accent-dot{width:34px;height:34px;border:0;border-radius:999px;display:grid;place-items:center;cursor:pointer;color:var(--muted);background:transparent}.theme-toggle button.active{color:white;background:var(--accent)}.accent-dot{background:var(--dot);border:2px solid transparent}.accent-dot.active{border-color:var(--text);transform:scale(1.05)}.contest-placeholder{border:1px dashed color-mix(in srgb,var(--line) 80%,transparent);border-radius:24px;min-height:320px;background:linear-gradient(180deg,transparent,rgba(255,255,255,.025));opacity:.7}.mobile-menu-button{display:none;width:44px;height:44px;border:1px solid var(--line);border-radius:15px;place-items:center;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent-strong));box-shadow:0 14px 30px color-mix(in srgb,var(--accent) 25%,transparent);cursor:pointer}.mobile-drawer{display:none}.login-panel{padding:28px}.login-panel h2{margin:0 0 16px;font-size:30px;letter-spacing:-.04em}.login-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;padding:5px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.055)}.login-tabs button{height:40px;border:0;border-radius:14px;color:var(--muted);background:transparent;font-weight:900;cursor:pointer}.login-tabs button.active{color:white;background:var(--accent);box-shadow:0 12px 24px color-mix(in srgb,var(--accent) 24%,transparent)}.field{display:grid;gap:8px;margin-bottom:14px}.field label{font-weight:800;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.input-wrap{height:52px;border:1px solid var(--line);border-radius:17px;display:grid;grid-template-columns:42px 1fr 42px;align-items:center;background:var(--input)}.input-wrap input{height:100%;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-weight:700;min-width:0}.input-wrap svg{justify-self:center;color:var(--muted)}.eye{border:0;background:transparent;color:var(--muted);cursor:pointer}.login-button,.google-button{width:100%;height:52px;border:0;border-radius:17px;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:900;cursor:pointer}.login-button{margin-top:8px;color:white;background:linear-gradient(135deg,var(--accent),var(--accent-strong));box-shadow:0 18px 36px color-mix(in srgb,var(--accent) 28%,transparent)}.google-button{margin-top:12px;border:1px solid var(--line);color:var(--text);background:var(--panel-strong)}.error,.success{margin-top:14px;border-radius:15px;padding:12px;font-weight:800}.error{border:1px solid rgba(239,68,68,.35);color:#fecaca;background:rgba(127,29,29,.32)}.success{border:1px solid rgba(16,185,129,.38);color:#bbf7d0;background:rgba(6,95,70,.28)}.hint{margin:-3px 0 14px;color:var(--muted);font-size:13px;line-height:1.5}.session-note{display:none}@media(max-width:900px){.login-root{display:block;min-height:100svh;padding:16px;background:radial-gradient(circle at 50% -10%,var(--accent-soft),transparent 38%),linear-gradient(180deg,var(--bg),${isLight ? "#e2e8f0" : "#020617"})}.login-shell{display:grid;grid-template-columns:1fr;gap:14px}.login-card{border-radius:24px;box-shadow:0 20px 60px rgba(0,0,0,.22)}.login-left{min-height:300px;padding:22px;gap:16px}.brand-top{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:12px}.brand{min-width:0}.brand-logo{width:48px;height:48px;border-radius:16px}.brand h1{font-size:22px}.brand p{font-size:14px}.brand-tools{grid-column:1/-1;display:flex;align-items:center;justify-content:flex-start;gap:8px;overflow-x:auto;padding:2px 2px 4px;scrollbar-width:none}.brand-tools::-webkit-scrollbar{display:none}.theme-toggle,.accent-list{gap:5px;padding:5px}.theme-toggle button{width:30px;height:30px}.accent-dot{width:28px;height:28px}.mobile-menu-button{display:grid}.contest-placeholder{min-height:90px;border-style:solid;background:rgba(255,255,255,.025)}.login-panel{padding:22px}.login-panel h2{font-size:28px;margin-bottom:14px}.login-button,.google-button,.input-wrap{height:50px}.mobile-drawer{position:fixed;inset:0;z-index:50;display:grid;grid-template-rows:auto 1fr;background:rgba(2,6,23,.62);backdrop-filter:blur(18px);animation:drawerIn .18s ease both}.mobile-drawer-panel{margin:12px;border:1px solid var(--line);border-radius:24px;background:var(--panel-strong);padding:18px}.mobile-drawer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.mobile-drawer-head strong{font-size:18px}.mobile-drawer-close{width:40px;height:40px;border:1px solid var(--line);border-radius:14px;color:var(--text);background:transparent;display:grid;place-items:center}.mobile-contest-empty{min-height:150px;border:1px dashed var(--line);border-radius:18px;background:rgba(255,255,255,.025)}@keyframes drawerIn{from{opacity:0}to{opacity:1}}}@media(max-width:520px){.login-root{padding:10px}.login-left{min-height:255px}.brand{gap:10px}.brand-logo{width:44px;height:44px}.brand h1{font-size:20px}.brand p{font-size:13px}.contest-placeholder{display:block;min-height:70px}.login-panel{padding:20px}.field label{font-size:12px}.login-panel h2{font-size:26px}.login-card{border-radius:22px}.google-button{font-size:14px}}
-      `}</style>
-
+      <style>{loginCss(isLight)}</style>
       <section className="login-shell">
         <div className="login-card login-left">
           <div className="brand-top">
@@ -253,10 +231,18 @@ export default function Login({ onLogin }: LoginProps) {
               <div className="brand-logo"><ShieldCheck size={25} /></div>
               <div><h1>Bảng điểm A3K64</h1><p>Quản lý thi đua lớp 12A3</p></div>
             </div>
-            <button type="button" className="mobile-menu-button" onClick={() => setMobileMenuOpen(true)} aria-label="Mở danh sách cuộc thi"><Menu size={22} /></button>
-            {themeTools}
+            <div className="brand-tools" aria-label="Tuỳ chỉnh giao diện">
+              <div className="theme-toggle">
+                <button type="button" className={theme === "light" ? "active" : ""} onClick={() => setTheme("light")} title="Sáng"><Sun size={17} /></button>
+                <button type="button" className={theme === "dark" ? "active" : ""} onClick={() => setTheme("dark")} title="Tối"><Moon size={17} /></button>
+                <button type="button" className={theme === "auto" ? "active" : ""} onClick={() => setTheme("auto")} title="Tự động"><Monitor size={17} /></button>
+              </div>
+              <div className="accent-list">
+                {(Object.keys(ACCENTS) as AccentKey[]).map((key) => <button key={key} type="button" className={`accent-dot ${accentKey === key ? "active" : ""}`} style={{ "--dot": ACCENTS[key].main } as React.CSSProperties} onClick={() => setAccentKey(key)} title={ACCENTS[key].name} />)}
+              </div>
+            </div>
           </div>
-          <div className="contest-placeholder" aria-hidden="true" />
+          <div className="contest-placeholder"><strong>System A3K64</strong><span>Google login sẽ kiểm tra Gmail trong sheet ACCOUNTS.</span></div>
         </div>
 
         <div className="login-card login-panel">
@@ -273,7 +259,7 @@ export default function Login({ onLogin }: LoginProps) {
                 <div className="field"><label>Mật khẩu</label><div className="input-wrap"><Lock size={18} /><input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="••••••••" /><button type="button" className="eye" onClick={() => setShowPassword((v) => !v)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></div>
                 <button type="submit" className="login-button" disabled={loadingLocal}>{loadingLocal ? "Đang kiểm tra..." : "Đăng nhập"}</button>
               </form>
-              <button type="button" className="google-button" onClick={handleGoogleLogin} disabled={loadingGoogle}>{loadingGoogle ? "Đang mở Google..." : "Đăng nhập bằng Google"}</button>
+              <button type="button" className="google-button" onClick={handleGoogleLogin} disabled={loadingGoogle}>{loadingGoogle ? "Đang kiểm tra ACCOUNTS..." : "Đăng nhập bằng Google"}</button>
             </>
           ) : (
             <form onSubmit={handleResetPassword}>
@@ -291,15 +277,12 @@ export default function Login({ onLogin }: LoginProps) {
           <div className="session-note">Phiên đăng nhập tự lưu tối đa 7 ngày.</div>
         </div>
       </section>
-
-      {mobileMenuOpen && (
-        <div className="mobile-drawer" role="dialog" aria-modal="true">
-          <div className="mobile-drawer-panel">
-            <div className="mobile-drawer-head"><strong>Cuộc thi</strong><button className="mobile-drawer-close" type="button" onClick={() => setMobileMenuOpen(false)} aria-label="Đóng"><X size={20} /></button></div>
-            <div className="mobile-contest-empty" aria-hidden="true" />
-          </div>
-        </div>
-      )}
     </main>
   );
+}
+
+function loginCss(isLight: boolean) {
+  return `
+.login-root{min-height:100vh;display:grid;place-items:center;padding:28px;color:var(--text);font-family:"Segoe UI",system-ui,Arial,sans-serif;background:radial-gradient(circle at 16% 18%,var(--accent-soft),transparent 28%),radial-gradient(circle at 86% 12%,rgba(96,165,250,.2),transparent 28%),linear-gradient(135deg,var(--bg),${isLight ? "#dbeafe" : "#020617"});overflow:auto}.login-shell{width:min(1080px,100%);display:grid;grid-template-columns:minmax(0,1.03fr) minmax(320px,.75fr);gap:22px;align-items:stretch}.login-card{border:1px solid var(--line);border-radius:30px;background:var(--panel);box-shadow:0 28px 90px rgba(0,0,0,.22);backdrop-filter:blur(24px);overflow:hidden}.login-left{padding:32px;display:grid;grid-template-rows:auto 1fr;gap:24px;min-height:590px}.brand-top{display:grid;gap:16px}.brand{display:flex;align-items:center;gap:13px}.brand-logo{width:50px;height:50px;border-radius:17px;display:grid;place-items:center;color:white;background:linear-gradient(135deg,var(--accent),var(--accent-strong));box-shadow:0 18px 38px color-mix(in srgb,var(--accent) 36%,transparent)}.brand h1{margin:0;font-size:24px;letter-spacing:-.04em}.brand p{margin:4px 0 0;color:var(--muted)}.brand-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.theme-toggle,.accent-list{display:flex;gap:7px;padding:6px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.08)}.theme-toggle button,.accent-dot{width:34px;height:34px;border:0;border-radius:999px;display:grid;place-items:center;cursor:pointer;color:var(--muted);background:transparent}.theme-toggle button.active{color:white;background:var(--accent)}.accent-dot{background:var(--dot);border:2px solid transparent}.accent-dot.active{border-color:var(--text);transform:scale(1.05)}.contest-placeholder{border:1px dashed color-mix(in srgb,var(--line) 80%,transparent);border-radius:24px;min-height:320px;display:grid;place-items:center;text-align:center;align-content:center;gap:8px;background:linear-gradient(180deg,transparent,rgba(255,255,255,.025));opacity:.82}.contest-placeholder strong{font-size:28px;letter-spacing:-.04em}.contest-placeholder span{color:var(--muted);padding:0 18px}.login-panel{padding:28px}.login-panel h2{margin:0 0 16px;font-size:30px;letter-spacing:-.04em}.login-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;padding:5px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.055)}.login-tabs button{height:40px;border:0;border-radius:14px;color:var(--muted);background:transparent;font-weight:900;cursor:pointer}.login-tabs button.active{color:white;background:var(--accent);box-shadow:0 12px 24px color-mix(in srgb,var(--accent) 24%,transparent)}.field{display:grid;gap:8px;margin-bottom:14px}.field label{font-weight:800;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.input-wrap{height:52px;border:1px solid var(--line);border-radius:17px;display:grid;grid-template-columns:42px 1fr 42px;align-items:center;background:var(--input)}.input-wrap input{height:100%;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-weight:700;min-width:0}.input-wrap svg{justify-self:center;color:var(--muted)}.eye{border:0;background:transparent;color:var(--muted);cursor:pointer}.login-button,.google-button{width:100%;height:52px;border:0;border-radius:17px;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:900;cursor:pointer}.login-button{margin-top:8px;color:white;background:linear-gradient(135deg,var(--accent),var(--accent-strong));box-shadow:0 18px 36px color-mix(in srgb,var(--accent) 28%,transparent)}.google-button{margin-top:12px;border:1px solid var(--line);color:var(--text);background:var(--panel-strong)}.login-button:disabled,.google-button:disabled{opacity:.65;cursor:not-allowed}.error,.success{margin-top:14px;border-radius:15px;padding:12px;font-weight:800}.error{border:1px solid rgba(239,68,68,.35);color:#fecaca;background:rgba(127,29,29,.32)}.success{border:1px solid rgba(16,185,129,.38);color:#bbf7d0;background:rgba(6,95,70,.28)}.hint{margin:-3px 0 14px;color:var(--muted);font-size:13px;line-height:1.5}.session-note{margin-top:12px;color:var(--muted);font-size:12px;text-align:center}@media(max-width:900px){.login-root{display:block;min-height:100svh;padding:16px}.login-shell{display:grid;grid-template-columns:1fr;gap:14px}.login-card{border-radius:24px}.login-left{min-height:260px;padding:22px}.contest-placeholder{min-height:90px}.brand-tools{overflow-x:auto}.login-panel{padding:22px}.login-button,.google-button,.input-wrap{height:50px}}@media(max-width:520px){.login-root{padding:10px}.brand h1{font-size:20px}.brand p{font-size:13px}.login-panel h2{font-size:26px}.contest-placeholder{min-height:70px}.contest-placeholder strong{font-size:21px}.google-button{font-size:14px}}
+`;
 }
