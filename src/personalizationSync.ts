@@ -331,28 +331,17 @@ async function syncForSession(user: SessionUser) {
   activeAccount = account;
   initializedAccount = "";
 
-  const localBeforeFetch = collectPrefs();
-  const localBeforeJson = stablePrefsJson(localBeforeFetch);
-  const localBeforeUpdated = localUpdatedAtMs();
   const remote = await fetchRemotePrefs(user);
   if (remoteDisabled || isQuiet()) return;
 
   if (remote.exists && remote.prefs) {
     const remotePrefs = { version: 2, ...remote.prefs } as PersonalizationPayload;
     const remoteJson = stablePrefsJson(remotePrefs);
-    const remoteUpdated = remoteUpdatedAtMs(remotePrefs);
-    const localChanged = Boolean(localStorage.getItem(LOGIN_LOOK_DIRTY_KEY));
-    const localIsNewer = localBeforeUpdated > 0 && (!remoteUpdated || localBeforeUpdated > remoteUpdated + 1000);
 
-    if ((localChanged || localIsNewer) && localBeforeJson !== remoteJson) {
-      lastSavedJson = localBeforeJson;
-      initializedAccount = account;
-      const ok = await saveRemotePrefs(user, localBeforeFetch);
-      if (!ok) quietForAWhile();
-      clearLoginLookChanged();
-      return;
-    }
-
+    // Login must be server-first. A new device/browser may already have default
+    // localStorage values from the login screen. Never upload those defaults over
+    // an existing PERSONALIZATION row. User edits after this point are still saved
+    // normally through scheduleSave().
     lastSavedJson = remoteJson;
     applyPrefs(remotePrefs);
     initializedAccount = account;
