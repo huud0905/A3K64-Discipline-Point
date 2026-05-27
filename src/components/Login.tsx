@@ -47,6 +47,14 @@ function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+function cleanErrorMessage(message: string) {
+  return String(message || "")
+    .replace(/^googleLogin:\s*/i, "")
+    .replace(/^loginWithGoogleEmail:\s*/i, "")
+    .replace(/^Error:\s*/i, "")
+    .trim();
+}
+
 function saveSession(user: any, lastPath = window.location.pathname) {
   const path = lastPath.startsWith("/desktop") ? lastPath : "/desktop";
   const session: SavedSession = {
@@ -158,8 +166,8 @@ export default function Login({ onLogin }: LoginProps) {
       saveSession(user);
       onLogin(user);
       dispatchRestore("/desktop");
-    } catch {
-      setError("Không kết nối được hệ thống tài khoản. Hãy kiểm tra Google Apps Script.");
+    } catch (err: any) {
+      setError(cleanErrorMessage(err?.message) || "Không kết nối được hệ thống tài khoản. Hãy kiểm tra Google Apps Script.");
     } finally {
       setLoadingLocal(false);
     }
@@ -182,6 +190,8 @@ export default function Login({ onLogin }: LoginProps) {
       setPassword(newPassword);
       setTab("login");
       setSuccess("Đã cập nhật Gmail và mật khẩu. Bạn có thể đăng nhập ngay.");
+    } catch (err: any) {
+      setError(cleanErrorMessage(err?.message) || "Không cập nhật được tài khoản.");
     } finally {
       setLoadingReset(false);
     }
@@ -205,17 +215,18 @@ export default function Login({ onLogin }: LoginProps) {
       });
       if (!allowedUser) {
         await auth.signOut().catch(() => undefined);
-        return setError("Gmail này chưa được cấp quyền trong ACCOUNTS.");
+        return setError(`Gmail này chưa được cấp quyền trong ACCOUNTS: ${email || "không rõ Gmail"}`);
       }
       saveSession(allowedUser);
       onLogin(allowedUser);
       dispatchRestore("/desktop");
     } catch (err: any) {
       const code = String(err?.code || "");
-      const message = String(err?.message || "");
+      const message = cleanErrorMessage(err?.message || "");
+      await auth.signOut().catch(() => undefined);
       if (code.includes("popup-closed-by-user")) setError("Bạn đã đóng cửa sổ đăng nhập Google.");
       else if (message.includes("origin_mismatch") || code.includes("unauthorized-domain")) setError("Google OAuth chưa cho phép domain hiện tại.");
-      else setError("Không đăng nhập được bằng Google hoặc Gmail chưa có trong ACCOUNTS.");
+      else setError(message || "Không đăng nhập được bằng Google. Hãy kiểm tra Apps Script đã deploy bản Api.gs mới chưa.");
     } finally {
       setLoadingGoogle(false);
     }
