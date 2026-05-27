@@ -3,7 +3,7 @@ import type { GasLoginUser } from './gasApi';
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const JSONP_TIMEOUT_MS = 25000;
 
-type RawGasResponse = { ok?: boolean; error?: string; data?: any; user?: any; [key: string]: any };
+type RawGasResponse = { ok?: boolean; error?: string; message?: string; data?: any; user?: any; [key: string]: any };
 
 function asText(value: unknown, fallback = '') {
   if (value === null || value === undefined) return fallback;
@@ -52,26 +52,57 @@ function normalizeUser(raw: any, fallbackEmail: string, googleProfile?: Partial<
   if (!raw) return null;
   return {
     uid: asText(raw.uid, `google-${fallbackEmail}`),
-    displayName: asText(raw.displayName ?? raw.name ?? raw.hoten, googleProfile?.displayName || fallbackEmail),
-    email: asText(raw.email ?? raw.username, fallbackEmail).toLowerCase(),
+    displayName: asText(raw.displayName ?? raw.name ?? raw.hoten ?? raw.fullName, googleProfile?.displayName || fallbackEmail),
+    email: asText(raw.email ?? raw.username ?? raw.gmail, fallbackEmail).toLowerCase(),
     photoURL: asText(raw.photoURL, googleProfile?.photoURL || '') || null,
     provider: 'google',
     role: asText(raw.role, 'hoc_sinh'),
-    group: asText(raw.group ?? raw.to),
+    group: asText(raw.group ?? raw.to ?? raw.group_num),
   };
+}
+
+function extractUser(response: RawGasResponse | null, fallbackEmail: string, googleProfile: Partial<GasLoginUser>) {
+  if (!response) return null;
+  const data = response.data || response;
+  const nested = data.data || data;
+  const user = nested.user || data.user || response.user;
+  const ok = nested.ok === true || data.ok === true || response.ok === true;
+  if (!ok || !user) return null;
+  return normalizeUser(user, fallbackEmail, googleProfile);
+}
+
+function responseError(response: RawGasResponse | null) {
+  if (!response) return 'Không nhận được phản hồi từ Google Apps Script.';
+  const data = response.data || response;
+  const nested = data.data || data;
+  return asText(nested.error || data.error || response.error || nested.message || data.message || response.message);
 }
 
 export async function validateGoogleLoginWithGas(googleProfile: Partial<GasLoginUser>): Promise<GasLoginUser | null> {
   const email = asText(googleProfile.email).toLowerCase();
-  if (!email) return null;
-  const response = await gasJsonp('googleLogin', {
+  if (!email) throw new Error('Google không trả về Gmail.');
+
+  const payload = {
     email,
+    googleEmail: email,
+    username: email,
     uid: googleProfile.uid,
     displayName: googleProfile.displayName,
     photoURL: googleProfile.photoURL,
     provider: 'google',
-  });
-  const data = response?.data || response;
-  if (!data?.ok || !data.user) return null;
-  return normalizeUser(data.user, email, googleProfile);
+  };
+
+  const actions = ['googleLogin', 'loginWithGoogleEmail'];
+  const errors: string[] = [];
+
+  for (const action of actions) {
+    const response = await gasJsonp(action, payload);
+    const user = extractUser(response, email, googleProfile);
+    if (user) return user;
+    const err = responseError(response);
+    if (err && !/GAS API is running/i.test(err)) errors.push(`${action}: ${err}`);
+  }
+
+  if (errors.length) throw new Error(errors[errors.length - 1]);
+  throw new Error('Backend chưa expose action googleLogin/loginWithGoogleEmail, hoặc Gmail chưa trùng với ACCOUNTS.');
 }
