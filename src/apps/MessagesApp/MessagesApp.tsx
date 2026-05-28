@@ -1,6 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, MessageCircle, RefreshCw, Send, ShieldCheck, X } from 'lucide-react';
-import { ChatMessage, fetchMessagesState, isOnline, markThreadRead, readSessionUser, requestGroupAccess, respondGroupAccess, sendChatMessage, updatePresence } from '../../lib/messagesApi';
+import {
+  ChatContact,
+  ChatMessage,
+  fetchMessageContacts,
+  fetchMessagesState,
+  filterContacts,
+  isOnline,
+  markThreadRead,
+  readSessionUser,
+  requestGroupAccess,
+  resolveContactTarget,
+  respondGroupAccess,
+  sendChatMessage,
+  updatePresence,
+} from '../../lib/messagesApi';
 import './MessagesApp.css';
 
 type Panel = 'chats' | 'requests';
@@ -29,6 +43,7 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
   const [panel, setPanel] = useState<Panel>('chats');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [presence, setPresence] = useState<{ user: string; name: string; activeAt: string }[]>([]);
+  const [contacts, setContacts] = useState<ChatContact[]>([]);
   const [activeThread, setActiveThread] = useState('');
   const [newTo, setNewTo] = useState('');
   const [draft, setDraft] = useState('');
@@ -45,16 +60,31 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
     const state = await fetchMessagesState(me);
     setMessages(state.messages || []);
     setPresence(state.presence || []);
+    if (state.contacts?.length) setContacts(state.contacts);
   };
 
   useEffect(() => {
     void sync();
     void updatePresence(me);
+    void fetchMessageContacts(me).then(setContacts).catch(() => undefined);
     const poll = window.setInterval(sync, 5000);
     const pulse = window.setInterval(() => void updatePresence(me), 30000);
     return () => { window.clearInterval(poll); window.clearInterval(pulse); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me.email]);
+
+  const threadContacts = useMemo(() => {
+    const map = new Map<string, ChatContact>();
+    messages.forEach((m) => {
+      if (m.kind !== 'chat') return;
+      if (m.from && m.from !== me.email) map.set(m.from, { email: m.from, name: m.fromName || m.from });
+      if (m.to && m.to !== me.email && !m.to.startsWith('to')) map.set(m.to, { email: m.to, name: m.toName || m.to });
+    });
+    contacts.forEach((contact) => map.set(contact.email, contact));
+    return [...map.values()].filter((contact) => contact.email !== me.email);
+  }, [contacts, messages, me.email]);
+
+  const contactSuggestions = useMemo(() => filterContacts(newTo, threadContacts, me.email), [newTo, threadContacts, me.email]);
 
   const threads = useMemo(() => {
     const map = new Map<string, ChatMessage[]>();
@@ -76,11 +106,15 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
   const otherPresence = presence.find((p) => p.user === other.id);
   const pendingCount = requests.filter((r) => r.permissionStatus === 'pending').length;
 
+  const selectContact = (contact: ChatContact) => {
+    setNewTo(contact.name);
+  };
+
   const createThread = async () => {
-    const to = newTo.trim().toLowerCase();
-    if (!to) return showToast('Nhập email người nhận trước.');
-    await sendChatMessage(to, 'Đã tạo cuộc trò chuyện.', to, me);
-    setActiveThread([me.email, to].sort().join('__'));
+    const target = resolveContactTarget(newTo, threadContacts);
+    if (!target) return showToast('Nhập tên người nhận hoặc chọn từ gợi ý.');
+    await sendChatMessage(target.email, 'Đã tạo cuộc trò chuyện.', target.name, me);
+    setActiveThread([me.email, target.email].sort().join('__'));
     setNewTo('');
     setPanel('chats');
     await sync();
@@ -121,7 +155,7 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
     <aside className="messages-sidebar">
       <div className="messages-user-card"><div className="messages-avatar"><MessageCircle size={22} /></div><div><strong>{me.name}</strong><span>{me.email} · {me.role || 'hoc_sinh'}{me.group ? ` · Tổ ${me.group}` : ''}</span></div></div>
       <div className="messages-tabs"><button type="button" className={panel === 'chats' ? 'active' : ''} onClick={() => setPanel('chats')}>Tin nhắn</button><button type="button" className={panel === 'requests' ? 'active' : ''} onClick={() => setPanel('requests')}>Yêu cầu{pendingCount ? ` (${pendingCount})` : ''}</button></div>
-      {panel === 'chats' ? <><div className="messages-new-thread"><input value={newTo} onChange={(e) => setNewTo(e.target.value)} placeholder="Email người nhận..." /><button type="button" onClick={createThread}>Cuộc trò chuyện mới</button></div><div className="messages-list">{threads.length ? threads.map((thread) => {
+      {panel === 'chats' ? <><div className="messages-new-thread"><div className="messages-contact-box"><input value={newTo} onChange={(e) => setNewTo(e.target.value)} placeholder="Nhập tên người nhận..." onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void createThread(); } }} />{newTo && contactSuggestions.length > 0 && <div className="messages-contact-suggestions">{contactSuggestions.map((contact) => <button key={contact.email} type="button" onClick={() => selectContact(contact)}><strong>{contact.name}</strong><span>{contact.email}{contact.group ? ` · Tổ ${contact.group}` : ''}</span></button>)}</div>}</div><button type="button" onClick={createThread}>Cuộc trò chuyện mới</button></div><div className="messages-list">{threads.length ? threads.map((thread) => {
         const last = thread.messages[thread.messages.length - 1];
         const target = last.from === me.email ? { id: last.to, name: last.toName || last.to } : { id: last.from, name: last.fromName || last.from };
         const targetPresence = presence.find((p) => p.user === target.id);
