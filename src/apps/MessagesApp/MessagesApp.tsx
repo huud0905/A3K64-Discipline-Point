@@ -31,6 +31,16 @@ function fmt(value: string) {
   return Number.isFinite(time) ? new Date(time).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '';
 }
 
+function isEmail(value?: string) {
+  return Boolean(String(value || '').includes('@'));
+}
+
+function emailAlias(value?: string) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  return raw.includes('@') ? raw.split('@')[0] : raw;
+}
+
 export default function MessagesApp({ userEmail, userName, userRole, userGroup }: Props) {
   const sessionUser = readSessionUser();
   const me = {
@@ -77,12 +87,35 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
     const map = new Map<string, ChatContact>();
     messages.forEach((m) => {
       if (m.kind !== 'chat') return;
-      if (m.from && m.from !== me.email) map.set(m.from, { email: m.from, name: m.fromName || m.from });
-      if (m.to && m.to !== me.email && !m.to.startsWith('to')) map.set(m.to, { email: m.to, name: m.toName || m.to });
+      if (m.from && m.from !== me.email) map.set(m.from, { email: m.from, name: m.fromName || emailAlias(m.from) });
+      if (m.to && m.to !== me.email && !m.to.startsWith('to')) map.set(m.to, { email: m.to, name: m.toName || emailAlias(m.to) });
     });
     contacts.forEach((contact) => map.set(contact.email, contact));
     return [...map.values()].filter((contact) => contact.email !== me.email);
   }, [contacts, messages, me.email]);
+
+  const contactNameByEmail = useMemo(() => {
+    const map = new Map<string, string>();
+    threadContacts.forEach((contact) => {
+      if (contact.email && contact.name && !isEmail(contact.name)) map.set(contact.email, contact.name);
+    });
+    map.set(me.email, me.name || emailAlias(me.email));
+    messages.forEach((message) => {
+      if (message.from && message.fromName && !isEmail(message.fromName)) map.set(message.from, message.fromName);
+      if (message.to && message.toName && !isEmail(message.toName)) map.set(message.to, message.toName);
+    });
+    return map;
+  }, [me.email, me.name, messages, threadContacts]);
+
+  const displayNameFor = (email: string, fallback?: string) => {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanFallback = String(fallback || '').trim();
+    if (cleanEmail === me.email) return me.name || emailAlias(cleanEmail);
+    const mapped = contactNameByEmail.get(cleanEmail);
+    if (mapped && !isEmail(mapped)) return mapped;
+    if (cleanFallback && !isEmail(cleanFallback)) return cleanFallback;
+    return emailAlias(cleanEmail || cleanFallback);
+  };
 
   const contactSuggestions = useMemo(() => filterContacts(newTo, threadContacts, me.email), [newTo, threadContacts, me.email]);
 
@@ -102,7 +135,7 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
   const active = threads.find((t) => t.threadId === activeThread);
   const activeMessages = active?.messages || [];
   const first = activeMessages[0];
-  const other = first ? (first.from === me.email ? { id: first.to, name: first.toName || first.to } : { id: first.from, name: first.fromName || first.from }) : { id: '', name: 'Chưa chọn cuộc trò chuyện' };
+  const other = first ? (first.from === me.email ? { id: first.to, name: displayNameFor(first.to, first.toName) } : { id: first.from, name: displayNameFor(first.from, first.fromName) }) : { id: '', name: 'Chưa chọn cuộc trò chuyện' };
   const otherPresence = presence.find((p) => p.user === other.id);
   const pendingCount = requests.filter((r) => r.permissionStatus === 'pending').length;
 
@@ -157,14 +190,14 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
       <div className="messages-tabs"><button type="button" className={panel === 'chats' ? 'active' : ''} onClick={() => setPanel('chats')}>Tin nhắn</button><button type="button" className={panel === 'requests' ? 'active' : ''} onClick={() => setPanel('requests')}>Yêu cầu{pendingCount ? ` (${pendingCount})` : ''}</button></div>
       {panel === 'chats' ? <><div className="messages-new-thread"><div className="messages-contact-box"><input value={newTo} onChange={(e) => setNewTo(e.target.value)} placeholder="Nhập tên người nhận..." onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void createThread(); } }} />{newTo && contactSuggestions.length > 0 && <div className="messages-contact-suggestions">{contactSuggestions.map((contact) => <button key={contact.email} type="button" onClick={() => selectContact(contact)}><strong>{contact.name}</strong><span>{contact.email}{contact.group ? ` · Tổ ${contact.group}` : ''}</span></button>)}</div>}</div><button type="button" onClick={createThread}>Cuộc trò chuyện mới</button></div><div className="messages-list">{threads.length ? threads.map((thread) => {
         const last = thread.messages[thread.messages.length - 1];
-        const target = last.from === me.email ? { id: last.to, name: last.toName || last.to } : { id: last.from, name: last.fromName || last.from };
+        const target = last.from === me.email ? { id: last.to, name: displayNameFor(last.to, last.toName) } : { id: last.from, name: displayNameFor(last.from, last.fromName) };
         const targetPresence = presence.find((p) => p.user === target.id);
         const unread = thread.messages.filter((m) => m.to === me.email && m.status !== 'read').length;
         return <button key={thread.threadId} type="button" className={`messages-thread ${thread.threadId === activeThread ? 'active' : ''}`} onClick={() => void openThread(thread.threadId)}><div><strong>{target.name}</strong>{unread > 0 && <b>{unread}</b>}<span className={`messages-dot ${targetPresence && isOnline(targetPresence.activeAt) ? 'online' : ''}`} /></div><p>{last.body}</p></button>;
       }) : <div className="messages-empty">Chưa có cuộc trò chuyện.</div>}</div></> : <div className="messages-list">{requests.length ? requests.map((request) => <button key={request.id} type="button" className="messages-request-mini"><div><strong>Tổ {request.requesterGroup || '?'} → Tổ {request.targetGroup || '?'}</strong><span className={request.permissionStatus || 'pending'}>{request.permissionStatus || 'pending'}</span></div><p>{request.body}</p></button>) : <div className="messages-empty">Chưa có yêu cầu quyền.</div>}</div>}
     </aside>
 
-    {panel === 'chats' ? <main className="messages-chat-main"><header className="messages-main-head"><div><strong>{other.name}</strong><span>{other.id ? (otherPresence && isOnline(otherPresence.activeAt) ? 'Đang hoạt động' : 'Hoạt động gần đây') : 'Tạo hoặc chọn cuộc trò chuyện'}</span></div><div><button type="button" className="messages-soft" onClick={() => setPanel('requests')}><ShieldCheck size={16} /> Yêu cầu quyền</button><button type="button" className="messages-soft" onClick={() => void sync()}><RefreshCw size={16} /> Đồng bộ</button></div></header><div className="messages-feed">{activeMessages.length ? activeMessages.map((m) => <article key={m.id} className={`messages-bubble ${m.from === me.email ? 'mine' : ''}`}><p>{m.body}</p><span>{m.fromName} · {fmt(m.createdAt)}{m.from === me.email ? ` · ${m.status === 'read' ? 'Đã đọc' : 'Đã gửi'}` : ''}</span></article>) : <div className="messages-center-empty"><strong>Messages 12A3</strong><span>Chọn hoặc tạo cuộc trò chuyện để bắt đầu.</span></div>}</div><footer className="messages-composer"><textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Nhập tin nhắn..." onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendNow(); } }} /><button type="button" onClick={sendNow}><Send size={17} /> Gửi</button></footer></main> : <main className="messages-requests-main"><section className="messages-request-form"><div><h2>Xin quyền hỗ trợ chấm điểm</h2><p>Dùng khi tổ khác cần hỗ trợ. Người nhận có thể đồng ý hoặc từ chối trong Messages.</p></div><div className="messages-request-fields"><input value={targetGroup} onChange={(e) => setTargetGroup(e.target.value)} placeholder="Tổ cần xin, VD: 2" /><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Lý do xin quyền hỗ trợ chấm" /><button type="button" onClick={sendRequest}>Gửi yêu cầu</button></div></section><section className="messages-request-grid">{requests.length ? requests.map((r) => { const mine = r.from === me.email; const myGroup = Number(me.group || 0); const canResolve = !mine && r.permissionStatus === 'pending' && (!r.targetGroup || r.targetGroup === myGroup || ['lop_truong', 'gvcn'].includes(String(me.role || ''))); return <article key={r.id} className="messages-request-card"><header><strong>{r.fromName} xin chấm Tổ {r.targetGroup}</strong><span className={r.permissionStatus || 'pending'}>{r.permissionStatus || 'pending'}</span></header><p>{r.body}</p><small>Từ Tổ {r.requesterGroup || '?'} · {fmt(r.createdAt)}</small>{canResolve && <div><button type="button" onClick={() => void respond(r.id, 'approved')}><Check size={16} /> Đồng ý</button><button type="button" className="danger" onClick={() => void respond(r.id, 'rejected')}><X size={16} /> Từ chối</button></div>}</article>; }) : <div className="messages-center-empty"><strong>Chưa có yêu cầu quyền</strong><span>Các yêu cầu xin hỗ trợ chấm tổ khác sẽ nằm ở đây.</span></div>}</section></main>}
+    {panel === 'chats' ? <main className="messages-chat-main"><header className="messages-main-head"><div><strong>{other.name}</strong><span>{other.id ? (otherPresence && isOnline(otherPresence.activeAt) ? 'Đang hoạt động' : 'Hoạt động gần đây') : 'Tạo hoặc chọn cuộc trò chuyện'}</span></div><div><button type="button" className="messages-soft" onClick={() => setPanel('requests')}><ShieldCheck size={16} /> Yêu cầu quyền</button><button type="button" className="messages-soft" onClick={() => void sync()}><RefreshCw size={16} /> Đồng bộ</button></div></header><div className="messages-feed">{activeMessages.length ? activeMessages.map((m) => <article key={m.id} className={`messages-bubble ${m.from === me.email ? 'mine' : ''}`}><p>{m.body}</p><span>{displayNameFor(m.from, m.fromName)} · {fmt(m.createdAt)}{m.from === me.email ? ` · ${m.status === 'read' ? 'Đã đọc' : 'Đã gửi'}` : ''}</span></article>) : <div className="messages-center-empty"><strong>Messages 12A3</strong><span>Chọn hoặc tạo cuộc trò chuyện để bắt đầu.</span></div>}</div><footer className="messages-composer"><textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Nhập tin nhắn..." onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendNow(); } }} /><button type="button" onClick={sendNow}><Send size={17} /> Gửi</button></footer></main> : <main className="messages-requests-main"><section className="messages-request-form"><div><h2>Xin quyền hỗ trợ chấm điểm</h2><p>Dùng khi tổ khác cần hỗ trợ. Người nhận có thể đồng ý hoặc từ chối trong Messages.</p></div><div className="messages-request-fields"><input value={targetGroup} onChange={(e) => setTargetGroup(e.target.value)} placeholder="Tổ cần xin, VD: 2" /><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Lý do xin quyền hỗ trợ chấm" /><button type="button" onClick={sendRequest}>Gửi yêu cầu</button></div></section><section className="messages-request-grid">{requests.length ? requests.map((r) => { const mine = r.from === me.email; const myGroup = Number(me.group || 0); const canResolve = !mine && r.permissionStatus === 'pending' && (!r.targetGroup || r.targetGroup === myGroup || ['lop_truong', 'gvcn'].includes(String(me.role || ''))); return <article key={r.id} className="messages-request-card"><header><strong>{displayNameFor(r.from, r.fromName)} xin chấm Tổ {r.targetGroup}</strong><span className={r.permissionStatus || 'pending'}>{r.permissionStatus || 'pending'}</span></header><p>{r.body}</p><small>Từ Tổ {r.requesterGroup || '?'} · {fmt(r.createdAt)}</small>{canResolve && <div><button type="button" onClick={() => void respond(r.id, 'approved')}><Check size={16} /> Đồng ý</button><button type="button" className="danger" onClick={() => void respond(r.id, 'rejected')}><X size={16} /> Từ chối</button></div>}</article>; }) : <div className="messages-center-empty"><strong>Chưa có yêu cầu quyền</strong><span>Các yêu cầu xin hỗ trợ chấm tổ khác sẽ nằm ở đây.</span></div>}</section></main>}
     {toast && <div className="messages-toast">{toast}</div>}
   </section>;
 }
