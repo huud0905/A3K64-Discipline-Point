@@ -63,7 +63,7 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
 
   const showToast = (msg: string) => {
     setToast(msg);
-    window.setTimeout(() => setToast(''), 2400);
+    window.setTimeout(() => setToast(''), 2600);
   };
 
   const sync = async () => {
@@ -143,9 +143,18 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
     setNewTo(contact.name);
   };
 
+  const resolveTargetFromInput = async () => {
+    const firstTry = resolveContactTarget(newTo, threadContacts);
+    if (firstTry) return firstTry;
+    const latest = await fetchMessageContacts(me).catch(() => [] as ChatContact[]);
+    if (latest.length) setContacts(latest);
+    return resolveContactTarget(newTo, latest.length ? latest : threadContacts);
+  };
+
   const createThread = async () => {
-    const target = resolveContactTarget(newTo, threadContacts);
-    if (!target) return showToast('Nhập tên người nhận hoặc chọn từ gợi ý.');
+    const target = await resolveTargetFromInput();
+    if (!target) return showToast('Không tìm thấy tên này trong danh bạ. Hãy chọn từ gợi ý hoặc nhập Gmail.');
+    if (target.email === me.email) return showToast('Không thể tạo cuộc trò chuyện với chính mình.');
     await sendChatMessage(target.email, 'Đã tạo cuộc trò chuyện.', target.name, me);
     setActiveThread([me.email, target.email].sort().join('__'));
     setNewTo('');
@@ -157,6 +166,7 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
     const body = draft.trim();
     if (!body) return;
     if (!other.id) return showToast('Chưa chọn người nhận.');
+    if (other.id === me.email) return showToast('Đang chọn chính bạn. Hãy tạo cuộc trò chuyện với người khác trước.');
     await sendChatMessage(other.id, body, other.name, me);
     setDraft('');
     await sync();
