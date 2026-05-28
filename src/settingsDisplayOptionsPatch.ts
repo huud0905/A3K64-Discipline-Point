@@ -8,10 +8,19 @@ function getSavedScale() {
   return A3_SCALE_OPTIONS.includes(raw) ? raw : 100;
 }
 
+function setAppScaledSize(scale: number) {
+  const ratio = scale / 100;
+  const width = `${100 / ratio}vw`;
+  const height = `${100 / ratio}vh`;
+  document.documentElement.style.setProperty("--a3-display-scale", String(ratio));
+  document.documentElement.style.setProperty("--a3-scaled-width", width);
+  document.documentElement.style.setProperty("--a3-scaled-height", height);
+}
+
 function applyScale(scale: number) {
   const safeScale = A3_SCALE_OPTIONS.includes(scale) ? scale : 100;
   localStorage.setItem(SCALE_STORAGE_KEY, String(safeScale));
-  document.documentElement.style.setProperty("--a3-display-scale", String(safeScale / 100));
+  setAppScaledSize(safeScale);
   document.documentElement.style.setProperty("zoom", `${safeScale}%`);
   (document.body.style as CSSStyleDeclaration & { zoom?: string }).zoom = `${safeScale}%`;
   window.dispatchEvent(new CustomEvent("a3k64-display-scale-change", { detail: { scale: safeScale } }));
@@ -22,6 +31,8 @@ function injectStyle() {
   const style = document.createElement("style");
   style.id = "a3-display-options-style";
   style.textContent = `
+    html,body,#root{min-width:var(--a3-scaled-width,100vw)!important;min-height:var(--a3-scaled-height,100vh)!important;background:#050914!important;overflow:auto!important}
+    #root>.win-root,.win-root{width:var(--a3-scaled-width,100vw)!important;min-width:var(--a3-scaled-width,100vw)!important;height:var(--a3-scaled-height,100vh)!important;min-height:var(--a3-scaled-height,100vh)!important;background:#050914!important}
     .a3-display-settings-card{max-width:960px;border:1px solid #243044;border-radius:18px;background:#0b1220;overflow:hidden;color:#f8fafc}
     .a3-display-settings-title{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;padding:18px;border-bottom:1px solid #243044}
     .a3-display-settings-icon{width:22px;height:22px;color:var(--desktop-accent,#f97316)}
@@ -36,7 +47,7 @@ function injectStyle() {
     .theme-light .a3-display-settings-title p,.theme-light .a3-display-row-left span,.win-root.theme-light .a3-display-settings-title p,.win-root.theme-light .a3-display-row-left span{color:#64748b}
     .theme-light .a3-display-select,.win-root.theme-light .a3-display-select{color:#0f172a;background-color:#fff;border-color:#94a3b8}
     .theme-light .a3-display-select option,.win-root.theme-light .a3-display-select option{color:#0f172a;background:#fff}
-    @media(max-width:760px){.a3-display-row{display:grid;gap:10px;align-items:start}.a3-display-select{width:100%;min-width:0}.a3-display-settings-title h2{font-size:22px}}
+    @media(max-width:760px){html,body,#root,#root>.win-root,.win-root{width:100%!important;min-width:100%!important;height:auto!important;min-height:100svh!important}.a3-display-row{display:grid;gap:10px;align-items:start}.a3-display-select{width:100%;min-width:0}.a3-display-settings-title h2{font-size:22px}}
   `;
   document.head.appendChild(style);
 }
@@ -70,6 +81,7 @@ function buildDisplayCard() {
 
 function patchDisplayPage() {
   injectStyle();
+  setAppScaledSize(getSavedScale());
   const apps = Array.from(document.querySelectorAll(".settings-app"));
   for (const app of apps) {
     if (!isDisplayPage(app)) continue;
@@ -85,6 +97,7 @@ function initDisplayOptionsPatch() {
   patchDisplayPage();
   const observer = new MutationObserver(() => patchDisplayPage());
   observer.observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener("resize", () => setAppScaledSize(getSavedScale()));
   window.addEventListener("storage", () => {
     applyScale(getSavedScale());
     patchDisplayPage();
