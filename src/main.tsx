@@ -53,6 +53,7 @@ import './scoreboardMobileScoreEditorRuntimeFix';
 import './scoreboardPositiveColor.css';
 import './settingsDisplayOptionsPatch';
 import './messagesThreadActionsPatch';
+import './messagesSuggestionOpenPatch';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
