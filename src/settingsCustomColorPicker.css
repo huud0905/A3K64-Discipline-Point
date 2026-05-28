@@ -1,4 +1,49 @@
 /* Custom color picker for Settings. Uses Settings CSS variables so light/dark mode stays consistent. */
+
+/* Theme tokens for the custom picker.
+   The old picker only had light fallbacks (#fff), so in dark mode the custom
+   palette became a white block. These scoped tokens force it to follow the
+   active desktop/mobile theme. */
+.win-root.theme-dark .settings-app,
+.win-root.theme-dark .settings-mobile-native,
+.theme-dark .settings-app,
+.theme-dark .settings-mobile-native,
+.settings-app.theme-dark,
+.settings-mobile-native.theme-dark {
+  --settings-picker-bg: #0f172a;
+  --settings-input-bg: #020617;
+  --settings-text: #f8fafc;
+  --settings-muted: #94a3b8;
+  --settings-border: rgba(148, 163, 184, .22);
+  --settings-border-strong: rgba(148, 163, 184, .34);
+  --settings-preview-ring: rgba(15, 23, 42, .95);
+  --settings-swatch-border: rgba(255, 255, 255, .18);
+  --settings-active-ring: rgba(248, 250, 252, .95);
+  --settings-sv-ring: rgba(255, 255, 255, .18);
+  --settings-focus-ring: color-mix(in srgb, var(--desktop-accent, #ef4444) 25%, transparent);
+  --settings-shadow: 0 18px 44px rgba(0, 0, 0, .28);
+}
+
+.win-root.theme-light .settings-app,
+.win-root.theme-light .settings-mobile-native,
+.theme-light .settings-app,
+.theme-light .settings-mobile-native,
+.settings-app.theme-light,
+.settings-mobile-native.theme-light {
+  --settings-picker-bg: #ffffff;
+  --settings-input-bg: #ffffff;
+  --settings-text: #0f172a;
+  --settings-muted: #64748b;
+  --settings-border: #d7dee8;
+  --settings-border-strong: #cbd5e1;
+  --settings-preview-ring: rgba(255, 255, 255, .9);
+  --settings-swatch-border: rgba(15, 23, 42, .16);
+  --settings-active-ring: rgba(255, 255, 255, .95);
+  --settings-sv-ring: rgba(15, 23, 42, .16);
+  --settings-focus-ring: color-mix(in srgb, var(--desktop-accent, #ef4444) 18%, transparent);
+  --settings-shadow: 0 10px 24px rgba(15, 23, 42, .055);
+}
+
 .settings-app .a3-native-color-hidden,
 .settings-mobile-native .a3-native-color-hidden {
   position: absolute !important;
@@ -26,6 +71,24 @@
   background: var(--settings-picker-bg, #ffffff) !important;
   box-shadow: var(--settings-shadow, 0 10px 24px rgba(15, 23, 42, .045)) !important;
   box-sizing: border-box !important;
+}
+
+.win-root.theme-dark .settings-app .a3-color-picker,
+.win-root.theme-dark .settings-mobile-native .a3-color-picker,
+.theme-dark .settings-app .a3-color-picker,
+.theme-dark .settings-mobile-native .a3-color-picker {
+  color: #f8fafc !important;
+  background: #0f172a !important;
+  border-color: rgba(148, 163, 184, .22) !important;
+}
+
+.win-root.theme-light .settings-app .a3-color-picker,
+.win-root.theme-light .settings-mobile-native .a3-color-picker,
+.theme-light .settings-app .a3-color-picker,
+.theme-light .settings-mobile-native .a3-color-picker {
+  color: #0f172a !important;
+  background: #ffffff !important;
+  border-color: #d7dee8 !important;
 }
 
 .settings-app .a3-picker-head,
@@ -200,6 +263,24 @@
   font-weight: 800 !important;
   outline: none !important;
   box-sizing: border-box !important;
+}
+
+.win-root.theme-dark .settings-app .a3-field input,
+.win-root.theme-dark .settings-mobile-native .a3-field input,
+.theme-dark .settings-app .a3-field input,
+.theme-dark .settings-mobile-native .a3-field input {
+  color: #f8fafc !important;
+  background: #020617 !important;
+  border-color: rgba(148, 163, 184, .34) !important;
+}
+
+.win-root.theme-light .settings-app .a3-field input,
+.win-root.theme-light .settings-mobile-native .a3-field input,
+.theme-light .settings-app .a3-field input,
+.theme-light .settings-mobile-native .a3-field input {
+  color: #0f172a !important;
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
 }
 
 .settings-app .a3-field input:focus,
