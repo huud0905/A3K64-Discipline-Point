@@ -95,6 +95,37 @@ function localPresence() {
 
 function writeLocalPresence(presence: PresenceRecord[]) {
   localStorage.setItem(LOCAL_PRESENCE_KEY, JSON.stringify(presence));
+  window.dispatchEvent(new Event('a3k64-messages-local-change'));
+}
+
+function mergeMessages(local: ChatMessage[], remote: ChatMessage[]) {
+  const map = new Map<string, ChatMessage>();
+  [...remote, ...local].forEach((message) => {
+    if (!message?.id) return;
+    const previous = map.get(message.id);
+    if (!previous) {
+      map.set(message.id, message);
+      return;
+    }
+    map.set(message.id, {
+      ...previous,
+      ...message,
+      status: previous.status === 'read' || message.status === 'read' ? 'read' : message.status || previous.status,
+      readAt: previous.readAt || message.readAt,
+    });
+  });
+  return [...map.values()].sort((a, b) => Date.parse(a.createdAt || '') - Date.parse(b.createdAt || ''));
+}
+
+function mergePresence(local: PresenceRecord[], remote: PresenceRecord[]) {
+  const map = new Map<string, PresenceRecord>();
+  [...remote, ...local].forEach((item) => {
+    const user = normalizeUser(item?.user);
+    if (!user) return;
+    const previous = map.get(user);
+    if (!previous || Date.parse(item.activeAt || '') >= Date.parse(previous.activeAt || '')) map.set(user, { ...item, user });
+  });
+  return [...map.values()].sort((a, b) => Date.parse(b.activeAt || '') - Date.parse(a.activeAt || '')).slice(0, 100);
 }
 
 function gasJsonp(action: string, payload?: unknown): Promise<any | null> {
@@ -141,12 +172,23 @@ function unwrapMessagesState(response: any): MessagesState | null {
   };
 }
 
+function syncRemoteMessages(action: string, payload?: unknown) {
+  void gasJsonp(action, payload).then((response) => {
+    const remote = unwrapMessagesState(response);
+    if (!remote) return;
+    writeLocalMessages(mergeMessages(localMessages(), remote.messages));
+    writeLocalPresence(mergePresence(localPresence(), remote.presence));
+  }).catch(() => undefined);
+}
+
 export async function fetchMessagesState(user = readSessionUser()): Promise<MessagesState> {
   const remote = unwrapMessagesState(await gasJsonp('getMessages', { user: user.email }));
   if (remote) {
-    writeLocalMessages(remote.messages);
-    writeLocalPresence(remote.presence);
-    return remote;
+    const mergedMessages = mergeMessages(localMessages(), remote.messages);
+    const mergedPresence = mergePresence(localPresence(), remote.presence);
+    writeLocalMessages(mergedMessages);
+    writeLocalPresence(mergedPresence);
+    return { messages: mergedMessages, presence: mergedPresence, updatedAt: remote.updatedAt };
   }
   return { messages: localMessages(), presence: localPresence(), updatedAt: nowIso() };
 }
@@ -166,23 +208,21 @@ export async function sendChatMessage(to: string, body: string, toName = '', use
     createdAt: nowIso(),
   };
   writeLocalMessages([...localMessages(), message]);
-  const remote = unwrapMessagesState(await gasJsonp('sendMessage', { message, user: user.email }));
-  if (remote) writeLocalMessages(remote.messages);
+  syncRemoteMessages('sendMessage', { message, user: user.email });
   return message;
 }
 
 export async function markThreadRead(threadId: string, user = readSessionUser()) {
   const local = localMessages().map((message) => message.threadId === threadId && message.to === user.email ? { ...message, status: 'read' as const, readAt: message.readAt || nowIso() } : message);
   writeLocalMessages(local);
-  const remote = unwrapMessagesState(await gasJsonp('markMessagesRead', { threadId, user: user.email }));
-  if (remote) writeLocalMessages(remote.messages);
+  syncRemoteMessages('markMessagesRead', { threadId, user: user.email });
 }
 
 export async function updatePresence(user = readSessionUser()) {
   const next: PresenceRecord = { user: user.email, name: user.name, activeAt: nowIso() };
   const presence = [next, ...localPresence().filter((item) => normalizeUser(item.user) !== user.email)].slice(0, 80);
   writeLocalPresence(presence);
-  await gasJsonp('setPresence', next);
+  syncRemoteMessages('setPresence', next);
   return next;
 }
 
@@ -207,8 +247,7 @@ export async function requestGroupAccess(targetGroup: number, reason: string, we
     createdAt: nowIso(),
   };
   writeLocalMessages([...localMessages(), message]);
-  const remote = unwrapMessagesState(await gasJsonp('requestGroupAccess', { message, user: user.email }));
-  if (remote) writeLocalMessages(remote.messages);
+  syncRemoteMessages('requestGroupAccess', { message, user: user.email });
   return message;
 }
 
@@ -225,8 +264,7 @@ export async function respondGroupAccess(messageId: string, status: Extract<Perm
   const changed = updated.find((message) => message.id === messageId);
   if (changed && status === 'approved') saveApprovedPermission(changed);
   writeLocalMessages(updated);
-  const remote = unwrapMessagesState(await gasJsonp('respondGroupAccess', { messageId, status, user: user.email, resolverName: user.name }));
-  if (remote) writeLocalMessages(remote.messages);
+  syncRemoteMessages('respondGroupAccess', { messageId, status, user: user.email, resolverName: user.name });
   return changed || null;
 }
 
