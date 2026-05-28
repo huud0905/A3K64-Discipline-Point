@@ -6,6 +6,13 @@ export type ChatUser = {
   group?: number | string;
 };
 
+export type ChatContact = {
+  email: string;
+  name: string;
+  role?: string;
+  group?: number | string;
+};
+
 export type ChatMessageKind = 'chat' | 'permission_request' | 'system';
 export type ChatMessageStatus = 'sent' | 'read';
 export type PermissionStatus = 'pending' | 'approved' | 'rejected' | 'expired';
@@ -38,6 +45,7 @@ export type PresenceRecord = {
 export type MessagesState = {
   messages: ChatMessage[];
   presence: PresenceRecord[];
+  contacts?: ChatContact[];
   updatedAt: string;
 };
 
@@ -45,6 +53,7 @@ const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const JSONP_TIMEOUT_MS = 22000;
 const LOCAL_MESSAGES_KEY = 'a3k64-messages-local-v1';
 const LOCAL_PRESENCE_KEY = 'a3k64-messages-presence-local-v1';
+const LOCAL_CONTACTS_KEY = 'a3k64-messages-contacts-local-v1';
 const EXTRA_PERMISSION_KEY = 'a3k64-extra-edit-permissions-v1';
 
 function nowIso() {
@@ -53,6 +62,18 @@ function nowIso() {
 
 function normalizeUser(value: unknown) {
   return String(value || '').trim().toLowerCase();
+}
+
+export function normalizeContactText(value: unknown) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .replace(/[^a-z0-9@.]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function id(prefix: string) {
@@ -96,6 +117,35 @@ function localPresence() {
 function writeLocalPresence(presence: PresenceRecord[]) {
   localStorage.setItem(LOCAL_PRESENCE_KEY, JSON.stringify(presence));
   window.dispatchEvent(new Event('a3k64-messages-local-change'));
+}
+
+function localContacts() {
+  return safeJson<ChatContact[]>(localStorage.getItem(LOCAL_CONTACTS_KEY), []);
+}
+
+function writeLocalContacts(contacts: ChatContact[]) {
+  const unique = mergeContacts(contacts);
+  localStorage.setItem(LOCAL_CONTACTS_KEY, JSON.stringify(unique));
+  window.dispatchEvent(new Event('a3k64-messages-local-change'));
+}
+
+function mergeContacts(contacts: ChatContact[]) {
+  const map = new Map<string, ChatContact>();
+  contacts.forEach((contact) => {
+    const email = normalizeUser(contact?.email);
+    if (!email || email === 'local-user') return;
+    map.set(email, { ...map.get(email), ...contact, email, name: String(contact.name || email).trim() });
+  });
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' }));
+}
+
+function contactsFromMessages(messages: ChatMessage[], currentUser = readSessionUser()) {
+  const contacts: ChatContact[] = [];
+  messages.forEach((message) => {
+    if (message.from && message.from !== currentUser.email) contacts.push({ email: message.from, name: message.fromName || message.from });
+    if (message.to && message.to !== currentUser.email && !message.to.startsWith('to')) contacts.push({ email: message.to, name: message.toName || message.to });
+  });
+  return mergeContacts(contacts);
 }
 
 function mergeMessages(local: ChatMessage[], remote: ChatMessage[]) {
@@ -161,6 +211,19 @@ function gasJsonp(action: string, payload?: unknown): Promise<any | null> {
   });
 }
 
+function unwrapContacts(response: any): ChatContact[] {
+  const data = response?.data || response;
+  const raw = data?.contacts || data?.users || data?.items || [];
+  if (!Array.isArray(raw)) return [];
+  return mergeContacts(raw.flatMap((item) => {
+    const record = item as Record<string, unknown>;
+    const email = normalizeUser(record.email || record.username || record.gmail || record.user);
+    const name = String(record.name || record.displayName || record.fullName || record.hoten || record.hoTen || email).trim();
+    if (!email) return [];
+    return [{ email, name, role: String(record.role || ''), group: record.group as number | string | undefined }];
+  }));
+}
+
 function unwrapMessagesState(response: any): MessagesState | null {
   const data = response?.data || response;
   const state = data?.messagesState || data;
@@ -168,6 +231,7 @@ function unwrapMessagesState(response: any): MessagesState | null {
   return {
     messages: state.messages,
     presence: Array.isArray(state.presence) ? state.presence : [],
+    contacts: unwrapContacts(state),
     updatedAt: String(state.updatedAt || nowIso()),
   };
 }
@@ -176,8 +240,10 @@ function syncRemoteMessages(action: string, payload?: unknown) {
   void gasJsonp(action, payload).then((response) => {
     const remote = unwrapMessagesState(response);
     if (!remote) return;
-    writeLocalMessages(mergeMessages(localMessages(), remote.messages));
+    const nextMessages = mergeMessages(localMessages(), remote.messages);
+    writeLocalMessages(nextMessages);
     writeLocalPresence(mergePresence(localPresence(), remote.presence));
+    writeLocalContacts(mergeContacts([...(remote.contacts || []), ...contactsFromMessages(nextMessages), ...localContacts()]));
   }).catch(() => undefined);
 }
 
@@ -186,11 +252,42 @@ export async function fetchMessagesState(user = readSessionUser()): Promise<Mess
   if (remote) {
     const mergedMessages = mergeMessages(localMessages(), remote.messages);
     const mergedPresence = mergePresence(localPresence(), remote.presence);
+    const contacts = mergeContacts([...(remote.contacts || []), ...contactsFromMessages(mergedMessages, user), ...localContacts()]);
     writeLocalMessages(mergedMessages);
     writeLocalPresence(mergedPresence);
-    return { messages: mergedMessages, presence: mergedPresence, updatedAt: remote.updatedAt };
+    writeLocalContacts(contacts);
+    return { messages: mergedMessages, presence: mergedPresence, contacts, updatedAt: remote.updatedAt };
   }
-  return { messages: localMessages(), presence: localPresence(), updatedAt: nowIso() };
+  const messages = localMessages();
+  const contacts = mergeContacts([...localContacts(), ...contactsFromMessages(messages, user)]);
+  return { messages, presence: localPresence(), contacts, updatedAt: nowIso() };
+}
+
+export async function fetchMessageContacts(user = readSessionUser()): Promise<ChatContact[]> {
+  const remote = unwrapContacts(await gasJsonp('getMessageContacts', { user: user.email }));
+  const contacts = mergeContacts([...remote, ...localContacts(), ...contactsFromMessages(localMessages(), user)]);
+  writeLocalContacts(contacts);
+  return contacts;
+}
+
+export function resolveContactTarget(input: string, contacts: ChatContact[]) {
+  const raw = String(input || '').trim();
+  if (!raw) return null;
+  if (raw.includes('@')) return { email: normalizeUser(raw), name: raw };
+  const query = normalizeContactText(raw);
+  const exact = contacts.find((contact) => normalizeContactText(contact.name) === query || normalizeContactText(contact.email) === query);
+  if (exact) return exact;
+  const starts = contacts.find((contact) => normalizeContactText(contact.name).startsWith(query));
+  return starts || null;
+}
+
+export function filterContacts(input: string, contacts: ChatContact[], currentEmail?: string) {
+  const query = normalizeContactText(input);
+  if (!query) return contacts.filter((contact) => contact.email !== currentEmail).slice(0, 8);
+  return contacts
+    .filter((contact) => contact.email !== currentEmail)
+    .filter((contact) => `${normalizeContactText(contact.name)} ${normalizeContactText(contact.email)}`.includes(query))
+    .slice(0, 8);
 }
 
 export async function sendChatMessage(to: string, body: string, toName = '', user = readSessionUser()) {
@@ -207,6 +304,7 @@ export async function sendChatMessage(to: string, body: string, toName = '', use
     status: 'sent',
     createdAt: nowIso(),
   };
+  writeLocalContacts(mergeContacts([...localContacts(), { email: target, name: toName || target }]));
   writeLocalMessages([...localMessages(), message]);
   syncRemoteMessages('sendMessage', { message, user: user.email });
   return message;
