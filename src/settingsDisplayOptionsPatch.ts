@@ -1,14 +1,15 @@
-const A3_SCALE_OPTIONS = [75];
+const A3_SCALE_OPTIONS = [75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
 
 const SCALE_STORAGE_KEY = "a3k64-display-scale";
 const PATCH_FLAG = "data-a3-display-settings-patched";
 
 function getSavedScale() {
-  return 75;
+  const raw = Number(localStorage.getItem(SCALE_STORAGE_KEY) || "100");
+  return A3_SCALE_OPTIONS.includes(raw) ? raw : 100;
 }
 
 function applyScale(scale: number) {
-  const safeScale = 75;
+  const safeScale = A3_SCALE_OPTIONS.includes(scale) ? scale : 100;
   localStorage.setItem(SCALE_STORAGE_KEY, String(safeScale));
   document.documentElement.style.setProperty("--a3-display-scale", String(safeScale / 100));
   document.documentElement.style.setProperty("zoom", `${safeScale}%`);
@@ -57,12 +58,12 @@ function buildDisplayCard() {
     </div>
     <div class="a3-display-row">
       <div class="a3-display-row-left"><strong>Tỷ lệ và bố cục</strong><span>Thay đổi kích thước chữ, ứng dụng và các thành phần khác.</span></div>
-      <select class="a3-display-select" data-a3-display-scale>${A3_SCALE_OPTIONS.map((item) => `<option value="${item}" ${item === scale ? "selected" : ""}>${item}%</option>`).join("")}</select>
+      <select class="a3-display-select" data-a3-display-scale>${A3_SCALE_OPTIONS.map((item) => `<option value="${item}" ${item === scale ? "selected" : ""}>${item}%${item === 100 ? " (Khuyến nghị)" : ""}</option>`).join("")}</select>
     </div>
   `;
 
-  wrapper.querySelector<HTMLSelectElement>("[data-a3-display-scale]")?.addEventListener("change", () => {
-    applyScale(75);
+  wrapper.querySelector<HTMLSelectElement>("[data-a3-display-scale]")?.addEventListener("change", (event) => {
+    applyScale(Number((event.currentTarget as HTMLSelectElement).value));
   });
   return wrapper;
 }
@@ -80,12 +81,12 @@ function patchDisplayPage() {
 }
 
 function initDisplayOptionsPatch() {
-  applyScale(75);
+  applyScale(getSavedScale());
   patchDisplayPage();
   const observer = new MutationObserver(() => patchDisplayPage());
   observer.observe(document.documentElement, { childList: true, subtree: true });
   window.addEventListener("storage", () => {
-    applyScale(75);
+    applyScale(getSavedScale());
     patchDisplayPage();
   });
 }
