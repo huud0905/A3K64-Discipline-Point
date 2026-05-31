@@ -1,0 +1,162 @@
+html[data-theme="light"] .messages-native-app.messages-redesign,
+body[data-theme="light"] .messages-native-app.messages-redesign,
+.theme-light .messages-native-app.messages-redesign,
+.win-root.theme-light .messages-native-app.messages-redesign,
+.messages-native-app.messages-redesign[data-theme="light"]{
+  color:#0f172a!important;
+  background:#f8fafc!important;
+}
+
+html[data-theme="light"] .messages-left-panel,
+body[data-theme="light"] .messages-left-panel,
+.theme-light .messages-left-panel,
+.win-root.theme-light .messages-left-panel{
+  color:#0f172a!important;
+  background:#ffffff!important;
+  border-color:#d7dee8!important;
+}
+
+html[data-theme="light"] .messages-main-panel,
+body[data-theme="light"] .messages-main-panel,
+.theme-light .messages-main-panel,
+.win-root.theme-light .messages-main-panel{
+  color:#0f172a!important;
+  background:#f8fafc!important;
+}
+
+html[data-theme="light"] .messages-profile-card,
+html[data-theme="light"] .messages-chat-header,
+html[data-theme="light"] .messages-composer,
+body[data-theme="light"] .messages-profile-card,
+body[data-theme="light"] .messages-chat-header,
+body[data-theme="light"] .messages-composer,
+.theme-light .messages-profile-card,
+.theme-light .messages-chat-header,
+.theme-light .messages-composer,
+.win-root.theme-light .messages-profile-card,
+.win-root.theme-light .messages-chat-header,
+.win-root.theme-light .messages-composer{
+  color:#0f172a!important;
+  background:#ffffff!important;
+  border-color:#d7dee8!important;
+}
+
+html[data-theme="light"] .messages-feed,
+body[data-theme="light"] .messages-feed,
+.theme-light .messages-feed,
+.win-root.theme-light .messages-feed{
+  background:#f8fafc!important;
+}
+
+html[data-theme="light"] .messages-search-box,
+html[data-theme="light"] .messages-contact-box,
+html[data-theme="light"] .messages-thread-main,
+html[data-theme="light"] .messages-composer textarea,
+html[data-theme="light"] .messages-contact-suggestions,
+html[data-theme="light"] .messages-thread-menu,
+html[data-theme="light"] .messages-request-row,
+body[data-theme="light"] .messages-search-box,
+body[data-theme="light"] .messages-contact-box,
+body[data-theme="light"] .messages-thread-main,
+body[data-theme="light"] .messages-composer textarea,
+body[data-theme="light"] .messages-contact-suggestions,
+body[data-theme="light"] .messages-thread-menu,
+body[data-theme="light"] .messages-request-row,
+.theme-light .messages-search-box,
+.theme-light .messages-contact-box,
+.theme-light .messages-thread-main,
+.theme-light .messages-composer textarea,
+.theme-light .messages-contact-suggestions,
+.theme-light .messages-thread-menu,
+.theme-light .messages-request-row,
+.win-root.theme-light .messages-search-box,
+.win-root.theme-light .messages-contact-box,
+.win-root.theme-light .messages-thread-main,
+.win-root.theme-light .messages-composer textarea,
+.win-root.theme-light .messages-contact-suggestions,
+.win-root.theme-light .messages-thread-menu,
+.win-root.theme-light .messages-request-row{
+  color:#0f172a!important;
+  background:#ffffff!important;
+  border-color:#d7dee8!important;
+}
+
+html[data-theme="light"] .messages-search-box input,
+html[data-theme="light"] .messages-contact-box input,
+html[data-theme="light"] .messages-composer textarea,
+body[data-theme="light"] .messages-search-box input,
+body[data-theme="light"] .messages-contact-box input,
+body[data-theme="light"] .messages-composer textarea,
+.theme-light .messages-search-box input,
+.theme-light .messages-contact-box input,
+.theme-light .messages-composer textarea,
+.win-root.theme-light .messages-search-box input,
+.win-root.theme-light .messages-contact-box input,
+.win-root.theme-light .messages-composer textarea{
+  color:#0f172a!important;
+  background:#ffffff!important;
+}
+
+html[data-theme="light"] .messages-profile-card span,
+html[data-theme="light"] .messages-thread-info p,
+html[data-theme="light"] .messages-chat-title span,
+html[data-theme="light"] .messages-center-empty span,
+html[data-theme="light"] .messages-empty-state,
+body[data-theme="light"] .messages-profile-card span,
+body[data-theme="light"] .messages-thread-info p,
+body[data-theme="light"] .messages-chat-title span,
+body[data-theme="light"] .messages-center-empty span,
+body[data-theme="light"] .messages-empty-state,
+.theme-light .messages-profile-card span,
+.theme-light .messages-thread-info p,
+.theme-light .messages-chat-title span,
+.theme-light .messages-center-empty span,
+.theme-light .messages-empty-state,
+.win-root.theme-light .messages-profile-card span,
+.win-root.theme-light .messages-thread-info p,
+.win-root.theme-light .messages-chat-title span,
+.win-root.theme-light .messages-center-empty span,
+.win-root.theme-light .messages-empty-state{
+  color:#64748b!important;
+}
+
+html[data-theme="light"] .messages-center-empty strong,
+body[data-theme="light"] .messages-center-empty strong,
+.theme-light .messages-center-empty strong,
+.win-root.theme-light .messages-center-empty strong{
+  color:#0f172a!important;
+}
+
+html[data-theme="light"] .messages-thread-card.active .messages-thread-main,
+html[data-theme="light"] .messages-thread-main:hover,
+body[data-theme="light"] .messages-thread-card.active .messages-thread-main,
+body[data-theme="light"] .messages-thread-main:hover,
+.theme-light .messages-thread-card.active .messages-thread-main,
+.theme-light .messages-thread-main:hover,
+.win-root.theme-light .messages-thread-card.active .messages-thread-main,
+.win-root.theme-light .messages-thread-main:hover{
+  background:color-mix(in srgb,var(--desktop-accent,#16a34a) 10%,#ffffff)!important;
+  border-color:color-mix(in srgb,var(--desktop-accent,#16a34a) 55%,#d7dee8)!important;
+}
+
+html[data-theme="light"] .messages-bubble,
+body[data-theme="light"] .messages-bubble,
+.theme-light .messages-bubble,
+.win-root.theme-light .messages-bubble{
+  background:#e5e7eb!important;
+  color:#111827!important;
+}
+
+html[data-theme="light"] .messages-bubble.mine,
+body[data-theme="light"] .messages-bubble.mine,
+.theme-light .messages-bubble.mine,
+.win-root.theme-light .messages-bubble.mine{
+  background:color-mix(in srgb,var(--desktop-accent,#16a34a) 32%,#ffffff)!important;
+  color:#0f172a!important;
+}
+
+.messages-native-app.a3-messages-reloading .messages-profile-card button svg{
+  animation:a3MessagesSpin .8s linear infinite;
+}
+
+@keyframes a3MessagesSpin{to{transform:rotate(360deg)}}
