@@ -161,18 +161,52 @@ body .win-root .task-right {
   background: var(--desktop-accent, #059669) !important;
 }
 
-/* Dark mode vẫn giữ dock trắng nhẹ để nổi trên hình nền. */
+/* Dark mode: dùng kính tối thay vì dock trắng để hợp nền đen/xanh. */
 .win-root:not(.theme-light) .task-center,
 .win-root:not(.theme-light) .task-right {
-  background: rgba(255, 255, 255, .86) !important;
-  background-color: rgba(255, 255, 255, .86) !important;
-  border-color: rgba(226, 232, 240, .66) !important;
-  box-shadow: 0 20px 54px rgba(2, 6, 23, .22) !important;
+  background: rgba(15, 23, 42, .72) !important;
+  background-color: rgba(15, 23, 42, .72) !important;
+  border-color: rgba(148, 163, 184, .28) !important;
+  box-shadow:
+    0 20px 54px rgba(2, 6, 23, .34),
+    inset 0 1px 0 rgba(255, 255, 255, .08) !important;
+  backdrop-filter: blur(18px) saturate(1.18) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.18) !important;
 }
 
+.win-root:not(.theme-light) .task-icon,
+.win-root:not(.theme-light) .task-search,
+.win-root:not(.theme-light) .task-focus-switch {
+  background: rgba(2, 6, 23, .72) !important;
+  border-color: rgba(148, 163, 184, .22) !important;
+  color: #e2e8f0 !important;
+  box-shadow: none !important;
+}
+
+.win-root:not(.theme-light) .task-icon:hover,
+.win-root:not(.theme-light) .task-icon.active,
+.win-root:not(.theme-light) .task-search:hover,
+.win-root:not(.theme-light) .task-focus-switch:hover {
+  background: rgba(30, 41, 59, .9) !important;
+  border-color: rgba(148, 163, 184, .36) !important;
+}
+
+.win-root:not(.theme-light) .task-start {
+  color: #ffffff !important;
+  background: var(--desktop-accent, #059669) !important;
+  border-color: color-mix(in srgb, var(--desktop-accent, #059669) 70%, #ffffff) !important;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--desktop-accent, #059669) 30%, transparent) !important;
+}
+
+.win-root:not(.theme-light) .task-focus-switch .task-focus-text,
+.win-root:not(.theme-light) .task-search span,
 .win-root:not(.theme-light) .task-right,
 .win-root:not(.theme-light) .task-right span {
-  color: #334155 !important;
+  color: #dbeafe !important;
+}
+
+.win-root:not(.theme-light) .task-focus-knob {
+  background: #94a3b8 !important;
 }
 
 @media (max-width: 760px) {
