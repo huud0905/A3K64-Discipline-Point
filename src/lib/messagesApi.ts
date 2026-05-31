@@ -13,7 +13,7 @@ export type ChatContact = {
   group?: number | string;
 };
 
-export type ChatMessageKind = 'chat' | 'permission_request' | 'system';
+export type ChatMessageKind = 'chat' | 'message' | 'permission_request' | 'permission_response' | 'system' | 'presence';
 export type ChatMessageStatus = 'sent' | 'read';
 export type PermissionStatus = 'pending' | 'approved' | 'rejected' | 'expired';
 
@@ -88,45 +88,30 @@ function safeJson<T>(raw: string | null, fallback: T): T {
   }
 }
 
-export function readSessionUser(): ChatUser {
-  const session = safeJson<{ user?: Record<string, unknown> } | null>(localStorage.getItem('a3k64-login-session-v1'), null);
-  const user = session?.user || {};
-  const email = normalizeUser(user.email || user.username || user.uid || 'local-user');
-  return {
-    id: String(user.uid || email),
-    email,
-    name: String(user.displayName || user.hoten || user.name || email.split('@')[0] || 'Người dùng'),
-    role: String(user.role || 'hoc_sinh'),
-    group: user.group as number | string | undefined,
-  };
-}
-
 function localMessages() {
   return safeJson<ChatMessage[]>(localStorage.getItem(LOCAL_MESSAGES_KEY), []);
-}
-
-function writeLocalMessages(messages: ChatMessage[]) {
-  localStorage.setItem(LOCAL_MESSAGES_KEY, JSON.stringify(messages));
-  window.dispatchEvent(new Event('a3k64-messages-local-change'));
 }
 
 function localPresence() {
   return safeJson<PresenceRecord[]>(localStorage.getItem(LOCAL_PRESENCE_KEY), []);
 }
 
-function writeLocalPresence(presence: PresenceRecord[]) {
-  localStorage.setItem(LOCAL_PRESENCE_KEY, JSON.stringify(presence));
-  window.dispatchEvent(new Event('a3k64-messages-local-change'));
-}
-
 function localContacts() {
   return safeJson<ChatContact[]>(localStorage.getItem(LOCAL_CONTACTS_KEY), []);
 }
 
-function writeLocalContacts(contacts: ChatContact[]) {
-  const unique = mergeContacts(contacts);
-  localStorage.setItem(LOCAL_CONTACTS_KEY, JSON.stringify(unique));
+function emitLocalChange() {
   window.dispatchEvent(new Event('a3k64-messages-local-change'));
+}
+
+function writeLocalMessages(messages: ChatMessage[]) {
+  localStorage.setItem(LOCAL_MESSAGES_KEY, JSON.stringify(messages));
+  emitLocalChange();
+}
+
+function writeLocalPresence(presence: PresenceRecord[]) {
+  localStorage.setItem(LOCAL_PRESENCE_KEY, JSON.stringify(presence));
+  emitLocalChange();
 }
 
 function mergeContacts(contacts: ChatContact[]) {
@@ -134,9 +119,15 @@ function mergeContacts(contacts: ChatContact[]) {
   contacts.forEach((contact) => {
     const email = normalizeUser(contact?.email);
     if (!email || email === 'local-user') return;
-    map.set(email, { ...map.get(email), ...contact, email, name: String(contact.name || email).trim() });
+    const name = String(contact.name || email).trim();
+    map.set(email, { ...map.get(email), ...contact, email, name });
   });
   return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' }));
+}
+
+function writeLocalContacts(contacts: ChatContact[]) {
+  localStorage.setItem(LOCAL_CONTACTS_KEY, JSON.stringify(mergeContacts(contacts)));
+  emitLocalChange();
 }
 
 function contactsFromMessages(messages: ChatMessage[], currentUser = readSessionUser()) {
@@ -150,18 +141,16 @@ function contactsFromMessages(messages: ChatMessage[], currentUser = readSession
 
 function mergeMessages(local: ChatMessage[], remote: ChatMessage[]) {
   const map = new Map<string, ChatMessage>();
-  [...remote, ...local].forEach((message) => {
+  [...local, ...remote].forEach((message) => {
     if (!message?.id) return;
+    const kind = message.kind === 'message' ? 'chat' : message.kind;
     const previous = map.get(message.id);
-    if (!previous) {
-      map.set(message.id, message);
-      return;
-    }
     map.set(message.id, {
       ...previous,
       ...message,
-      status: previous.status === 'read' || message.status === 'read' ? 'read' : message.status || previous.status,
-      readAt: previous.readAt || message.readAt,
+      kind,
+      status: previous?.status === 'read' || message.status === 'read' ? 'read' : (message.status || previous?.status || 'sent'),
+      readAt: previous?.readAt || message.readAt,
     });
   });
   return [...map.values()].sort((a, b) => Date.parse(a.createdAt || '') - Date.parse(b.createdAt || ''));
@@ -169,7 +158,7 @@ function mergeMessages(local: ChatMessage[], remote: ChatMessage[]) {
 
 function mergePresence(local: PresenceRecord[], remote: PresenceRecord[]) {
   const map = new Map<string, PresenceRecord>();
-  [...remote, ...local].forEach((item) => {
+  [...local, ...remote].forEach((item) => {
     const user = normalizeUser(item?.user);
     if (!user) return;
     const previous = map.get(user);
@@ -213,7 +202,7 @@ function gasJsonp(action: string, payload?: unknown): Promise<any | null> {
 
 function unwrapContacts(response: any): ChatContact[] {
   const data = response?.data || response;
-  const raw = data?.contacts || data?.users || data?.items || [];
+  const raw = data?.contacts || data?.users || data?.items || data?.messageContacts || [];
   if (!Array.isArray(raw)) return [];
   return mergeContacts(raw.flatMap((item) => {
     const record = item as Record<string, unknown>;
@@ -229,35 +218,45 @@ function unwrapMessagesState(response: any): MessagesState | null {
   const state = data?.messagesState || data;
   if (!state || !Array.isArray(state.messages)) return null;
   return {
-    messages: state.messages,
+    messages: state.messages.map((message: ChatMessage) => ({ ...message, kind: message.kind === 'message' ? 'chat' : message.kind })),
     presence: Array.isArray(state.presence) ? state.presence : [],
     contacts: unwrapContacts(state),
     updatedAt: String(state.updatedAt || nowIso()),
   };
 }
 
-function syncRemoteMessages(action: string, payload?: unknown) {
-  void gasJsonp(action, payload).then((response) => {
-    const remote = unwrapMessagesState(response);
-    if (!remote) return;
-    const nextMessages = mergeMessages(localMessages(), remote.messages);
-    writeLocalMessages(nextMessages);
-    writeLocalPresence(mergePresence(localPresence(), remote.presence));
-    writeLocalContacts(mergeContacts([...(remote.contacts || []), ...contactsFromMessages(nextMessages), ...localContacts()]));
-  }).catch(() => undefined);
+function applyRemote(response: unknown, user = readSessionUser()) {
+  const remote = unwrapMessagesState(response);
+  if (!remote) return null;
+  const mergedMessages = mergeMessages(localMessages(), remote.messages);
+  const mergedPresence = mergePresence(localPresence(), remote.presence);
+  const contacts = mergeContacts([...(remote.contacts || []), ...contactsFromMessages(mergedMessages, user), ...localContacts()]);
+  writeLocalMessages(mergedMessages);
+  writeLocalPresence(mergedPresence);
+  writeLocalContacts(contacts);
+  return { messages: mergedMessages, presence: mergedPresence, contacts, updatedAt: remote.updatedAt };
+}
+
+function syncRemoteMessages(action: string, payload?: unknown, user = readSessionUser()) {
+  void gasJsonp(action, payload).then((response) => applyRemote(response, user)).catch(() => undefined);
+}
+
+export function readSessionUser(): ChatUser {
+  const session = safeJson<{ user?: Record<string, unknown> } | null>(localStorage.getItem('a3k64-login-session-v1'), null);
+  const user = session?.user || {};
+  const email = normalizeUser(user.email || user.username || user.uid || 'local-user');
+  return {
+    id: String(user.uid || email),
+    email,
+    name: String(user.displayName || user.hoten || user.name || email.split('@')[0] || 'Người dùng'),
+    role: String(user.role || 'hoc_sinh'),
+    group: user.group as number | string | undefined,
+  };
 }
 
 export async function fetchMessagesState(user = readSessionUser()): Promise<MessagesState> {
-  const remote = unwrapMessagesState(await gasJsonp('getMessages', { user: user.email }));
-  if (remote) {
-    const mergedMessages = mergeMessages(localMessages(), remote.messages);
-    const mergedPresence = mergePresence(localPresence(), remote.presence);
-    const contacts = mergeContacts([...(remote.contacts || []), ...contactsFromMessages(mergedMessages, user), ...localContacts()]);
-    writeLocalMessages(mergedMessages);
-    writeLocalPresence(mergedPresence);
-    writeLocalContacts(contacts);
-    return { messages: mergedMessages, presence: mergedPresence, contacts, updatedAt: remote.updatedAt };
-  }
+  const remote = applyRemote(await gasJsonp('getMessages', { user: user.email }), user);
+  if (remote) return remote;
   const messages = localMessages();
   const contacts = mergeContacts([...localContacts(), ...contactsFromMessages(messages, user)]);
   return { messages, presence: localPresence(), contacts, updatedAt: nowIso() };
@@ -273,21 +272,28 @@ export async function fetchMessageContacts(user = readSessionUser()): Promise<Ch
 export function resolveContactTarget(input: string, contacts: ChatContact[]) {
   const raw = String(input || '').trim();
   if (!raw) return null;
-  if (raw.includes('@')) return { email: normalizeUser(raw), name: raw };
+  if (raw.includes('@')) {
+    const email = normalizeUser(raw);
+    const found = contacts.find((contact) => normalizeUser(contact.email) === email);
+    return found || { email, name: email.split('@')[0] };
+  }
   const query = normalizeContactText(raw);
   const exact = contacts.find((contact) => normalizeContactText(contact.name) === query || normalizeContactText(contact.email) === query);
   if (exact) return exact;
   const starts = contacts.find((contact) => normalizeContactText(contact.name).startsWith(query));
-  return starts || null;
+  if (starts) return starts;
+  const contains = contacts.find((contact) => `${normalizeContactText(contact.name)} ${normalizeContactText(contact.email)}`.includes(query));
+  if (contains) return contains;
+  return { email: raw.toLowerCase(), name: raw };
 }
 
 export function filterContacts(input: string, contacts: ChatContact[], currentEmail?: string) {
   const query = normalizeContactText(input);
-  if (!query) return contacts.filter((contact) => contact.email !== currentEmail).slice(0, 8);
-  return contacts
-    .filter((contact) => contact.email !== currentEmail)
+  const filtered = contacts.filter((contact) => contact.email !== currentEmail);
+  if (!query) return filtered.slice(0, 10);
+  return filtered
     .filter((contact) => `${normalizeContactText(contact.name)} ${normalizeContactText(contact.email)}`.includes(query))
-    .slice(0, 8);
+    .slice(0, 10);
 }
 
 export async function sendChatMessage(to: string, body: string, toName = '', user = readSessionUser()) {
@@ -299,28 +305,40 @@ export async function sendChatMessage(to: string, body: string, toName = '', use
     from: user.email,
     fromName: user.name,
     to: target,
-    toName,
+    toName: toName || target.split('@')[0] || target,
     body: body.trim(),
     status: 'sent',
     createdAt: nowIso(),
   };
-  writeLocalContacts(mergeContacts([...localContacts(), { email: target, name: toName || target }]));
+  writeLocalContacts(mergeContacts([...localContacts(), { email: target, name: message.toName || target }]));
   writeLocalMessages([...localMessages(), message]);
-  syncRemoteMessages('sendMessage', { message, user: user.email });
+  syncRemoteMessages('sendMessage', { message, user: user.email }, user);
   return message;
 }
 
 export async function markThreadRead(threadId: string, user = readSessionUser()) {
-  const local = localMessages().map((message) => message.threadId === threadId && message.to === user.email ? { ...message, status: 'read' as const, readAt: message.readAt || nowIso() } : message);
+  const local = localMessages().map((message) => message.threadId === threadId && (message.to === user.email || message.from === user.email) ? { ...message, status: 'read' as const, readAt: message.readAt || nowIso() } : message);
   writeLocalMessages(local);
-  syncRemoteMessages('markMessagesRead', { threadId, user: user.email });
+  syncRemoteMessages('markMessagesRead', { threadId, user: user.email }, user);
+}
+
+export async function markThreadUnread(threadId: string, user = readSessionUser()) {
+  const local = localMessages().map((message) => message.threadId === threadId && (message.to === user.email || message.from === user.email) ? { ...message, status: 'sent' as const, readAt: undefined } : message);
+  writeLocalMessages(local);
+  syncRemoteMessages('markMessagesUnread', { threadId, user: user.email }, user);
+}
+
+export async function hideMessageThread(threadId: string, user = readSessionUser()) {
+  const remaining = localMessages().filter((message) => message.threadId !== threadId);
+  writeLocalMessages(remaining);
+  syncRemoteMessages('deleteMessageThread', { threadId, user: user.email }, user);
 }
 
 export async function updatePresence(user = readSessionUser()) {
   const next: PresenceRecord = { user: user.email, name: user.name, activeAt: nowIso() };
   const presence = [next, ...localPresence().filter((item) => normalizeUser(item.user) !== user.email)].slice(0, 80);
   writeLocalPresence(presence);
-  syncRemoteMessages('setPresence', next);
+  syncRemoteMessages('setPresence', next, user);
   return next;
 }
 
@@ -345,7 +363,7 @@ export async function requestGroupAccess(targetGroup: number, reason: string, we
     createdAt: nowIso(),
   };
   writeLocalMessages([...localMessages(), message]);
-  syncRemoteMessages('requestGroupAccess', { message, user: user.email });
+  syncRemoteMessages('requestGroupAccess', { message, user: user.email }, user);
   return message;
 }
 
@@ -362,7 +380,7 @@ export async function respondGroupAccess(messageId: string, status: Extract<Perm
   const changed = updated.find((message) => message.id === messageId);
   if (changed && status === 'approved') saveApprovedPermission(changed);
   writeLocalMessages(updated);
-  syncRemoteMessages('respondGroupAccess', { messageId, status, user: user.email, resolverName: user.name });
+  syncRemoteMessages('respondGroupAccess', { messageId, status, user: user.email, resolverName: user.name }, user);
   return changed || null;
 }
 
