@@ -39,7 +39,6 @@ import './scoreboardExcelExport';
 import './scoreboardScreenshotCapture';
 import './scoreboardScreenshotFullPreviewFix.css';
 import './shotFix.css';
-import './shotLoadingDomFix.css';
 import './scoreboardScreenshotAllClassCompact';
 import './scoreboardScreenshotGroupFullDetailsFix';
 import './overlayThemeSync';
@@ -60,7 +59,6 @@ import './messagesMessengerBubblePolish.css';
 import './messagesLightModeHardFix.css';
 import './messagesServerReloadHardFix';
 import './desktopLightThemeHardFix.css';
-import './desktopLightBackgroundRuntimeFix';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
