@@ -62,6 +62,7 @@ import './desktopLightThemeHardFix.css';
 import './desktopDarkBackgroundSoftFix.css';
 import './desktopDriveWallpaperSync';
 import './desktopDriveErrorPolish';
+import './desktopWallpaperStabilityFix';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
