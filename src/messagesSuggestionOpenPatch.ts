@@ -92,7 +92,7 @@ function gasJsonp(action: string, payload?: unknown): Promise<any | null> {
 
     callbacks[callbackName] = (json: unknown) => finish(json);
     script.onerror = () => finish(null);
-    timeoutId = window.setTimeout(() => finish(null), 16000);
+    timeoutId = window.setTimeout(() => finish(null), 8000);
     script.src = url.toString();
     document.head.appendChild(script);
   });
@@ -150,9 +150,10 @@ function createLocalThread(targetName: string) {
     fromName: user.name,
     to: target.email,
     toName: target.name,
-    body: 'Đã tạo cuộc trò chuyện.',
-    status: 'sent',
+    body: '',
+    status: 'read',
     createdAt: now,
+    payload: { threadOnly: true },
     pendingServer: true,
   };
   const messages = safeJson<Array<Record<string, unknown>>>(localStorage.getItem(LOCAL_MESSAGES_KEY), []);
@@ -163,28 +164,11 @@ function createLocalThread(targetName: string) {
   return message;
 }
 
-function clickSync() {
-  const syncButton = Array.from(document.querySelectorAll<HTMLButtonElement>('.messages-profile-card button,.messages-soft'))
-    .find((button) => (button.title || button.textContent || '').toLowerCase().includes('đồng bộ'));
-  window.setTimeout(() => syncButton?.click(), 80);
-}
-
 function syncThreadToServer(message: Record<string, unknown>) {
   const user = readSessionUser();
   void gasJsonp('sendMessage', { message, user: user.email }).then((response) => {
-    const ok = Boolean(response?.ok !== false && mergeServerMessages(response));
-    if (ok) clickSync();
+    if (response?.ok !== false) mergeServerMessages(response);
   }).catch(() => undefined);
-}
-
-function toast(text: string) {
-  const old = document.querySelector('.a3-message-server-toast');
-  old?.remove();
-  const node = document.createElement('div');
-  node.className = 'messages-toast a3-message-server-toast';
-  node.textContent = text;
-  document.querySelector('.messages-native-app')?.appendChild(node);
-  window.setTimeout(() => node.remove(), 2200);
 }
 
 function createThreadFromInput(input: HTMLInputElement) {
@@ -203,7 +187,7 @@ function openSelectedContact(button: HTMLButtonElement) {
   const name = (button.querySelector('strong')?.textContent || button.textContent || '').trim();
   if (!input || !name) return;
   setReactInputValue(input, name);
-  window.setTimeout(() => createThreadFromInput(input), 20);
+  window.setTimeout(() => createThreadFromInput(input), 0);
 }
 
 function initMessageSuggestionOpenPatch() {
@@ -227,7 +211,6 @@ function initMessageSuggestionOpenPatch() {
         event.stopPropagation();
         event.stopImmediatePropagation();
         createThreadFromInput(input);
-        toast('Đang đồng bộ máy chủ...');
       }
     }
   }, true);
