@@ -8,7 +8,7 @@
   display: none !important;
 }
 
-/* Ghi đè thật mạnh vì App.tsx có style nội bộ cho .taskbar. */
+/* Taskbar chỉ là lớp định vị trong suốt. Dock và đồng hồ tự định vị riêng. */
 .win-root .taskbar,
 .win-root.theme-light .taskbar,
 body .win-root .taskbar {
@@ -32,10 +32,7 @@ body .win-root .taskbar {
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  display: grid !important;
-  grid-template-columns: 1fr max-content max-content !important;
-  align-items: center !important;
-  gap: 10px !important;
+  display: block !important;
   pointer-events: none !important;
   overflow: visible !important;
 }
@@ -47,31 +44,20 @@ body .win-root .taskbar {
   background: transparent !important;
 }
 
-.win-root .taskbar.align-left,
-.win-root.theme-light .taskbar.align-left {
-  grid-template-columns: max-content 1fr max-content !important;
-}
-
-.win-root .taskbar.align-left .task-left,
-.win-root.theme-light .taskbar.align-left .task-left {
-  display: none !important;
-}
-
 .win-root .task-left,
 .win-root.theme-light .task-left {
-  display: block !important;
-  min-width: 0 !important;
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  pointer-events: none !important;
+  display: none !important;
 }
 
 .win-root .task-center,
 .win-root.theme-light .task-center,
 body .win-root .task-center {
+  position: absolute !important;
+  left: 50% !important;
+  right: auto !important;
+  top: 4px !important;
+  bottom: auto !important;
+  transform: translateX(-50%) !important;
   width: max-content !important;
   max-width: min(760px, calc(100vw - 210px)) !important;
   min-width: 0 !important;
@@ -96,30 +82,39 @@ body .win-root .task-center {
   pointer-events: auto !important;
   transition: max-width .2s ease, padding .18s ease, background .18s ease !important;
   scrollbar-width: none !important;
-  justify-self: center !important;
+  justify-self: auto !important;
+  grid-column: auto !important;
 }
 
 .win-root .task-center::-webkit-scrollbar {
   display: none !important;
 }
 
+/* Căn trái: dock dính trái, đồng hồ vẫn riêng bên phải. */
 .win-root .taskbar.align-left .task-center,
 .win-root.theme-light .taskbar.align-left .task-center {
-  justify-self: start !important;
-  grid-column: 1 !important;
+  left: 0 !important;
+  transform: none !important;
 }
 
+/* Căn giữa: dock luôn ở đúng giữa viewport, không bị cụm giờ/ngày kéo lệch. */
 .win-root .taskbar.align-center .task-center,
 .win-root .taskbar:not(.align-left) .task-center,
 .win-root.theme-light .taskbar.align-center .task-center,
 .win-root.theme-light .taskbar:not(.align-left) .task-center {
-  justify-self: center !important;
-  grid-column: 2 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
 }
 
 .win-root .task-right,
 .win-root.theme-light .task-right,
 body .win-root .task-right {
+  position: absolute !important;
+  right: 0 !important;
+  left: auto !important;
+  top: 4px !important;
+  bottom: auto !important;
+  transform: none !important;
   width: max-content !important;
   min-width: 92px !important;
   max-width: 150px !important;
@@ -140,7 +135,7 @@ body .win-root .task-right {
   backdrop-filter: blur(18px) saturate(1.25) !important;
   -webkit-backdrop-filter: blur(18px) saturate(1.25) !important;
   pointer-events: auto !important;
-  justify-self: end !important;
+  justify-self: auto !important;
 }
 
 .win-root .task-right span,
@@ -187,7 +182,6 @@ body .win-root .task-right {
     right: 10px !important;
     bottom: 8px !important;
     height: 50px !important;
-    grid-template-columns: 1fr max-content !important;
   }
 
   .win-root .task-center,
