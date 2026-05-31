@@ -34,10 +34,35 @@ function makeMessageId() {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function toLocalTargetId(raw: string) {
-  const value = raw.trim();
-  if (value.includes('@')) return normalizeUser(value);
-  return value.toLowerCase();
+function normalizeNameKey(value: unknown) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .replace(/[^a-z0-9@.]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function resolveTarget(rawInput: string) {
+  const raw = rawInput.trim();
+  if (!raw) return null;
+  const contacts = safeJson<Array<Record<string, unknown>>>(localStorage.getItem(LOCAL_CONTACTS_KEY), []);
+  if (raw.includes('@')) {
+    const email = normalizeUser(raw);
+    const found = contacts.find((c) => normalizeUser(c.email || c.username || c.gmail) === email);
+    return { email, name: String(found?.name || found?.displayName || email.split('@')[0]) };
+  }
+  const key = normalizeNameKey(raw);
+  const found = contacts.find((contact) => {
+    const name = normalizeNameKey(contact.name || contact.displayName || contact.fullName || contact.hoten);
+    const email = normalizeNameKey(contact.email || contact.username || contact.gmail);
+    return name === key || name.startsWith(key) || `${name} ${email}`.includes(key);
+  });
+  if (found) return { email: normalizeUser(found.email || found.username || found.gmail || raw), name: String(found.name || found.displayName || raw) };
+  return { email: raw.toLowerCase(), name: raw };
 }
 
 function gasJsonp(action: string, payload?: unknown): Promise<any | null> {
@@ -77,7 +102,7 @@ function upsertLocalContact(targetId: string, targetName: string) {
   const contacts = safeJson<Array<Record<string, unknown>>>(localStorage.getItem(LOCAL_CONTACTS_KEY), []);
   const next = [
     { email: targetId, name: targetName, displayName: targetName },
-    ...contacts.filter((item) => normalizeUser(item.email) !== targetId),
+    ...contacts.filter((item) => normalizeUser(item.email || item.username || item.gmail) !== targetId),
   ].slice(0, 300);
   localStorage.setItem(LOCAL_CONTACTS_KEY, JSON.stringify(next));
 }
@@ -92,7 +117,7 @@ function mergeServerMessages(response: any) {
   [...currentMessages, ...state.messages].forEach((message) => {
     const id = String(message?.id || '');
     if (!id) return;
-    map.set(id, { ...map.get(id), ...message });
+    map.set(id, { ...map.get(id), ...message, pendingServer: false });
   });
   localStorage.setItem(LOCAL_MESSAGES_KEY, JSON.stringify([...map.values()]));
 
@@ -111,62 +136,45 @@ function mergeServerMessages(response: any) {
   return true;
 }
 
-function appendLocalFallback(targetName: string, serverId?: string) {
+function createLocalThread(targetName: string) {
   const user = readSessionUser();
-  const targetId = toLocalTargetId(targetName);
-  const now = new Date().toISOString();
-  const message = {
-    id: serverId || makeMessageId(),
-    threadId: [user.email, targetId].sort().join('__'),
-    kind: 'chat',
-    from: user.email,
-    fromName: user.name,
-    to: targetId,
-    toName: targetName,
-    body: 'Đã tạo cuộc trò chuyện.',
-    status: 'sent',
-    createdAt: now,
-    pendingServer: !serverId,
-  };
-  const messages = safeJson<Array<Record<string, unknown>>>(localStorage.getItem(LOCAL_MESSAGES_KEY), []);
-  const exists = messages.some((item) => item.threadId === message.threadId);
-  localStorage.setItem(LOCAL_MESSAGES_KEY, JSON.stringify(exists ? messages : [...messages, message]));
-  upsertLocalContact(targetId, targetName);
-  window.dispatchEvent(new Event('a3k64-messages-local-change'));
-}
-
-function clickSync() {
-  const syncButton = Array.from(document.querySelectorAll<HTMLButtonElement>('.messages-soft'))
-    .find((button) => (button.textContent || '').toLowerCase().includes('đồng bộ'));
-  window.setTimeout(() => syncButton?.click(), 80);
-}
-
-async function createThreadOnServer(targetName: string) {
-  const user = readSessionUser();
-  const targetRaw = targetName.trim();
+  const target = resolveTarget(targetName);
+  if (!target) return null;
   const now = new Date().toISOString();
   const message = {
     id: makeMessageId(),
-    threadId: [user.email, toLocalTargetId(targetRaw)].sort().join('__'),
+    threadId: [user.email, target.email].sort().join('__'),
     kind: 'chat',
     type: 'message',
     from: user.email,
     fromName: user.name,
-    to: targetRaw,
-    toName: targetRaw,
+    to: target.email,
+    toName: target.name,
     body: 'Đã tạo cuộc trò chuyện.',
     status: 'sent',
     createdAt: now,
+    pendingServer: true,
   };
+  const messages = safeJson<Array<Record<string, unknown>>>(localStorage.getItem(LOCAL_MESSAGES_KEY), []);
+  const exists = messages.some((item) => item.threadId === message.threadId);
+  localStorage.setItem(LOCAL_MESSAGES_KEY, JSON.stringify(exists ? messages : [...messages, message]));
+  upsertLocalContact(target.email, target.name);
+  window.dispatchEvent(new Event('a3k64-messages-local-change'));
+  return message;
+}
 
-  const response = await gasJsonp('sendMessage', { message, user: user.email });
-  const ok = Boolean(response?.ok !== false && mergeServerMessages(response));
-  if (!ok) {
-    appendLocalFallback(targetRaw);
-    return false;
-  }
-  clickSync();
-  return true;
+function clickSync() {
+  const syncButton = Array.from(document.querySelectorAll<HTMLButtonElement>('.messages-profile-card button,.messages-soft'))
+    .find((button) => (button.title || button.textContent || '').toLowerCase().includes('đồng bộ'));
+  window.setTimeout(() => syncButton?.click(), 80);
+}
+
+function syncThreadToServer(message: Record<string, unknown>) {
+  const user = readSessionUser();
+  void gasJsonp('sendMessage', { message, user: user.email }).then((response) => {
+    const ok = Boolean(response?.ok !== false && mergeServerMessages(response));
+    if (ok) clickSync();
+  }).catch(() => undefined);
 }
 
 function toast(text: string) {
@@ -176,25 +184,26 @@ function toast(text: string) {
   node.className = 'messages-toast a3-message-server-toast';
   node.textContent = text;
   document.querySelector('.messages-native-app')?.appendChild(node);
-  window.setTimeout(() => node.remove(), 2600);
+  window.setTimeout(() => node.remove(), 2200);
 }
 
-async function createThreadFromInput(input: HTMLInputElement) {
+function createThreadFromInput(input: HTMLInputElement) {
   const name = input.value.trim();
   if (!name) return false;
   setReactInputValue(input, '');
-  const ok = await createThreadOnServer(name);
-  if (!ok) toast('Máy chủ chưa phản hồi, đã tạm hiển thị và sẽ đồng bộ lại sau.');
+  const message = createLocalThread(name);
+  if (!message) return false;
+  syncThreadToServer(message);
   return true;
 }
 
 function openSelectedContact(button: HTMLButtonElement) {
-  const box = button.closest('.messages-new-thread');
+  const box = button.closest('.messages-new-thread,.messages-new-box');
   const input = box?.querySelector<HTMLInputElement>('.messages-contact-box input');
   const name = (button.querySelector('strong')?.textContent || button.textContent || '').trim();
   if (!input || !name) return;
   setReactInputValue(input, name);
-  window.setTimeout(() => void createThreadFromInput(input), 50);
+  window.setTimeout(() => createThreadFromInput(input), 20);
 }
 
 function initMessageSuggestionOpenPatch() {
@@ -204,18 +213,21 @@ function initMessageSuggestionOpenPatch() {
     if (suggestion) {
       event.preventDefault();
       event.stopPropagation();
+      event.stopImmediatePropagation();
       openSelectedContact(suggestion);
       return;
     }
 
-    const createButton = target?.closest('.messages-new-thread > button') as HTMLButtonElement | null;
+    const createButton = target?.closest('.messages-new-thread > button,.messages-new-box > button') as HTMLButtonElement | null;
     if (createButton) {
-      const box = createButton.closest('.messages-new-thread');
+      const box = createButton.closest('.messages-new-thread,.messages-new-box');
       const input = box?.querySelector<HTMLInputElement>('.messages-contact-box input');
       if (input && input.value.trim()) {
         event.preventDefault();
         event.stopPropagation();
-        void createThreadFromInput(input);
+        event.stopImmediatePropagation();
+        createThreadFromInput(input);
+        toast('Đang đồng bộ máy chủ...');
       }
     }
   }, true);
