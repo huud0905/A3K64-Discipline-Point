@@ -1,0 +1,31 @@
+/* Đồng bộ màu công tắc ON với màu chủ đạo trong Settings.
+   File này cần import sau SettingsApp/settings polish để thắng light-mode override. */
+
+.settings-app .toggle.on,
+.win-root .settings-app .toggle.on,
+.win-root.theme-light .settings-app .toggle.on,
+.theme-light .settings-app .toggle.on {
+  background: var(--desktop-accent, #059669) !important;
+  border-color: color-mix(in srgb, var(--desktop-accent, #059669) 78%, #ffffff) !important;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--desktop-accent, #059669) 24%, transparent) !important;
+}
+
+.settings-app .toggle.on span,
+.win-root .settings-app .toggle.on span,
+.win-root.theme-light .settings-app .toggle.on span,
+.theme-light .settings-app .toggle.on span {
+  background: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, .18) !important;
+}
+
+.settings-app .toggle:not(.on),
+.win-root.theme-light .settings-app .toggle:not(.on),
+.theme-light .settings-app .toggle:not(.on) {
+  background: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.win-root:not(.theme-light) .settings-app .toggle:not(.on) {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
