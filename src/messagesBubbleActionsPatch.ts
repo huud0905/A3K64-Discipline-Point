@@ -1,3 +1,9 @@
+const LOCAL_MESSAGES_KEY = 'a3k64-messages-local-v1';
+
+function safeJson<T>(raw: string | null, fallback: T): T {
+  try { return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; }
+}
+
 function getBubbleText(bubble: Element) {
   return (bubble.querySelector('p')?.textContent || '').trim();
 }
@@ -10,6 +16,59 @@ function setTextareaValue(textarea: HTMLTextAreaElement, value: string) {
   textarea.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
+function readSessionEmail() {
+  const session = safeJson<{ user?: Record<string, unknown> } | null>(localStorage.getItem('a3k64-login-session-v1'), null);
+  return String(session?.user?.email || session?.user?.username || session?.user?.uid || '').trim().toLowerCase();
+}
+
+function initialsFromName(name: string) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+function bubbleSenderName(bubble: HTMLElement) {
+  const meta = bubble.querySelector('span')?.textContent || '';
+  return meta.split('·')[0]?.trim() || '';
+}
+
+function activeThreadName() {
+  return (document.querySelector('.messages-chat-title strong')?.textContent || '').trim();
+}
+
+function activeThreadIdFromDom() {
+  const activeCard = document.querySelector('.messages-thread-card.active');
+  const name = (activeCard?.querySelector('.messages-thread-info strong')?.textContent || activeThreadName()).trim();
+  const lastText = (activeCard?.querySelector('.messages-thread-info p')?.textContent || '').trim();
+  return { name, lastText };
+}
+
+function markActiveThreadReadLocal() {
+  const me = readSessionEmail();
+  if (!me) return;
+  const active = activeThreadIdFromDom();
+  if (!active.name) return;
+  const messages = safeJson<Array<Record<string, unknown>>>(localStorage.getItem(LOCAL_MESSAGES_KEY), []);
+  let changed = false;
+  const next = messages.map((message) => {
+    const to = String(message.to || '').toLowerCase();
+    const fromName = String(message.fromName || '');
+    const toName = String(message.toName || '');
+    const body = String(message.body || '');
+    const belongs = fromName === active.name || toName === active.name || body === active.lastText;
+    if (belongs && to === me && message.status !== 'read') {
+      changed = true;
+      return { ...message, status: 'read', readAt: new Date().toISOString() };
+    }
+    return message;
+  });
+  if (changed) {
+    localStorage.setItem(LOCAL_MESSAGES_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event('a3k64-messages-local-change'));
+  }
+}
+
 function toast(text: string) {
   const old = document.querySelector('.a3-message-action-toast');
   old?.remove();
@@ -20,11 +79,25 @@ function toast(text: string) {
   window.setTimeout(() => node.remove(), 2200);
 }
 
+function addAvatarToBubble(bubble: HTMLElement) {
+  if (bubble.classList.contains('mine')) return;
+  if (bubble.querySelector('.a3-bubble-avatar')) return;
+  const name = bubbleSenderName(bubble) || activeThreadName();
+  const avatar = document.createElement('span');
+  avatar.className = 'a3-bubble-avatar';
+  avatar.textContent = initialsFromName(name);
+  bubble.appendChild(avatar);
+}
+
 function patchBubble(bubble: HTMLElement) {
-  if (bubble.dataset.a3BubbleActions === '1') return;
+  if (bubble.dataset.a3BubbleActions === '1') {
+    addAvatarToBubble(bubble);
+    return;
+  }
   bubble.dataset.a3BubbleActions = '1';
   const meta = bubble.querySelector('span')?.textContent || '';
   if (meta) bubble.title = meta;
+  addAvatarToBubble(bubble);
 
   const actions = document.createElement('div');
   actions.className = 'a3-message-hover-actions';
@@ -69,12 +142,20 @@ function patchBubble(bubble: HTMLElement) {
 
 function patchAll() {
   document.querySelectorAll<HTMLElement>('.messages-bubble').forEach(patchBubble);
+  markActiveThreadReadLocal();
 }
 
 function init() {
   patchAll();
   const observer = new MutationObserver(patchAll);
   observer.observe(document.documentElement, { childList: true, subtree: true });
+  document.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('.messages-thread-card,.messages-thread-main,.messages-chat-main,.messages-main-panel')) {
+      window.setTimeout(markActiveThreadReadLocal, 100);
+    }
+  }, true);
+  window.setInterval(markActiveThreadReadLocal, 2500);
 }
 
 if (typeof window !== 'undefined') {
