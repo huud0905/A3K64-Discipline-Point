@@ -60,6 +60,7 @@ import './messagesLightModeHardFix.css';
 import './messagesServerReloadHardFix';
 import './desktopLightThemeHardFix.css';
 import './desktopDarkBackgroundSoftFix.css';
+import './desktopDriveWallpaperSync';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
