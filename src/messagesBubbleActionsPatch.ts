@@ -99,9 +99,20 @@ function patchBubble(bubble: HTMLElement) {
   if (meta) bubble.title = meta;
   addAvatarToBubble(bubble);
 
+  const isMine = bubble.classList.contains('mine');
   const actions = document.createElement('div');
   actions.className = 'a3-message-hover-actions';
-  actions.innerHTML = '<button type="button" data-action="react" title="React">😊</button><button type="button" data-action="reply" title="Trả lời">↩</button><button type="button" data-action="more" title="Thêm">⋮</button><div class="a3-message-more-menu"><button type="button" data-action="forward">Chuyển tiếp</button><button type="button" data-action="remove-me">Gỡ bên phía bạn</button><button type="button" data-action="unsend">Thu hồi cả 2 phía</button><button type="button" data-action="pin">Ghim</button></div>';
+  actions.innerHTML = `
+    <button type="button" data-action="react" title="React">😊</button>
+    <button type="button" data-action="reply" title="Trả lời">↩</button>
+    <button type="button" data-action="more" title="Thêm">⋮</button>
+    <div class="a3-message-more-menu">
+      <button type="button" data-action="forward">Chuyển tiếp</button>
+      <button type="button" data-action="remove-me">Gỡ bên phía bạn</button>
+      ${isMine ? '<button type="button" data-action="unsend">Thu hồi cả 2 phía</button>' : ''}
+      <button type="button" data-action="pin">Ghim</button>
+    </div>
+  `;
   actions.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
