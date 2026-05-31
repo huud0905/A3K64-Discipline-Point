@@ -49,6 +49,10 @@ export type MessagesState = {
   updatedAt: string;
 };
 
+export type FetchMessagesOptions = {
+  force?: boolean;
+};
+
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const JSONP_TIMEOUT_MS = 12000;
 const LOCAL_MESSAGES_KEY = 'a3k64-messages-local-v1';
@@ -232,12 +236,12 @@ function unwrapMessagesState(response: any): MessagesState | null {
   };
 }
 
-function applyRemote(response: unknown, user = readSessionUser()) {
+function applyRemote(response: unknown, user = readSessionUser(), replaceLocal = false) {
   const remote = unwrapMessagesState(response);
   if (!remote) return null;
-  const mergedMessages = mergeMessages(localMessages(), remote.messages);
-  const mergedPresence = mergePresence(localPresence(), remote.presence);
-  const contacts = mergeContacts([...(remote.contacts || []), ...contactsFromMessages(mergedMessages, user), ...localContacts()]);
+  const mergedMessages = replaceLocal ? remote.messages : mergeMessages(localMessages(), remote.messages);
+  const mergedPresence = replaceLocal ? remote.presence : mergePresence(localPresence(), remote.presence);
+  const contacts = mergeContacts([...(remote.contacts || []), ...contactsFromMessages(mergedMessages, user), ...(replaceLocal ? [] : localContacts())]);
   writeLocalMessages(mergedMessages);
   writeLocalPresence(mergedPresence);
   writeLocalContacts(contacts);
@@ -268,11 +272,17 @@ function localState(user = readSessionUser()): MessagesState {
   return { messages, presence: localPresence(), contacts, updatedAt: nowIso() };
 }
 
-export async function fetchMessagesState(user = readSessionUser()): Promise<MessagesState> {
+export async function fetchMessagesState(user = readSessionUser(), options: FetchMessagesOptions = {}): Promise<MessagesState> {
   const cached = localState(user);
-  if (Date.now() - lastMessagesFetchAt < CACHE_MAX_AGE_MS && cached.messages.length) return cached;
-  if (inFlightState) return inFlightState;
-  inFlightState = gasJsonp('getMessages', { user: user.email, limit: 250 }).then((response) => applyRemote(response, user) || cached).finally(() => { inFlightState = null; });
+  if (!options.force && Date.now() - lastMessagesFetchAt < CACHE_MAX_AGE_MS && cached.messages.length) return cached;
+  if (!options.force && inFlightState) return inFlightState;
+  const request = gasJsonp('getMessages', { user: user.email, limit: 250, force: options.force ? 1 : 0 }).then((response) => {
+    const remote = applyRemote(response, user, Boolean(options.force));
+    if (remote) return remote;
+    return cached;
+  });
+  if (options.force) return request;
+  inFlightState = request.finally(() => { inFlightState = null; });
   return inFlightState;
 }
 
