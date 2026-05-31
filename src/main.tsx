@@ -64,6 +64,7 @@ import './desktopDriveWallpaperSync';
 import './desktopDriveErrorPolish';
 import './desktopWallpaperStabilityFix';
 import './settingsWallpaperUiPolish.css';
+import './settingsToggleAccentFix.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
