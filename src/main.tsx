@@ -54,6 +54,7 @@ import './scoreboardPositiveColor.css';
 import './settingsDisplayOptionsPatch';
 import './messagesThreadActionsPatch';
 import './messagesSuggestionOpenPatch';
+import './messagesPermissionRoleGuard';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
