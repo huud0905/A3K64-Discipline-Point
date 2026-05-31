@@ -1,10 +1,29 @@
-/* Làm nền desktop tối sáng hơn một chút, không dùng runtime JS để tránh treo web. */
-.win-root:not(.theme-light) {
-  background:
-    radial-gradient(circle at 16% 12%, rgba(16, 185, 129, .13), transparent 24%),
-    radial-gradient(circle at 82% 18%, rgba(59, 130, 246, .16), transparent 26%),
-    radial-gradient(circle at 50% 100%, rgba(148, 163, 184, .10), transparent 38%),
-    linear-gradient(135deg, #162033 0%, #1e2b4a 45%, #243447 100%) !important;
+/* Khôi phục hình nền desktop thật. Không dùng runtime JS để tránh treo web.
+   Lớp .win-desktop là lớp phủ toàn màn hình nên phải set nền trực tiếp ở đây. */
+
+.win-root:not(.theme-light),
+.win-root:not(.theme-light) .win-desktop {
+  background-color: #061225 !important;
+  background-image:
+    radial-gradient(circle at 16% 12%, rgba(16, 185, 129, .15), transparent 24%),
+    radial-gradient(circle at 82% 18%, rgba(59, 130, 246, .14), transparent 26%),
+    radial-gradient(circle at 50% 100%, rgba(148, 163, 184, .08), transparent 38%),
+    linear-gradient(135deg, #07111f 0%, #0f1b31 42%, #08111d 100%) !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  background-attachment: fixed !important;
+}
+
+.win-root.theme-light,
+.win-root.theme-light .win-desktop {
+  background-color: #eef2f7 !important;
+  background-image:
+    radial-gradient(circle at 18% 12%, rgba(5, 150, 105, .16), transparent 31%),
+    radial-gradient(circle at 84% 18%, rgba(37, 99, 235, .10), transparent 30%),
+    linear-gradient(135deg, #eff6ff 0%, #f8fafc 52%, #e2e8f0 100%) !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  background-attachment: fixed !important;
 }
 
 .win-root:not(.theme-light) .win-empty-note {
