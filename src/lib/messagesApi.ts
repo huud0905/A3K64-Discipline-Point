@@ -50,11 +50,14 @@ export type MessagesState = {
 };
 
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
-const JSONP_TIMEOUT_MS = 22000;
+const JSONP_TIMEOUT_MS = 12000;
 const LOCAL_MESSAGES_KEY = 'a3k64-messages-local-v1';
 const LOCAL_PRESENCE_KEY = 'a3k64-messages-presence-local-v1';
 const LOCAL_CONTACTS_KEY = 'a3k64-messages-contacts-local-v1';
 const EXTRA_PERMISSION_KEY = 'a3k64-extra-edit-permissions-v1';
+const CACHE_MAX_AGE_MS = 5000;
+let lastMessagesFetchAt = 0;
+let inFlightState: Promise<MessagesState> | null = null;
 
 function nowIso() {
   return new Date().toISOString();
@@ -86,6 +89,10 @@ function safeJson<T>(raw: string | null, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function isThreadOnly(message: Partial<ChatMessage>) {
+  return !String(message.body || '').trim() && Boolean((message.payload as Record<string, unknown> | undefined)?.threadOnly);
 }
 
 function localMessages() {
@@ -234,6 +241,7 @@ function applyRemote(response: unknown, user = readSessionUser()) {
   writeLocalMessages(mergedMessages);
   writeLocalPresence(mergedPresence);
   writeLocalContacts(contacts);
+  lastMessagesFetchAt = Date.now();
   return { messages: mergedMessages, presence: mergedPresence, contacts, updatedAt: remote.updatedAt };
 }
 
@@ -254,19 +262,27 @@ export function readSessionUser(): ChatUser {
   };
 }
 
-export async function fetchMessagesState(user = readSessionUser()): Promise<MessagesState> {
-  const remote = applyRemote(await gasJsonp('getMessages', { user: user.email }), user);
-  if (remote) return remote;
+function localState(user = readSessionUser()): MessagesState {
   const messages = localMessages();
   const contacts = mergeContacts([...localContacts(), ...contactsFromMessages(messages, user)]);
   return { messages, presence: localPresence(), contacts, updatedAt: nowIso() };
 }
 
+export async function fetchMessagesState(user = readSessionUser()): Promise<MessagesState> {
+  const cached = localState(user);
+  if (Date.now() - lastMessagesFetchAt < CACHE_MAX_AGE_MS && cached.messages.length) return cached;
+  if (inFlightState) return inFlightState;
+  inFlightState = gasJsonp('getMessages', { user: user.email, limit: 250 }).then((response) => applyRemote(response, user) || cached).finally(() => { inFlightState = null; });
+  return inFlightState;
+}
+
 export async function fetchMessageContacts(user = readSessionUser()): Promise<ChatContact[]> {
-  const remote = unwrapContacts(await gasJsonp('getMessageContacts', { user: user.email }));
-  const contacts = mergeContacts([...remote, ...localContacts(), ...contactsFromMessages(localMessages(), user)]);
-  writeLocalContacts(contacts);
-  return contacts;
+  const local = mergeContacts([...localContacts(), ...contactsFromMessages(localMessages(), user)]);
+  void gasJsonp('getMessageContacts', { user: user.email }).then((response) => {
+    const remote = unwrapContacts(response);
+    if (remote.length) writeLocalContacts(mergeContacts([...remote, ...localContacts()]));
+  }).catch(() => undefined);
+  return local;
 }
 
 export function resolveContactTarget(input: string, contacts: ChatContact[]) {
