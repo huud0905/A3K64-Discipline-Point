@@ -66,6 +66,7 @@ import './desktopWallpaperStabilityFix';
 import './settingsWallpaperUiPolish.css';
 import './settingsToggleAccentFix.css';
 import './desktopCleanWallpaperMode.css';
+import './taskFocusSwitchDarkOnFix.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
