@@ -59,6 +59,7 @@ import './messagesMessengerBubblePolish.css';
 import './messagesLightModeHardFix.css';
 import './messagesServerReloadHardFix';
 import './desktopLightThemeHardFix.css';
+import './desktopDarkBackgroundSoftFix.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
