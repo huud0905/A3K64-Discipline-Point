@@ -1,13 +1,28 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, MessageCircle, RefreshCw, Send, ShieldCheck, X } from 'lucide-react';
+import {
+  Check,
+  Mail,
+  MailOpen,
+  MessageCircle,
+  MoreHorizontal,
+  RefreshCw,
+  Search,
+  Send,
+  ShieldCheck,
+  Trash2,
+  UserRound,
+  X,
+} from 'lucide-react';
 import {
   ChatContact,
   ChatMessage,
   fetchMessageContacts,
   fetchMessagesState,
   filterContacts,
+  hideMessageThread,
   isOnline,
   markThreadRead,
+  markThreadUnread,
   readSessionUser,
   requestGroupAccess,
   resolveContactTarget,
@@ -33,6 +48,18 @@ function fmt(value: string) {
     : '';
 }
 
+function normalizeText(value: unknown) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .replace(/[^a-z0-9@.]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function isEmail(value?: string) {
   return Boolean(String(value || '').includes('@'));
 }
@@ -41,6 +68,13 @@ function emailAlias(value?: string) {
   const raw = String(value || '').trim();
   if (!raw) return '';
   return raw.includes('@') ? raw.split('@')[0] : raw;
+}
+
+function initials(name: string) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 export default function MessagesApp({ userEmail, userName, userRole, userGroup }: Props) {
@@ -58,11 +92,13 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
   const [presence, setPresence] = useState<{ user: string; name: string; activeAt: string }[]>([]);
   const [contacts, setContacts] = useState<ChatContact[]>([]);
   const [activeThread, setActiveThread] = useState('');
+  const [query, setQuery] = useState('');
   const [newTo, setNewTo] = useState('');
   const [draft, setDraft] = useState('');
   const [targetGroup, setTargetGroup] = useState('');
   const [reason, setReason] = useState('');
   const [toast, setToast] = useState('');
+  const [menuThreadId, setMenuThreadId] = useState('');
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -89,61 +125,71 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me.email]);
 
-  const threadContacts = useMemo(() => {
+  useEffect(() => {
+    const close = () => setMenuThreadId('');
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, []);
+
+  const allContacts = useMemo(() => {
     const map = new Map<string, ChatContact>();
     map.set(me.email, { email: me.email, name: me.name || emailAlias(me.email), role: me.role, group: me.group });
-
     messages.forEach((m) => {
-      if (m.kind !== 'chat') return;
+      if (m.kind !== 'chat' && m.kind !== 'message') return;
       if (m.from) map.set(m.from, { email: m.from, name: m.fromName || emailAlias(m.from) });
       if (m.to && !m.to.startsWith('to')) map.set(m.to, { email: m.to, name: m.toName || emailAlias(m.to) });
     });
-
     contacts.forEach((contact) => {
       if (contact.email) map.set(contact.email, contact);
     });
-
     return [...map.values()];
   }, [contacts, me.email, me.group, me.name, me.role, messages]);
 
-  const contactNameByEmail = useMemo(() => {
+  const nameByEmail = useMemo(() => {
     const map = new Map<string, string>();
-    threadContacts.forEach((contact) => {
+    allContacts.forEach((contact) => {
       if (contact.email && contact.name && !isEmail(contact.name)) map.set(contact.email, contact.name);
     });
     map.set(me.email, me.name || emailAlias(me.email));
-    messages.forEach((message) => {
-      if (message.from && message.fromName && !isEmail(message.fromName)) map.set(message.from, message.fromName);
-      if (message.to && message.toName && !isEmail(message.toName)) map.set(message.to, message.toName);
+    messages.forEach((m) => {
+      if (m.from && m.fromName && !isEmail(m.fromName)) map.set(m.from, m.fromName);
+      if (m.to && m.toName && !isEmail(m.toName)) map.set(m.to, m.toName);
     });
     return map;
-  }, [me.email, me.name, messages, threadContacts]);
+  }, [allContacts, me.email, me.name, messages]);
 
   const displayNameFor = (email: string, fallback?: string) => {
     const cleanEmail = String(email || '').trim().toLowerCase();
     const cleanFallback = String(fallback || '').trim();
     if (cleanEmail === me.email) return me.name || emailAlias(cleanEmail);
-    const mapped = contactNameByEmail.get(cleanEmail);
+    const mapped = nameByEmail.get(cleanEmail);
     if (mapped && !isEmail(mapped)) return mapped;
     if (cleanFallback && !isEmail(cleanFallback)) return cleanFallback;
     return emailAlias(cleanEmail || cleanFallback);
   };
 
-  const contactSuggestions = useMemo(() => filterContacts(newTo, threadContacts), [newTo, threadContacts]);
-
   const threads = useMemo(() => {
     const map = new Map<string, ChatMessage[]>();
     messages
-      .filter((m) => m.kind === 'chat' && (m.from === me.email || m.to === me.email))
+      .filter((m) => (m.kind === 'chat' || m.kind === 'message') && (m.from === me.email || m.to === me.email))
       .forEach((m) => map.set(m.threadId, [...(map.get(m.threadId) || []), m]));
 
-    return [...map.entries()]
+    const list = [...map.entries()]
       .map(([threadId, items]) => ({
         threadId,
         messages: items.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
       }))
       .sort((a, b) => Date.parse(b.messages.at(-1)?.createdAt || '') - Date.parse(a.messages.at(-1)?.createdAt || ''));
-  }, [messages, me.email]);
+
+    const q = normalizeText(query);
+    if (!q) return list;
+    return list.filter((thread) => {
+      const last = thread.messages[thread.messages.length - 1];
+      const otherEmail = last.from === me.email ? last.to : last.from;
+      const otherName = last.from === me.email ? displayNameFor(last.to, last.toName) : displayNameFor(last.from, last.fromName);
+      return `${normalizeText(otherName)} ${normalizeText(otherEmail)} ${normalizeText(last.body)}`.includes(q);
+    });
+  }, [messages, me.email, query, nameByEmail]);
 
   const requests = useMemo(() => {
     const myGroup = Number(me.group || 0);
@@ -154,6 +200,7 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
 
   useEffect(() => {
     if (!activeThread && threads[0]) setActiveThread(threads[0].threadId);
+    if (activeThread && !threads.some((t) => t.threadId === activeThread) && threads[0]) setActiveThread(threads[0].threadId);
   }, [activeThread, threads]);
 
   const active = threads.find((t) => t.threadId === activeThread);
@@ -166,24 +213,13 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
     : { id: '', name: 'Chưa chọn cuộc trò chuyện' };
   const otherPresence = presence.find((p) => p.user === other.id);
   const pendingCount = requests.filter((r) => r.permissionStatus === 'pending').length;
-
-  const selectContact = (contact: ChatContact) => {
-    setNewTo(contact.name);
-  };
-
-  const resolveTargetFromInput = async () => {
-    const firstTry = resolveContactTarget(newTo, threadContacts);
-    if (firstTry) return firstTry;
-
-    const latest = await fetchMessageContacts(me).catch(() => [] as ChatContact[]);
-    if (latest.length) setContacts(latest);
-    return resolveContactTarget(newTo, latest.length ? [...latest, ...threadContacts] : threadContacts);
-  };
+  const contactSuggestions = useMemo(() => filterContacts(newTo, allContacts, me.email), [newTo, allContacts, me.email]);
 
   const createThread = async () => {
-    const target = await resolveTargetFromInput();
-    if (!target) return showToast('Không tìm thấy tên này trong danh bạ. Hãy chọn từ gợi ý hoặc nhập Gmail.');
-
+    const latest = await fetchMessageContacts(me).catch(() => [] as ChatContact[]);
+    if (latest.length) setContacts(latest);
+    const target = resolveContactTarget(newTo, latest.length ? [...latest, ...allContacts] : allContacts);
+    if (!target) return showToast('Nhập tên hoặc Gmail người nhận.');
     await sendChatMessage(target.email, 'Đã tạo cuộc trò chuyện.', target.name, me);
     setActiveThread([me.email, target.email].sort().join('__'));
     setNewTo('');
@@ -191,20 +227,39 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
     await sync();
   };
 
+  const openThread = async (threadId: string) => {
+    setPanel('chats');
+    setActiveThread(threadId);
+    setMenuThreadId('');
+    await markThreadRead(threadId, me);
+    await sync();
+  };
+
   const sendNow = async () => {
     const body = draft.trim();
     if (!body) return;
     if (!other.id) return showToast('Chưa chọn người nhận.');
-
     await sendChatMessage(other.id, body, other.name, me);
     setDraft('');
     await sync();
   };
 
-  const openThread = async (threadId: string) => {
-    setPanel('chats');
-    setActiveThread(threadId);
+  const markRead = async (threadId: string) => {
+    setMenuThreadId('');
     await markThreadRead(threadId, me);
+    await sync();
+  };
+
+  const markUnread = async (threadId: string) => {
+    setMenuThreadId('');
+    await markThreadUnread(threadId, me);
+    await sync();
+  };
+
+  const deleteThread = async (threadId: string) => {
+    setMenuThreadId('');
+    await hideMessageThread(threadId, me);
+    if (activeThread === threadId) setActiveThread('');
     await sync();
   };
 
@@ -224,29 +279,31 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
   };
 
   return (
-    <section className="messages-native-app">
-      <aside className="messages-sidebar">
-        <div className="messages-user-card">
-          <div className="messages-avatar"><MessageCircle size={22} /></div>
+    <section className="messages-native-app messages-redesign">
+      <aside className="messages-left-panel">
+        <header className="messages-profile-card">
+          <div className="messages-profile-avatar"><MessageCircle size={23} /></div>
           <div>
             <strong>{me.name}</strong>
-            <span>{me.email} · {me.role || 'hoc_sinh'}{me.group ? ` · Tổ ${me.group}` : ''}</span>
+            <span>{me.role || 'hoc_sinh'}{me.group ? ` · Tổ ${me.group}` : ''}</span>
           </div>
-        </div>
+          <button type="button" onClick={() => void sync()} title="Đồng bộ"><RefreshCw size={17} /></button>
+        </header>
 
-        <div className="messages-tabs">
+        <div className="messages-segment">
           <button type="button" className={panel === 'chats' ? 'active' : ''} onClick={() => setPanel('chats')}>Tin nhắn</button>
-          <button type="button" className={panel === 'requests' ? 'active' : ''} onClick={() => setPanel('requests')}>Yêu cầu{pendingCount ? ` (${pendingCount})` : ''}</button>
+          <button type="button" className={panel === 'requests' ? 'active' : ''} onClick={() => setPanel('requests')}>Yêu cầu{pendingCount ? ` ${pendingCount}` : ''}</button>
         </div>
 
         {panel === 'chats' ? (
           <>
-            <div className="messages-new-thread">
+            <div className="messages-search-box"><Search size={16} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm cuộc trò chuyện" /></div>
+            <div className="messages-new-box">
               <div className="messages-contact-box">
                 <input
                   value={newTo}
                   onChange={(e) => setNewTo(e.target.value)}
-                  placeholder="Nhập tên hoặc Gmail người nhận..."
+                  placeholder="Nhập tên hoặc Gmail"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -257,7 +314,7 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
                 {newTo && contactSuggestions.length > 0 && (
                   <div className="messages-contact-suggestions">
                     {contactSuggestions.map((contact) => (
-                      <button key={contact.email} type="button" onClick={() => selectContact(contact)}>
+                      <button key={contact.email} type="button" onClick={() => setNewTo(contact.name)}>
                         <strong>{displayNameFor(contact.email, contact.name)}</strong>
                         <span>{contact.group ? `Tổ ${contact.group}` : contact.role || 'Tài khoản'}</span>
                       </button>
@@ -265,10 +322,10 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
                   </div>
                 )}
               </div>
-              <button type="button" onClick={createThread}>Cuộc trò chuyện mới</button>
+              <button type="button" onClick={createThread}>Tạo chat</button>
             </div>
 
-            <div className="messages-list">
+            <div className="messages-thread-list">
               {threads.length ? threads.map((thread) => {
                 const last = thread.messages[thread.messages.length - 1];
                 const target = last.from === me.email
@@ -277,44 +334,64 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
                 const targetPresence = presence.find((p) => p.user === target.id);
                 const unread = thread.messages.filter((m) => m.to === me.email && m.status !== 'read').length;
                 return (
-                  <button key={thread.threadId} type="button" className={`messages-thread ${thread.threadId === activeThread ? 'active' : ''}`} onClick={() => void openThread(thread.threadId)}>
-                    <div>
-                      <strong>{target.name}</strong>
-                      {unread > 0 && <b>{unread}</b>}
-                      <span className={`messages-dot ${targetPresence && isOnline(targetPresence.activeAt) ? 'online' : ''}`} />
-                    </div>
-                    <p>{last.body}</p>
-                  </button>
+                  <article key={thread.threadId} className={`messages-thread-card ${thread.threadId === activeThread ? 'active' : ''}`}>
+                    <button type="button" className="messages-thread-main" onClick={() => void openThread(thread.threadId)}>
+                      <div className="messages-thread-avatar">{initials(target.name)}</div>
+                      <div className="messages-thread-info">
+                        <strong>{target.name}</strong>
+                        <p>{last.body}</p>
+                      </div>
+                      <div className="messages-thread-meta">
+                        <span className={`messages-dot ${targetPresence && isOnline(targetPresence.activeAt) ? 'online' : ''}`} />
+                        {unread > 0 && <b>{unread}</b>}
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className="messages-more-button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setMenuThreadId(menuThreadId === thread.threadId ? '' : thread.threadId);
+                      }}
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+                    {menuThreadId === thread.threadId && (
+                      <div className="messages-thread-menu" onClick={(event) => event.stopPropagation()}>
+                        <button type="button" onClick={() => void markRead(thread.threadId)}><MailOpen size={15} /> Đánh dấu đã đọc</button>
+                        <button type="button" onClick={() => void markUnread(thread.threadId)}><Mail size={15} /> Đánh dấu chưa đọc</button>
+                        <button type="button" className="danger" onClick={() => void deleteThread(thread.threadId)}><Trash2 size={15} /> Xoá khỏi danh sách</button>
+                      </div>
+                    )}
+                  </article>
                 );
-              }) : <div className="messages-empty">Chưa có cuộc trò chuyện.</div>}
+              }) : <div className="messages-empty-state">Chưa có cuộc trò chuyện.</div>}
             </div>
           </>
         ) : (
-          <div className="messages-list">
+          <div className="messages-request-list">
             {requests.length ? requests.map((request) => (
-              <button key={request.id} type="button" className="messages-request-mini">
-                <div>
-                  <strong>Tổ {request.requesterGroup || '?'} → Tổ {request.targetGroup || '?'}</strong>
-                  <span className={request.permissionStatus || 'pending'}>{request.permissionStatus || 'pending'}</span>
-                </div>
+              <button key={request.id} type="button" className="messages-request-row">
+                <strong>Tổ {request.requesterGroup || '?'} → Tổ {request.targetGroup || '?'}</strong>
+                <span className={request.permissionStatus || 'pending'}>{request.permissionStatus || 'pending'}</span>
                 <p>{request.body}</p>
               </button>
-            )) : <div className="messages-empty">Chưa có yêu cầu quyền.</div>}
+            )) : <div className="messages-empty-state">Chưa có yêu cầu quyền.</div>}
           </div>
         )}
       </aside>
 
       {panel === 'chats' ? (
-        <main className="messages-chat-main">
-          <header className="messages-main-head">
-            <div>
-              <strong>{other.name}</strong>
-              <span>{other.id ? (otherPresence && isOnline(otherPresence.activeAt) ? 'Đang hoạt động' : 'Hoạt động gần đây') : 'Tạo hoặc chọn cuộc trò chuyện'}</span>
+        <main className="messages-main-panel">
+          <header className="messages-chat-header">
+            <div className="messages-chat-title">
+              <div className="messages-large-avatar">{other.id ? initials(other.name) : <UserRound size={22} />}</div>
+              <div>
+                <strong>{other.name}</strong>
+                <span>{other.id ? (otherPresence && isOnline(otherPresence.activeAt) ? 'Đang hoạt động' : 'Hoạt động gần đây') : 'Tạo hoặc chọn cuộc trò chuyện'}</span>
+              </div>
             </div>
-            <div>
-              <button type="button" className="messages-soft" onClick={() => setPanel('requests')}><ShieldCheck size={16} /> Yêu cầu quyền</button>
-              <button type="button" className="messages-soft" onClick={() => void sync()}><RefreshCw size={16} /> Đồng bộ</button>
-            </div>
+            <button type="button" onClick={() => setPanel('requests')}><ShieldCheck size={16} /> Yêu cầu quyền</button>
           </header>
 
           <div className="messages-feed">
@@ -342,8 +419,8 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
           </footer>
         </main>
       ) : (
-        <main className="messages-requests-main">
-          <section className="messages-request-form">
+        <main className="messages-main-panel messages-permission-panel">
+          <section className="messages-permission-form">
             <div>
               <h2>Xin quyền hỗ trợ chấm điểm</h2>
               <p>Dùng khi tổ khác cần hỗ trợ. Người nhận có thể đồng ý hoặc từ chối trong Messages.</p>
