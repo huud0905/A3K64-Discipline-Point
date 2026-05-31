@@ -55,6 +55,8 @@ import './settingsDisplayOptionsPatch';
 import './messagesThreadActionsPatch';
 import './messagesSuggestionOpenPatch';
 import './messagesPermissionRoleGuard';
+import './messagesBubbleActionsPatch';
+import './messagesMessengerBubblePolish.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
