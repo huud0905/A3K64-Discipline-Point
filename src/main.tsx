@@ -67,6 +67,7 @@ import './settingsWallpaperUiPolish.css';
 import './settingsToggleAccentFix.css';
 import './desktopCleanWallpaperMode.css';
 import './taskFocusSwitchDarkOnFix.css';
+import './profileWeekScoreChartPatch';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
