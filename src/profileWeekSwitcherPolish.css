@@ -1,0 +1,162 @@
+/* Polish cụm chọn tuần trong Profile.
+   Sửa dropdown native bị thô, đồng bộ light/dark theme và màu chủ đạo. */
+
+.profile-week-switcher {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 4px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(148, 163, 184, .26) !important;
+  background: rgba(15, 23, 42, .42) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06) !important;
+  backdrop-filter: blur(14px) saturate(1.12) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.12) !important;
+}
+
+.profile-week-switcher > button {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  display: grid !important;
+  place-items: center !important;
+  color: #cbd5e1 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  transition: background .16s ease, color .16s ease, opacity .16s ease !important;
+}
+
+.profile-week-switcher > button:hover:not(:disabled) {
+  color: #ffffff !important;
+  background: color-mix(in srgb, var(--desktop-accent, #059669) 20%, transparent) !important;
+}
+
+.profile-week-switcher > button:disabled {
+  opacity: .34 !important;
+  cursor: default !important;
+}
+
+.profile-week-switcher label {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  min-width: 112px !important;
+  height: 34px !important;
+  margin: 0 !important;
+  border-radius: 999px !important;
+  border: 1px solid color-mix(in srgb, var(--desktop-accent, #059669) 62%, #e2e8f0) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .02)),
+    rgba(2, 6, 23, .72) !important;
+  box-shadow:
+    0 8px 20px rgba(2, 6, 23, .16),
+    inset 0 1px 0 rgba(255, 255, 255, .08) !important;
+  overflow: hidden !important;
+}
+
+.profile-week-switcher label > span {
+  display: none !important;
+}
+
+.profile-week-switcher select {
+  width: 100% !important;
+  height: 100% !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  border: 0 !important;
+  outline: 0 !important;
+  border-radius: 999px !important;
+  padding: 0 34px 0 16px !important;
+  color: #f8fafc !important;
+  background: transparent !important;
+  font: inherit !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: -.01em !important;
+  cursor: pointer !important;
+}
+
+.profile-week-switcher label::after {
+  content: "" !important;
+  position: absolute !important;
+  right: 14px !important;
+  top: 50% !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-right: 2px solid currentColor !important;
+  border-bottom: 2px solid currentColor !important;
+  transform: translateY(-66%) rotate(45deg) !important;
+  color: #f8fafc !important;
+  pointer-events: none !important;
+  opacity: .9 !important;
+}
+
+.profile-week-switcher select:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--desktop-accent, #059669) 82%, #ffffff) !important;
+}
+
+.profile-week-switcher select option {
+  color: #f8fafc !important;
+  background: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+.profile-week-switcher select option:checked,
+.profile-week-switcher select option:hover {
+  color: #ffffff !important;
+  background: var(--desktop-accent, #059669) !important;
+}
+
+/* Light mode */
+.win-root.theme-light .profile-week-switcher,
+.theme-light .profile-week-switcher {
+  border-color: rgba(203, 213, 225, .86) !important;
+  background: rgba(255, 255, 255, .78) !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .08) !important;
+}
+
+.win-root.theme-light .profile-week-switcher > button,
+.theme-light .profile-week-switcher > button {
+  color: #64748b !important;
+}
+
+.win-root.theme-light .profile-week-switcher > button:hover:not(:disabled),
+.theme-light .profile-week-switcher > button:hover:not(:disabled) {
+  color: var(--desktop-accent, #059669) !important;
+  background: color-mix(in srgb, var(--desktop-accent, #059669) 10%, #ffffff) !important;
+}
+
+.win-root.theme-light .profile-week-switcher label,
+.theme-light .profile-week-switcher label {
+  border-color: color-mix(in srgb, var(--desktop-accent, #059669) 58%, #cbd5e1) !important;
+  background:
+    linear-gradient(180deg, #ffffff, #f8fafc) !important;
+  box-shadow:
+    0 8px 18px rgba(15, 23, 42, .08),
+    inset 0 1px 0 rgba(255, 255, 255, .9) !important;
+}
+
+.win-root.theme-light .profile-week-switcher select,
+.theme-light .profile-week-switcher select {
+  color: #0f172a !important;
+}
+
+.win-root.theme-light .profile-week-switcher label::after,
+.theme-light .profile-week-switcher label::after {
+  color: #0f172a !important;
+}
+
+.win-root.theme-light .profile-week-switcher select option,
+.theme-light .profile-week-switcher select option {
+  color: #0f172a !important;
+  background: #ffffff !important;
+}
+
+.win-root.theme-light .profile-week-switcher select option:checked,
+.theme-light .profile-week-switcher select option:checked {
+  color: #ffffff !important;
+  background: var(--desktop-accent, #059669) !important;
+}
