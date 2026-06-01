@@ -70,6 +70,7 @@ import './taskFocusSwitchDarkOnFix.css';
 import './profileWeekScoreChartPatch';
 import './profileWeekSwitcherPolish.css';
 import './messagesMobileInterfaceFix.css';
+import './messagesMessengerMobileController';
 import './messagesMessengerMobileFinal.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
