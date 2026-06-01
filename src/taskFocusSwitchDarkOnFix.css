@@ -1,13 +1,36 @@
 /* Ép công tắc Focus ON trên taskbar dùng màu chủ đạo cả trong dark mode.
-   File này import sau desktopCleanWallpaperMode.css để thắng rule dark-mode OFF. */
+   File này import sau desktopCleanWallpaperMode.css để thắng rule dark-mode OFF.
+   Khi ON, đảo thứ tự để nút tròn trắng nằm bên phải như công tắc thật. */
 
+/* OFF giữ nguyên: nút tròn bên trái, chữ OFF bên phải. */
+.win-root .task-focus-switch:not(.on):not(.active):not([aria-pressed="true"]):not([data-state="on"]):not([data-on="true"]) {
+  flex-direction: row !important;
+}
+
+/* ON chung cho cả light + dark: dùng màu chủ đạo và đẩy knob sang phải. */
+.win-root .task-focus-switch.on,
+.win-root .task-focus-switch.active,
+.win-root .task-focus-switch[aria-pressed="true"],
+.win-root .task-focus-switch[data-state="on"],
+.win-root .task-focus-switch[data-on="true"],
+.win-root.theme-dark .task-focus-switch.on,
+.win-root.theme-dark .task-focus-switch.active,
+.win-root.theme-dark .task-focus-switch[aria-pressed="true"],
+.win-root.theme-dark .task-focus-switch[data-state="on"],
+.win-root.theme-dark .task-focus-switch[data-on="true"],
 .win-root:not(.theme-light) .task-focus-switch.on,
 .win-root:not(.theme-light) .task-focus-switch.active,
 .win-root:not(.theme-light) .task-focus-switch[aria-pressed="true"],
 .win-root:not(.theme-light) .task-focus-switch[data-state="on"],
 .win-root:not(.theme-light) .task-focus-switch[data-on="true"] {
+  display: inline-flex !important;
+  flex-direction: row-reverse !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
   background: var(--desktop-accent, #059669) !important;
   background-color: var(--desktop-accent, #059669) !important;
+  background-image: none !important;
   border-color: color-mix(in srgb, var(--desktop-accent, #059669) 76%, #ffffff) !important;
   color: #ffffff !important;
   box-shadow:
@@ -15,6 +38,16 @@
     inset 0 1px 0 rgba(255, 255, 255, .18) !important;
 }
 
+.win-root .task-focus-switch.on:hover,
+.win-root .task-focus-switch.active:hover,
+.win-root .task-focus-switch[aria-pressed="true"]:hover,
+.win-root .task-focus-switch[data-state="on"]:hover,
+.win-root .task-focus-switch[data-on="true"]:hover,
+.win-root.theme-dark .task-focus-switch.on:hover,
+.win-root.theme-dark .task-focus-switch.active:hover,
+.win-root.theme-dark .task-focus-switch[aria-pressed="true"]:hover,
+.win-root.theme-dark .task-focus-switch[data-state="on"]:hover,
+.win-root.theme-dark .task-focus-switch[data-on="true"]:hover,
 .win-root:not(.theme-light) .task-focus-switch.on:hover,
 .win-root:not(.theme-light) .task-focus-switch.active:hover,
 .win-root:not(.theme-light) .task-focus-switch[aria-pressed="true"]:hover,
@@ -25,20 +58,43 @@
   border-color: color-mix(in srgb, var(--desktop-accent, #059669) 82%, #ffffff) !important;
 }
 
+.win-root .task-focus-switch.on .task-focus-text,
+.win-root .task-focus-switch.active .task-focus-text,
+.win-root .task-focus-switch[aria-pressed="true"] .task-focus-text,
+.win-root .task-focus-switch[data-state="on"] .task-focus-text,
+.win-root .task-focus-switch[data-on="true"] .task-focus-text,
+.win-root.theme-dark .task-focus-switch.on .task-focus-text,
+.win-root.theme-dark .task-focus-switch.active .task-focus-text,
+.win-root.theme-dark .task-focus-switch[aria-pressed="true"] .task-focus-text,
+.win-root.theme-dark .task-focus-switch[data-state="on"] .task-focus-text,
+.win-root.theme-dark .task-focus-switch[data-on="true"] .task-focus-text,
 .win-root:not(.theme-light) .task-focus-switch.on .task-focus-text,
 .win-root:not(.theme-light) .task-focus-switch.active .task-focus-text,
 .win-root:not(.theme-light) .task-focus-switch[aria-pressed="true"] .task-focus-text,
 .win-root:not(.theme-light) .task-focus-switch[data-state="on"] .task-focus-text,
 .win-root:not(.theme-light) .task-focus-switch[data-on="true"] .task-focus-text {
+  order: 1 !important;
   color: #ffffff !important;
   text-shadow: 0 1px 6px rgba(15, 23, 42, .22) !important;
 }
 
+.win-root .task-focus-switch.on .task-focus-knob,
+.win-root .task-focus-switch.active .task-focus-knob,
+.win-root .task-focus-switch[aria-pressed="true"] .task-focus-knob,
+.win-root .task-focus-switch[data-state="on"] .task-focus-knob,
+.win-root .task-focus-switch[data-on="true"] .task-focus-knob,
+.win-root.theme-dark .task-focus-switch.on .task-focus-knob,
+.win-root.theme-dark .task-focus-switch.active .task-focus-knob,
+.win-root.theme-dark .task-focus-switch[aria-pressed="true"] .task-focus-knob,
+.win-root.theme-dark .task-focus-switch[data-state="on"] .task-focus-knob,
+.win-root.theme-dark .task-focus-switch[data-on="true"] .task-focus-knob,
 .win-root:not(.theme-light) .task-focus-switch.on .task-focus-knob,
 .win-root:not(.theme-light) .task-focus-switch.active .task-focus-knob,
 .win-root:not(.theme-light) .task-focus-switch[aria-pressed="true"] .task-focus-knob,
 .win-root:not(.theme-light) .task-focus-switch[data-state="on"] .task-focus-knob,
 .win-root:not(.theme-light) .task-focus-switch[data-on="true"] .task-focus-knob {
+  order: 2 !important;
   background: #ffffff !important;
   box-shadow: 0 2px 8px rgba(15, 23, 42, .22) !important;
+  transform: none !important;
 }
