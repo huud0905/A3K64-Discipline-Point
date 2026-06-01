@@ -1,0 +1,326 @@
+/* Mobile UI cho Messages.
+   Áp dụng theo kích thước cửa sổ app, không chỉ theo kích thước trình duyệt.
+   Mục tiêu: khi cửa sổ nhỏ/mobile, vẫn thấy danh sách chat + tạo chat, input bám đáy và bố cục gọn như app điện thoại. */
+
+.win-body.settings-mode:has(.messages-native-app.messages-redesign) {
+  container-type: inline-size;
+  container-name: messages-app-window;
+}
+
+@container messages-app-window (max-width: 760px) {
+  .messages-native-app.messages-redesign {
+    height: 100% !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: minmax(235px, 42%) minmax(0, 1fr) !important;
+    grid-template-columns: 1fr !important;
+    overflow: hidden !important;
+    background: #06111f !important;
+  }
+
+  .messages-left-panel {
+    display: flex !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid #263247 !important;
+    background: linear-gradient(180deg, #08111f 0%, #07111f 100%) !important;
+    overflow: hidden !important;
+  }
+
+  .messages-profile-card {
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+    gap: 10px !important;
+    padding: 12px !important;
+  }
+
+  .messages-profile-avatar,
+  .messages-avatar {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 14px !important;
+  }
+
+  .messages-segment {
+    padding: 10px 12px !important;
+    gap: 7px !important;
+  }
+
+  .messages-segment button {
+    height: 36px !important;
+    border-radius: 13px !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+  }
+
+  .messages-search-box {
+    margin: 0 12px 8px !important;
+    height: 38px !important;
+    border-radius: 13px !important;
+  }
+
+  .messages-new-box {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 8px !important;
+    padding: 0 12px 10px !important;
+  }
+
+  .messages-contact-box {
+    height: 38px !important;
+    border-radius: 13px !important;
+  }
+
+  .messages-new-box > button {
+    height: 38px !important;
+    border-radius: 13px !important;
+    padding: 0 12px !important;
+    white-space: nowrap !important;
+  }
+
+  .messages-contact-suggestions {
+    top: 42px !important;
+    max-height: 190px !important;
+    border-radius: 14px !important;
+  }
+
+  .messages-thread-list,
+  .messages-request-list {
+    flex: 1 !important;
+    min-height: 0 !important;
+    padding: 8px 10px 10px !important;
+    gap: 7px !important;
+    overflow: auto !important;
+  }
+
+  .messages-thread-main {
+    min-height: 58px !important;
+    border-radius: 16px !important;
+    padding: 8px 40px 8px 9px !important;
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+  }
+
+  .messages-thread-avatar {
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 14px !important;
+  }
+
+  .messages-thread-info strong {
+    font-size: 13px !important;
+  }
+
+  .messages-thread-info p {
+    font-size: 11.5px !important;
+  }
+
+  .messages-more-button {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    top: 14px !important;
+    right: 8px !important;
+  }
+
+  .messages-thread-menu {
+    right: 6px !important;
+    top: 44px !important;
+    min-width: 190px !important;
+  }
+
+  .messages-main-panel {
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    background: #07111f !important;
+    overflow: hidden !important;
+  }
+
+  .messages-chat-header {
+    min-height: 62px !important;
+    padding: 10px 12px !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+
+  .messages-chat-title {
+    min-width: 0 !important;
+    gap: 10px !important;
+  }
+
+  .messages-large-avatar {
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 15px !important;
+  }
+
+  .messages-chat-title strong {
+    font-size: 15px !important;
+  }
+
+  .messages-chat-title span {
+    font-size: 11.5px !important;
+  }
+
+  .messages-chat-header > button {
+    width: auto !important;
+    height: 36px !important;
+    border-radius: 13px !important;
+    padding: 0 10px !important;
+    font-size: 0 !important;
+  }
+
+  .messages-chat-header > button svg {
+    width: 17px !important;
+    height: 17px !important;
+  }
+
+  .messages-feed {
+    min-height: 0 !important;
+    padding: 12px 10px !important;
+    gap: 8px !important;
+    overflow: auto !important;
+    background: radial-gradient(circle at 70% -20%, rgba(14, 165, 233, .09), transparent 40%), #07111f !important;
+  }
+
+  .messages-center-empty {
+    min-height: 180px !important;
+    height: 100% !important;
+    padding: 18px !important;
+  }
+
+  .messages-center-empty strong {
+    font-size: 17px !important;
+  }
+
+  .messages-center-empty span {
+    font-size: 12px !important;
+  }
+
+  .messages-bubble {
+    max-width: 88% !important;
+    border-radius: 17px 17px 17px 6px !important;
+    padding: 9px 11px !important;
+  }
+
+  .messages-bubble.mine {
+    border-radius: 17px 17px 6px 17px !important;
+  }
+
+  .messages-bubble p {
+    font-size: 13px !important;
+  }
+
+  .messages-bubble span {
+    font-size: 10.5px !important;
+  }
+
+  .messages-composer {
+    min-height: 64px !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 8px !important;
+    padding: 9px 10px calc(9px + env(safe-area-inset-bottom)) !important;
+    border-top: 1px solid #263247 !important;
+    background: rgba(11, 18, 32, .96) !important;
+    backdrop-filter: blur(14px) saturate(1.1) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(1.1) !important;
+  }
+
+  .messages-composer textarea {
+    min-height: 44px !important;
+    max-height: 92px !important;
+    border-radius: 16px !important;
+    padding: 11px 13px !important;
+    font-size: 13px !important;
+  }
+
+  .messages-composer button {
+    min-width: 54px !important;
+    height: 44px !important;
+    border-radius: 15px !important;
+    padding: 0 12px !important;
+    font-size: 12px !important;
+  }
+
+  .messages-permission-panel {
+    min-height: 0 !important;
+    padding: 10px !important;
+    overflow: auto !important;
+  }
+
+  .messages-permission-form {
+    padding: 13px !important;
+    border-radius: 18px !important;
+  }
+
+  .messages-request-fields {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+
+  .messages-request-fields input,
+  .messages-request-fields button {
+    height: 40px !important;
+    border-radius: 14px !important;
+  }
+
+  .messages-request-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .messages-toast {
+    left: 12px !important;
+    right: 12px !important;
+    bottom: 12px !important;
+    width: auto !important;
+    text-align: center !important;
+  }
+
+  .win-root.theme-light .messages-native-app.messages-redesign,
+  .win-root.theme-light .messages-main-panel {
+    background: #f1f5f9 !important;
+  }
+
+  .win-root.theme-light .messages-left-panel {
+    border-bottom-color: #d7dee8 !important;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+  }
+
+  .win-root.theme-light .messages-feed {
+    background: #f8fafc !important;
+  }
+
+  .win-root.theme-light .messages-composer {
+    background: rgba(255, 255, 255, .96) !important;
+    border-top-color: #d7dee8 !important;
+  }
+}
+
+/* Fallback khi chạy trên viewport mobile thật. */
+@media (max-width: 760px) {
+  .messages-native-app.messages-redesign {
+    height: 100% !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-rows: minmax(235px, 42%) minmax(0, 1fr) !important;
+    grid-template-columns: 1fr !important;
+    overflow: hidden !important;
+  }
+
+  .messages-left-panel {
+    display: flex !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid #263247 !important;
+    overflow: hidden !important;
+  }
+
+  .messages-chat-header {
+    align-items: center !important;
+    flex-direction: row !important;
+  }
+
+  .messages-chat-header > button {
+    width: auto !important;
+  }
+}
