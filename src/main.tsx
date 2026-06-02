@@ -72,6 +72,7 @@ import './profileWeekSwitcherPolish.css';
 import './messagesMobileInterfaceFix.css';
 import './messagesMessengerMobileController';
 import './messagesMessengerMobileFinal.css';
+import './messagesMobileCleanFinal.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
