@@ -73,6 +73,7 @@ import './messagesMobileInterfaceFix.css';
 import './messagesMessengerMobileController';
 import './messagesMessengerMobileFinal.css';
 import './messagesMobileCleanFinal.css';
+import './messagesMobileBackVisibleFix.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
