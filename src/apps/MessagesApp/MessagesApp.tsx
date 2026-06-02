@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowLeft,
   Check,
+  Edit3,
   Mail,
   MailOpen,
   MessageCircle,
@@ -33,6 +35,7 @@ import {
 import './MessagesApp.css';
 
 type Panel = 'chats' | 'requests';
+type MobileView = 'list' | 'chat' | 'requests';
 
 type Props = {
   userEmail?: string | null;
@@ -88,6 +91,7 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
   };
 
   const [panel, setPanel] = useState<Panel>('chats');
+  const [mobileView, setMobileView] = useState<MobileView>('list');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [presence, setPresence] = useState<{ user: string; name: string; activeAt: string }[]>([]);
   const [contacts, setContacts] = useState<ChatContact[]>([]);
@@ -116,6 +120,7 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
     applyState(state);
     if (force && !(state.messages || []).length) {
       setActiveThread('');
+      setMobileView('list');
       setToast('Không có dữ liệu trong sheet MESSAGES. Đã xoá cache hiển thị.');
       window.setTimeout(() => setToast(''), 2200);
     }
@@ -236,11 +241,13 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
     setActiveThread([me.email, target.email].sort().join('__'));
     setNewTo('');
     setPanel('chats');
+    setMobileView('chat');
   };
 
   const openThread = async (threadId: string) => {
     setPanel('chats');
     setActiveThread(threadId);
+    setMobileView('chat');
     setMenuThreadId('');
     await markThreadRead(threadId, me);
   };
@@ -266,7 +273,10 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
   const deleteThread = async (threadId: string) => {
     setMenuThreadId('');
     await hideMessageThread(threadId, me);
-    if (activeThread === threadId) setActiveThread('');
+    if (activeThread === threadId) {
+      setActiveThread('');
+      setMobileView('list');
+    }
   };
 
   const sendRequest = async () => {
@@ -276,15 +286,34 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
     setTargetGroup('');
     setReason('');
     setPanel('requests');
+    setMobileView('requests');
   };
 
   const respond = async (id: string, status: 'approved' | 'rejected') => {
     await respondGroupAccess(id, status, me);
   };
 
+  const showChats = () => {
+    setPanel('chats');
+    setMobileView('list');
+  };
+
+  const showRequests = () => {
+    setPanel('requests');
+    setMobileView('requests');
+  };
+
   return (
-    <section className="messages-native-app messages-redesign">
+    <section className={`messages-native-app messages-redesign a3k64-messages-mobile messages-mobile-view-${mobileView}`} data-mobile-view={mobileView}>
       <aside className="messages-left-panel">
+        <header className="a3k64-messages-mobile-head">
+          <div><small>12A3</small><strong>Messages</strong></div>
+          <div>
+            <button type="button" onClick={() => void sync(true)} title="Đồng bộ"><RefreshCw size={18} /></button>
+            <button type="button" onClick={() => setNewTo('')} title="Tạo chat"><Edit3 size={18} /></button>
+          </div>
+        </header>
+
         <header className="messages-profile-card">
           <div className="messages-profile-avatar"><MessageCircle size={23} /></div>
           <div>
@@ -295,8 +324,8 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
         </header>
 
         <div className="messages-segment">
-          <button type="button" className={panel === 'chats' ? 'active' : ''} onClick={() => setPanel('chats')}>Tin nhắn</button>
-          <button type="button" className={panel === 'requests' ? 'active' : ''} onClick={() => setPanel('requests')}>Yêu cầu{pendingCount ? ` ${pendingCount}` : ''}</button>
+          <button type="button" className={panel === 'chats' ? 'active' : ''} onClick={showChats}>Tin nhắn</button>
+          <button type="button" className={panel === 'requests' ? 'active' : ''} onClick={showRequests}>Yêu cầu{pendingCount ? ` ${pendingCount}` : ''}</button>
         </div>
 
         {panel === 'chats' ? (
@@ -384,11 +413,18 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
             )) : <div className="messages-empty-state">Chưa có yêu cầu quyền.</div>}
           </div>
         )}
+
+        <nav className="a3k64-messages-bottom-nav" aria-label="Điều hướng Messages">
+          <button type="button" className={mobileView === 'list' ? 'active' : ''} onClick={showChats}><MessageCircle size={20} /><span>Đoạn chat</span></button>
+          <button type="button" className={mobileView === 'requests' ? 'active' : ''} onClick={showRequests}><ShieldCheck size={20} /><span>Yêu cầu</span>{pendingCount > 0 && <b>{pendingCount}</b>}</button>
+          <button type="button" onClick={() => void sync(true)}><RefreshCw size={20} /><span>Làm mới</span></button>
+        </nav>
       </aside>
 
       {panel === 'chats' ? (
         <main className="messages-main-panel">
           <header className="messages-chat-header">
+            <button type="button" className="a3k64-messages-back" onClick={showChats}><ArrowLeft size={22} /></button>
             <div className="messages-chat-title">
               <div className="messages-large-avatar">{other.id ? initials(other.name) : <UserRound size={22} />}</div>
               <div>
@@ -396,7 +432,7 @@ export default function MessagesApp({ userEmail, userName, userRole, userGroup }
                 <span>{other.id ? (otherPresence && isOnline(otherPresence.activeAt) ? 'Đang hoạt động' : 'Hoạt động gần đây') : 'Tạo hoặc chọn cuộc trò chuyện'}</span>
               </div>
             </div>
-            <button type="button" onClick={() => setPanel('requests')}><ShieldCheck size={16} /> Yêu cầu quyền</button>
+            <button type="button" onClick={showRequests}><ShieldCheck size={16} /> Yêu cầu quyền</button>
           </header>
 
           <div className="messages-feed">
