@@ -1,0 +1,90 @@
+/* Fix nút quay lại trong Messages mobile.
+   Một số CSS cũ đang ẩn .a3k64-messages-back, nên ép hiện rõ bằng pseudo text.
+*/
+
+.messages-native-app.a3k64-messages-mobile.messages-mobile-view-chat .a3k64-messages-back,
+.messages-native-app.a3k64-messages-mobile[data-mobile-view="chat"] .a3k64-messages-back,
+.messages-native-app.messages-redesign.a3k64-messages-mobile .messages-chat-header .a3k64-messages-back {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 50 !important;
+  width: auto !important;
+  min-width: 46px !important;
+  height: 40px !important;
+  padding: 0 10px 0 8px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  color: var(--desktop-accent, #f43f5e) !important;
+  background: rgba(255, 255, 255, .06) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08) !important;
+  font-size: 0 !important;
+  line-height: 1 !important;
+}
+
+.messages-native-app.a3k64-messages-mobile .messages-chat-header .a3k64-messages-back::before {
+  content: "‹" !important;
+  display: block !important;
+  color: currentColor !important;
+  font-size: 34px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  transform: translateY(-1px) !important;
+}
+
+.messages-native-app.a3k64-messages-mobile .messages-chat-header .a3k64-messages-back::after {
+  content: "Chat" !important;
+  display: block !important;
+  color: currentColor !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  letter-spacing: -.01em !important;
+}
+
+.messages-native-app.a3k64-messages-mobile .messages-chat-header .a3k64-messages-back svg {
+  display: none !important;
+}
+
+.messages-native-app.a3k64-messages-mobile .messages-chat-header .a3k64-messages-back:hover {
+  background: color-mix(in srgb, var(--desktop-accent, #f43f5e) 14%, transparent) !important;
+}
+
+/* Header chat nới cột đầu để nút quay lại không đè avatar/tên. */
+.messages-native-app.a3k64-messages-mobile.messages-mobile-view-chat .messages-chat-header,
+.messages-native-app.a3k64-messages-mobile[data-mobile-view="chat"] .messages-chat-header {
+  grid-template-columns: auto minmax(0, 1fr) auto !important;
+  gap: 7px !important;
+  padding-left: 8px !important;
+}
+
+.messages-native-app.a3k64-messages-mobile .messages-chat-title {
+  min-width: 0 !important;
+}
+
+.messages-native-app.a3k64-messages-mobile .messages-chat-title strong {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Bottom nav: đổi cảm giác thành nút điều hướng rõ hơn. */
+.messages-native-app.a3k64-messages-mobile .a3k64-messages-bottom-nav button:first-child span {
+  font-size: 0 !important;
+}
+
+.messages-native-app.a3k64-messages-mobile .a3k64-messages-bottom-nav button:first-child span::after {
+  content: "Đoạn chat" !important;
+  font-size: 11px !important;
+}
+
+.win-root.theme-light .messages-native-app.a3k64-messages-mobile .messages-chat-header .a3k64-messages-back {
+  color: var(--desktop-accent, #f43f5e) !important;
+  background: color-mix(in srgb, var(--desktop-accent, #f43f5e) 8%, #ffffff) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--desktop-accent, #f43f5e) 24%, #cbd5e1) !important;
+}
