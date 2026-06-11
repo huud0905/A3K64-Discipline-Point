@@ -75,6 +75,7 @@ import './messagesMessengerMobileFinal.css';
 import './messagesMobileCleanFinal.css';
 import './messagesMobileBackVisibleFix.css';
 import './seatingMapStableApp';
+import './seatingRoomSlotsStablePatch';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
