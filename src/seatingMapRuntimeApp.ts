@@ -20,6 +20,7 @@ const SEATING_WINDOW_ID = "a3k64-seating-window";
 const SEATING_START_ID = "a3k64-seating-start-app";
 const SEATING_SEARCH_ID = "a3k64-seating-search-app";
 const SEATING_TASKBAR_ID = "a3k64-seating-taskbar-button";
+const SEATING_PATH = "/desktop/seating-chart";
 
 const DEFAULT_SEATING: SeatingState = {
   left: [
@@ -42,7 +43,9 @@ const DEFAULT_SEATING: SeatingState = {
   ],
 };
 
-const ALL_STUDENTS = Array.from(new Set(DEFAULT_SEATING.left.flat().concat(DEFAULT_SEATING.right.flat()).map((name) => name.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "vi"));
+const ALL_STUDENTS = Array.from(
+  new Set(DEFAULT_SEATING.left.flat().concat(DEFAULT_SEATING.right.flat()).map((name) => name.trim()).filter(Boolean)),
+).sort((a, b) => a.localeCompare(b, "vi"));
 
 function cloneSeating(value: SeatingState): SeatingState {
   return { left: value.left.map((row) => row.slice()), right: value.right.map((row) => row.slice()) };
@@ -54,10 +57,7 @@ function loadSeating(): SeatingState {
     if (!raw) return cloneSeating(DEFAULT_SEATING);
     const parsed = JSON.parse(raw) as SeatingState;
     if (!Array.isArray(parsed.left) || !Array.isArray(parsed.right)) return cloneSeating(DEFAULT_SEATING);
-    return {
-      left: normalizeRows(parsed.left),
-      right: normalizeRows(parsed.right),
-    };
+    return { left: normalizeRows(parsed.left), right: normalizeRows(parsed.right) };
   } catch {
     return cloneSeating(DEFAULT_SEATING);
   }
@@ -84,17 +84,20 @@ function injectSeatingStyles() {
   style.textContent = `
     .a3-seat-window{position:absolute;left:calc(50% - min(650px,calc((100vw - 176px)/2)));top:18px;width:min(1300px,calc(100vw - 176px));height:min(740px,calc(100vh - 104px));min-height:560px;border:1px solid color-mix(in srgb,var(--desktop-accent,#2563eb) 38%,#273244);border-radius:22px;overflow:hidden;background:#07111f;color:#f8fafc;box-shadow:0 34px 100px rgba(0,0,0,.46);z-index:90;animation:seatWindowIn .18s ease both;}
     @keyframes seatWindowIn{from{opacity:0;transform:translateY(18px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
-    .a3-seat-window.maximized{position:fixed;left:0!important;top:0!important;width:100vw!important;height:calc(100vh - 58px)!important;min-height:0;border-radius:0;}
+    .a3-seat-window.maximized{position:fixed;left:0!important;top:0!important;width:100vw!important;height:calc(100vh - 58px)!important;min-height:0;border-radius:0;transform:none!important;}
+    .a3-seat-window.minimized{display:none!important;}
     .a3-seat-titlebar{height:46px;display:grid;grid-template-columns:1fr auto;align-items:center;border-bottom:1px solid #273244;background:#0b1220;cursor:move;user-select:none;}
     .a3-seat-title-left{display:flex;align-items:center;gap:10px;padding-left:14px;min-width:0;}
     .a3-seat-title-icon{width:30px;height:30px;display:grid;place-items:center;border-radius:10px;background:var(--desktop-accent,#2563eb);color:#fff;font-weight:900;}
     .a3-seat-title-icon svg{width:19px;height:19px;}
     .a3-seat-title-left strong{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .a3-seat-title-left span{font-size:12px;color:#94a3b8;margin-left:4px;white-space:nowrap;}
-    .a3-seat-actions{display:flex;height:100%;}
-    .a3-seat-actions button{width:46px;border:0;color:#e2e8f0;background:transparent;display:grid;place-items:center;cursor:pointer;font-size:18px;}
+    .a3-seat-actions{display:flex;height:100%;cursor:default;}
+    .a3-seat-actions button{width:46px;border:0;color:#e2e8f0;background:transparent;display:grid;place-items:center;cursor:pointer;padding:0;}
+    .a3-seat-actions button svg{width:16px;height:16px;stroke-width:2.25;}
     .a3-seat-actions button:hover{background:#172033;}
-    .a3-seat-actions .danger{margin:7px 8px 7px 0;width:32px;height:32px;border-radius:9px;background:rgba(239,68,68,.92);}
+    .a3-seat-actions .danger{margin:7px 8px 7px 0;width:32px;height:32px;border-radius:9px;background:rgba(239,68,68,.92);color:#fff;}
+    .a3-seat-actions .danger:hover{background:#dc2626;}
     .a3-seat-body{height:calc(100% - 46px);overflow:auto;padding:16px;background:radial-gradient(circle at 12% 12%,color-mix(in srgb,var(--desktop-accent,#2563eb) 18%,transparent),transparent 32%),#050914;}
     .a3-seat-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;}
     .a3-seat-heading{display:flex;align-items:center;gap:12px;min-width:0;}
@@ -139,6 +142,9 @@ function injectSeatingStyles() {
     .a3-seat-mobile-note{display:none;margin-top:10px;color:#fbbf24;font-size:12px;}
     .theme-light .a3-seat-window{background:#f8fafc;color:#0f172a;border-color:#dbe4f0;}
     .theme-light .a3-seat-titlebar{background:#f8fafc;border-bottom-color:#dbe4f0;}
+    .theme-light .a3-seat-actions button{color:#334155;}
+    .theme-light .a3-seat-actions button:hover{background:#e2e8f0;}
+    .theme-light .a3-seat-actions .danger{background:rgba(239,68,68,.92);color:#fff;}
     .theme-light .a3-seat-title-left strong,.theme-light .a3-seat-heading h1{color:#0f172a;}
     .theme-light .a3-seat-title-left span,.theme-light .a3-seat-heading p,.theme-light .a3-seat-students-head span{color:#475569;}
     .theme-light .a3-seat-body{background:linear-gradient(180deg,#f8fafc,#edf2f7);}
@@ -163,6 +169,20 @@ function injectSeatingStyles() {
 
 function seatingIconSvg() {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16"/><path d="M4 10h16"/><path d="M4 15h16"/><path d="M7 5v14"/><path d="M17 5v14"/><path d="M5 19h14"/></svg>`;
+}
+
+function minimizeSvg() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M6 18h12"/></svg>`;
+}
+
+function maximizeSvg(maximized = false) {
+  return maximized
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M8 8h10v10H8z"/><path d="M6 14H4V4h10v2"/></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linejoin="round"><path d="M7 7h10v10H7z"/></svg>`;
+}
+
+function closeSvg() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>`;
 }
 
 function normalizeText(value: string) {
@@ -190,13 +210,14 @@ function findStudent(state: SeatingState, name: string): SeatPosition | null {
   return null;
 }
 
-function openSeatingMapApp() {
+function openSeatingMapApp(pushUrl = true) {
   injectSeatingStyles();
   let existing = document.getElementById(SEATING_WINDOW_ID) as HTMLElement | null;
   if (existing) {
     existing.style.zIndex = String(nextSeatingZ());
     existing.classList.remove("minimized");
     ensureTaskbarButton();
+    if (pushUrl && window.location.pathname !== SEATING_PATH) window.history.pushState({}, "", SEATING_PATH);
     return;
   }
 
@@ -208,12 +229,17 @@ function openSeatingMapApp() {
   win.innerHTML = `
     <header class="a3-seat-titlebar">
       <div class="a3-seat-title-left"><div class="a3-seat-title-icon">${seatingIconSvg()}</div><strong>Sơ đồ chỗ ngồi</strong><span>Lớp 11A3</span></div>
-      <div class="a3-seat-actions"><button type="button" data-action="maximize" title="Phóng to">□</button><button type="button" class="danger" data-action="close" title="Đóng">×</button></div>
+      <div class="a3-seat-actions">
+        <button type="button" data-action="minimize" title="Thu nhỏ">${minimizeSvg()}</button>
+        <button type="button" data-action="maximize" title="Phóng to">${maximizeSvg(false)}</button>
+        <button type="button" class="danger" data-action="close" title="Đóng">${closeSvg()}</button>
+      </div>
     </header>
     <div class="a3-seat-body"></div>
   `;
   desktop.appendChild(win);
   ensureTaskbarButton();
+  if (pushUrl && window.location.pathname !== SEATING_PATH) window.history.pushState({}, "", SEATING_PATH);
 
   let state = loadSeating();
   let editMode = false;
@@ -286,8 +312,21 @@ function openSeatingMapApp() {
 
   render();
   makeSeatWindowDraggable(win);
-  win.querySelector<HTMLElement>("[data-action='close']")?.addEventListener("click", () => { win.remove(); removeTaskbarButton(); });
-  win.querySelector<HTMLElement>("[data-action='maximize']")?.addEventListener("click", () => win.classList.toggle("maximized"));
+  const maxButton = win.querySelector<HTMLElement>("[data-action='maximize']");
+  win.querySelector<HTMLElement>("[data-action='minimize']")?.addEventListener("click", () => {
+    win.classList.add("minimized");
+    markTaskbarActive(false);
+    if (window.location.pathname === SEATING_PATH) window.history.pushState({}, "", "/desktop");
+  });
+  win.querySelector<HTMLElement>("[data-action='close']")?.addEventListener("click", () => {
+    win.remove();
+    removeTaskbarButton();
+    if (window.location.pathname === SEATING_PATH) window.history.pushState({}, "", "/desktop");
+  });
+  maxButton?.addEventListener("click", () => {
+    win.classList.toggle("maximized");
+    if (maxButton) maxButton.innerHTML = maximizeSvg(win.classList.contains("maximized"));
+  });
   win.addEventListener("mousedown", () => { win.style.zIndex = String(nextSeatingZ()); markTaskbarActive(true); });
 }
 
@@ -329,7 +368,7 @@ function readPosition(el: HTMLElement): SeatPosition | null {
 }
 
 function escapeHtml(value: string) {
-  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;");
+  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
 function nextSeatingZ() {
@@ -371,8 +410,10 @@ function ensureTaskbarButton() {
   button.addEventListener("click", () => {
     const win = document.getElementById(SEATING_WINDOW_ID) as HTMLElement | null;
     if (!win) return openSeatingMapApp();
+    win.classList.remove("minimized");
     win.style.zIndex = String(nextSeatingZ());
     markTaskbarActive(true);
+    if (window.location.pathname !== SEATING_PATH) window.history.pushState({}, "", SEATING_PATH);
   });
   center.appendChild(button);
 }
@@ -395,7 +436,7 @@ function ensureDesktopShortcut() {
   button.title = "Sơ đồ chỗ ngồi - bấm đúp để mở";
   button.draggable = true;
   button.innerHTML = `<div class="desktop-shortcut-icon">${seatingIconSvg()}</div><span>Sơ đồ chỗ ngồi</span>`;
-  button.addEventListener("dblclick", openSeatingMapApp);
+  button.addEventListener("dblclick", () => openSeatingMapApp(true));
   icons.appendChild(button);
 }
 
@@ -407,7 +448,7 @@ function ensureStartMenuApp() {
   button.type = "button";
   button.className = "start-app";
   button.innerHTML = `<div class="start-app-icon">${seatingIconSvg()}</div><span>Sơ đồ chỗ ngồi</span>`;
-  button.addEventListener("click", openSeatingMapApp);
+  button.addEventListener("click", () => openSeatingMapApp(true));
   grid.appendChild(button);
 }
 
@@ -419,16 +460,27 @@ function ensureSearchApp() {
   button.type = "button";
   button.className = "side-item";
   button.innerHTML = `<div class="side-item-icon">${seatingIconSvg()}</div><div><strong>Sơ đồ chỗ ngồi</strong><span>Bản trực quan của lớp 11A3</span></div>`;
-  button.addEventListener("click", openSeatingMapApp);
+  button.addEventListener("click", () => openSeatingMapApp(true));
   panel.appendChild(button);
 }
 
 function bootSeatingRuntimeApp() {
   injectSeatingStyles();
-  const sync = () => { ensureDesktopShortcut(); ensureStartMenuApp(); ensureSearchApp(); if (document.getElementById(SEATING_WINDOW_ID)) ensureTaskbarButton(); };
+  const sync = () => {
+    ensureDesktopShortcut();
+    ensureStartMenuApp();
+    ensureSearchApp();
+    if (document.getElementById(SEATING_WINDOW_ID)) ensureTaskbarButton();
+    if (window.location.pathname === SEATING_PATH && document.querySelector(".win-desktop") && !document.getElementById(SEATING_WINDOW_ID)) {
+      window.setTimeout(() => openSeatingMapApp(false), 120);
+    }
+  };
   sync();
   const observer = new MutationObserver(sync);
   observer.observe(document.body, { childList: true, subtree: true });
+  window.addEventListener("popstate", () => {
+    if (window.location.pathname === SEATING_PATH) openSeatingMapApp(false);
+  });
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bootSeatingRuntimeApp);
