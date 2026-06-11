@@ -4,12 +4,9 @@ const ROOM_SLOT_WINDOW = "#a3k64-seating-window";
 
 type RoomSlotKey = "leftTop" | "leftBottom" | "rightTop" | "rightMiddle" | "rightBottom" | "frontLeft" | "frontCenter" | "frontRight" | "backCenter" | "aisleCenter";
 type RoomItemKey = "windowA" | "windowB" | "windowC" | "windowD" | "door" | "teacherDesk" | "board" | "backLabel" | "aisleLabel";
+type RoomKind = "window" | "door" | "label" | "teacher" | "board" | "aisle";
 
-type RoomItem = {
-  key: RoomItemKey;
-  label: string;
-  kind: "window" | "door" | "label" | "teacher" | "board" | "aisle";
-};
+type RoomItem = { key: RoomItemKey; label: string; kind: RoomKind };
 
 const DEFAULT_ROOM_SLOT_MAP: Record<RoomItemKey, RoomSlotKey> = {
   windowA: "leftTop",
@@ -35,7 +32,7 @@ const ROOM_ITEMS: RoomItem[] = [
   { key: "aisleLabel", label: "LỐI ĐI", kind: "aisle" },
 ];
 
-const ROOM_SLOTS: Array<{ key: RoomSlotKey; allowed: RoomItem["kind"][] }> = [
+const ROOM_SLOTS: Array<{ key: RoomSlotKey; allowed: RoomKind[] }> = [
   { key: "leftTop", allowed: ["window", "door"] },
   { key: "leftBottom", allowed: ["window", "door"] },
   { key: "rightTop", allowed: ["window", "door"] },
@@ -49,6 +46,7 @@ const ROOM_SLOTS: Array<{ key: RoomSlotKey; allowed: RoomItem["kind"][] }> = [
 ];
 
 let draggingRoomItem: RoomItemKey | null = null;
+let lastBoard: HTMLElement | null = null;
 
 function getRoomItem(key: RoomItemKey) {
   return ROOM_ITEMS.find((item) => item.key === key)!;
@@ -73,16 +71,16 @@ function injectRoomSlotStyle() {
   style.textContent = `
     ${ROOM_SLOT_WINDOW} .a3-seat-board{position:relative!important;border:2px solid #0f3554!important;border-radius:8px!important;padding:48px 46px 52px!important;background:#fff!important;overflow:visible!important;}
     ${ROOM_SLOT_WINDOW} .a3-room-slot{position:absolute;display:grid;place-items:center;z-index:8;}
-    ${ROOM_SLOT_WINDOW} .a3-room-slot-leftTop{left:-10px;top:15%;width:22px;height:98px;}
-    ${ROOM_SLOT_WINDOW} .a3-room-slot-leftBottom{left:-10px;top:63%;width:22px;height:98px;}
-    ${ROOM_SLOT_WINDOW} .a3-room-slot-rightTop{right:-10px;top:10%;width:22px;height:98px;}
-    ${ROOM_SLOT_WINDOW} .a3-room-slot-rightMiddle{right:-10px;top:38%;width:22px;height:98px;}
-    ${ROOM_SLOT_WINDOW} .a3-room-slot-rightBottom{right:-10px;bottom:18px;width:22px;height:116px;}
+    ${ROOM_SLOT_WINDOW} .a3-room-slot-leftTop{left:-11px;top:15%;width:22px;height:98px;}
+    ${ROOM_SLOT_WINDOW} .a3-room-slot-leftBottom{left:-11px;top:63%;width:22px;height:98px;}
+    ${ROOM_SLOT_WINDOW} .a3-room-slot-rightTop{right:-11px;top:10%;width:22px;height:98px;}
+    ${ROOM_SLOT_WINDOW} .a3-room-slot-rightMiddle{right:-11px;top:38%;width:22px;height:98px;}
+    ${ROOM_SLOT_WINDOW} .a3-room-slot-rightBottom{right:-11px;bottom:18px;width:22px;height:116px;}
     ${ROOM_SLOT_WINDOW} .a3-room-slot-frontLeft{left:16%;bottom:12px;min-width:110px;height:28px;}
     ${ROOM_SLOT_WINDOW} .a3-room-slot-frontCenter{left:50%;bottom:12px;transform:translateX(-50%);min-width:100px;height:28px;}
     ${ROOM_SLOT_WINDOW} .a3-room-slot-frontRight{right:13%;bottom:12px;min-width:140px;height:28px;}
     ${ROOM_SLOT_WINDOW} .a3-room-slot-backCenter{left:50%;top:12px;transform:translateX(-50%);min-width:120px;height:28px;}
-    ${ROOM_SLOT_WINDOW} .a3-room-slot-aisleCenter{left:50%;top:50%;transform:translate(-50%,-50%);width:70px;height:70%;pointer-events:none;z-index:2;}
+    ${ROOM_SLOT_WINDOW} .a3-room-slot-aisleCenter{left:50%;top:50%;transform:translate(-50%,-50%);width:70px;height:70%;z-index:2;}
     ${ROOM_SLOT_WINDOW} .a3-room-object{font-weight:1000;letter-spacing:.04em;user-select:none;touch-action:none;cursor:grab;text-align:center;border-radius:6px;line-height:1.1;}
     ${ROOM_SLOT_WINDOW} .a3-room-object:active{cursor:grabbing;}
     ${ROOM_SLOT_WINDOW} .a3-room-object.window{width:100%;height:100%;background:#176a8b;border:2px solid #08384d;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);font-size:0;color:transparent;}
@@ -92,7 +90,9 @@ function injectRoomSlotStyle() {
     ${ROOM_SLOT_WINDOW} .a3-room-object.label{color:#020617;padding:2px 10px;background:rgba(15,23,42,.03);}
     ${ROOM_SLOT_WINDOW} .a3-room-object.aisle{width:100%;height:100%;display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;text-orientation:mixed;color:#1d4ed8;border:1px dashed #cbd5e1;border-radius:16px;background:#f8fafc;}
     ${ROOM_SLOT_WINDOW} .a3-room-slot.drag-over{outline:2px dashed var(--desktop-accent,#2563eb);outline-offset:4px;background:color-mix(in srgb,var(--desktop-accent,#2563eb) 9%,transparent);}
-    ${ROOM_SLOT_WINDOW} .a3-seat-back,${ROOM_SLOT_WINDOW} .a3-seat-front,${ROOM_SLOT_WINDOW} .a3-seat-aisle{visibility:hidden!important;}
+    ${ROOM_SLOT_WINDOW} .a3-room-invalid{animation:a3RoomInvalid .42s ease both;}
+    @keyframes a3RoomInvalid{0%{box-shadow:0 0 0 0 rgba(239,68,68,.55)}60%{box-shadow:0 0 0 8px rgba(239,68,68,.13)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
+    ${ROOM_SLOT_WINDOW} .a3-seat-back,${ROOM_SLOT_WINDOW} .a3-seat-front,${ROOM_SLOT_WINDOW} .a3-seat-aisle{visibility:hidden!important;pointer-events:none!important;transform:none!important;}
     ${ROOM_SLOT_WINDOW} .a3-seat-layout{position:relative!important;z-index:4!important;}
     ${ROOM_SLOT_WINDOW} .a3-seat-row{background:#fff!important;}
     ${ROOM_SLOT_WINDOW} .a3-seat-cell{background:#fff!important;color:#020617!important;}
@@ -105,9 +105,11 @@ function injectRoomSlotStyle() {
   document.head.appendChild(style);
 }
 
-function ensureRoomSlots() {
-  const board = document.querySelector<HTMLElement>(`${ROOM_SLOT_WINDOW} .a3-seat-board`);
-  if (!board) return;
+function getBoard() {
+  return document.querySelector<HTMLElement>(`${ROOM_SLOT_WINDOW} .a3-seat-board`);
+}
+
+function ensureRoomSlots(board: HTMLElement) {
   ROOM_SLOTS.forEach((slot) => {
     if (board.querySelector(`[data-room-slot="${slot.key}"]`)) return;
     const el = document.createElement("div");
@@ -117,9 +119,7 @@ function ensureRoomSlots() {
   });
 }
 
-function renderRoomObjects() {
-  const board = document.querySelector<HTMLElement>(`${ROOM_SLOT_WINDOW} .a3-seat-board`);
-  if (!board) return;
+function renderRoomObjects(board: HTMLElement) {
   const map = loadRoomSlotMap();
   board.querySelectorAll(".a3-room-object").forEach((node) => node.remove());
   ROOM_ITEMS.forEach((item) => {
@@ -152,9 +152,7 @@ function isSwapAllowed(itemKey: RoomItemKey, targetSlotKey: RoomSlotKey, map: Re
   return Boolean(sourceSlot?.allowed.includes(occupant.kind));
 }
 
-function bindRoomSlotSwap() {
-  const board = document.querySelector<HTMLElement>(`${ROOM_SLOT_WINDOW} .a3-seat-board`);
-  if (!board) return;
+function bindRoomSlotSwap(board: HTMLElement) {
   board.querySelectorAll<HTMLElement>(".a3-room-slot").forEach((slot) => {
     if (slot.dataset.swapBound === "1") return;
     slot.dataset.swapBound = "1";
@@ -169,30 +167,27 @@ function bindRoomSlotSwap() {
       slot.classList.remove("drag-over");
       const itemKey = (draggingRoomItem || event.dataTransfer?.getData("text/plain")) as RoomItemKey;
       const targetSlotKey = slot.dataset.roomSlot as RoomSlotKey;
+      draggingRoomItem = null;
       if (!itemKey || !targetSlotKey) return;
       const map = loadRoomSlotMap();
       const sourceSlotKey = map[itemKey];
       if (sourceSlotKey === targetSlotKey) return;
       if (!isSwapAllowed(itemKey, targetSlotKey, map)) {
         flashInvalid(slot);
-        draggingRoomItem = null;
         return;
       }
       const occupying = (Object.keys(map) as RoomItemKey[]).find((key) => map[key] === targetSlotKey);
       map[itemKey] = targetSlotKey;
       if (occupying) map[occupying] = sourceSlotKey;
       saveRoomSlotMap(map);
-      draggingRoomItem = null;
-      renderRoomObjects();
+      renderRoomObjects(board);
     });
   });
 }
 
 function flashInvalid(slot: HTMLElement) {
-  slot.animate(
-    [{ outlineColor: "#ef4444", background: "rgba(239,68,68,.18)" }, { outlineColor: "transparent", background: "transparent" }],
-    { duration: 420, easing: "ease" },
-  );
+  slot.classList.remove("a3-room-invalid");
+  window.setTimeout(() => slot.classList.add("a3-room-invalid"), 0);
 }
 
 function ensureResetRoomButton() {
@@ -204,7 +199,8 @@ function ensureResetRoomButton() {
   button.textContent = "Reset phòng";
   button.addEventListener("click", () => {
     localStorage.removeItem(ROOM_SLOT_STORAGE_KEY);
-    renderRoomObjects();
+    const board = getBoard();
+    if (board) renderRoomObjects(board);
   });
   tools.appendChild(button);
 }
@@ -219,18 +215,26 @@ function disableOldFreeZoneTransforms() {
 
 function syncRoomSlotPatch() {
   injectRoomSlotStyle();
-  ensureRoomSlots();
   ensureResetRoomButton();
   disableOldFreeZoneTransforms();
-  renderRoomObjects();
-  bindRoomSlotSwap();
+  const board = getBoard();
+  if (!board) {
+    lastBoard = null;
+    return;
+  }
+  const isNewBoard = board !== lastBoard || board.dataset.roomSlotReady !== "1";
+  if (!isNewBoard) return;
+  lastBoard = board;
+  board.dataset.roomSlotReady = "1";
+  ensureRoomSlots(board);
+  renderRoomObjects(board);
+  bindRoomSlotSwap(board);
 }
 
 function bootRoomSlotPatch() {
   injectRoomSlotStyle();
   syncRoomSlotPatch();
-  const observer = new MutationObserver(syncRoomSlotPatch);
-  observer.observe(document.body, { childList: true, subtree: true });
+  window.setInterval(syncRoomSlotPatch, 500);
   window.addEventListener("dragend", () => { draggingRoomItem = null; });
 }
 
