@@ -77,6 +77,7 @@ import './messagesMobileBackVisibleFix.css';
 import './seatingMapRuntimeApp';
 import './seatingWindowControlsPolish';
 import './seatingLayoutZonesPatch';
+import './seatingRoomSlotSwapPatch';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
