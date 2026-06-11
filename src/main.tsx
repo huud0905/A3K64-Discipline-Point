@@ -76,6 +76,7 @@ import './messagesMobileCleanFinal.css';
 import './messagesMobileBackVisibleFix.css';
 import './seatingMapRuntimeApp';
 import './seatingWindowControlsPolish';
+import './seatingLayoutZonesPatch';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
