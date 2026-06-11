@@ -75,7 +75,6 @@ import './messagesMessengerMobileFinal.css';
 import './messagesMobileCleanFinal.css';
 import './messagesMobileBackVisibleFix.css';
 import './seatingMapStableApp';
-import './seatingRoomSlotsStablePatch';
 import './seatingHideStudentCount.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
