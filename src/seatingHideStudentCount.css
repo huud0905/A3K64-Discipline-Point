@@ -1,0 +1,13 @@
+#a3k64-seating-window .stable-seat-heading p {
+  font-size: 0 !important;
+}
+
+#a3k64-seating-window .stable-seat-heading p::after {
+  content: "Bật sửa rồi kéo tên từ danh sách bên trái vào ghế";
+  font-size: 13px;
+  color: #475569;
+}
+
+.theme-dark #a3k64-seating-window .stable-seat-heading p::after {
+  color: #94a3b8;
+}
