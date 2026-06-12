@@ -1,0 +1,18 @@
+body.a3k64-seat-admin #a3k64-seating-window .stable-seat-board,
+body.a3k64-seat-admin #a3k64-seating-window .stable-seat-student-panel,
+body.a3k64-seat-admin #a3k64-seating-window .stable-seat-tools,
+body.a3k64-seat-admin #a3k64-seating-window .stable-room-window,
+body.a3k64-seat-admin #a3k64-seating-window .stable-room-door {
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  filter: none !important;
+}
+
+body.a3k64-seat-admin #a3k64-seating-window::before,
+body.a3k64-seat-admin #a3k64-seating-window::after,
+body.a3k64-seat-admin #a3k64-seating-window .seat-lock-panel {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
