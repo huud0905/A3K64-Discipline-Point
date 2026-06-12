@@ -77,6 +77,77 @@
   margin-top: 16px !important;
 }
 
+/* Dark mode for the seating chart classroom board */
+.theme-dark #a3k64-seating-window .stable-seat-board,
+.theme-dark #a3k64-seating-window .a3-seat-board {
+  background: linear-gradient(180deg, #0f172a, #0b1220) !important;
+  border-color: #334155 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 18px 45px rgba(0,0,0,.18) !important;
+}
+
+.theme-dark #a3k64-seating-window .stable-seat-row,
+.theme-dark #a3k64-seating-window .a3-seat-row {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark #a3k64-seating-window .stable-seat-cell,
+.theme-dark #a3k64-seating-window .a3-seat-cell {
+  background: #111827 !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark #a3k64-seating-window .stable-seat-cell.empty,
+.theme-dark #a3k64-seating-window .a3-seat-cell.empty {
+  background: #0f172a !important;
+  color: #64748b !important;
+}
+
+.theme-dark #a3k64-seating-window .stable-seat-aisle,
+.theme-dark #a3k64-seating-window .a3-seat-aisle {
+  background: rgba(15,23,42,.82) !important;
+  color: #60a5fa !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark #a3k64-seating-window .stable-seat-back,
+.theme-dark #a3k64-seating-window .a3-seat-back,
+.theme-dark #a3k64-seating-window .stable-seat-front span,
+.theme-dark #a3k64-seating-window .a3-seat-front span {
+  color: #e2e8f0 !important;
+  text-shadow: none !important;
+}
+
+.theme-dark #a3k64-seating-window .stable-seat-front .teacher,
+.theme-dark #a3k64-seating-window .a3-seat-front .teacher {
+  color: #f59e0b !important;
+}
+
+.theme-dark #a3k64-seating-window .stable-seat-front .door,
+.theme-dark #a3k64-seating-window .a3-seat-front .door {
+  color: #34d399 !important;
+}
+
+.theme-dark #a3k64-seating-window .stable-seat-badge,
+.theme-dark #a3k64-seating-window .a3-seat-badge {
+  background: rgba(15,23,42,.88) !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark #a3k64-seating-window .stable-room-window,
+.theme-dark #a3k64-seating-window .a3-room-object.window {
+  background: #0e7490 !important;
+  border-color: #155e75 !important;
+}
+
+.theme-dark #a3k64-seating-window .stable-room-door,
+.theme-dark #a3k64-seating-window .a3-room-object.door {
+  background: #020617 !important;
+  border-color: #000 !important;
+}
+
 @media (max-width: 900px) {
   #a3k64-seating-window .stable-seat-board,
   #a3k64-seating-window .a3-seat-board {
