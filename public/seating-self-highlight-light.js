@@ -97,27 +97,49 @@
     return Array.from(out).filter((x) => compact(x).length >= 2);
   }
 
-  function isMatch(candidate, shortName, fullName) {
+  function scoreMatch(candidate, shortName, fullName) {
     const c = compact(candidate), s = compact(shortName), f = compact(fullName);
-    if (!c || !s) return false;
-    if (c === s || c === f) return true;
-    if (f.length >= 5 && (c.includes(f) || f.includes(c))) return true;
-    if (s.length >= 3 && c.includes(s)) return true;
-    if (c.length >= 3 && s.includes(c)) return true;
-    return false;
+    if (!c || !s) return 0;
+
+    // Ưu tiên tuyệt đối tên hiển thị trong ô. Ví dụ candidate Hữu phải thắng ô Hữu,
+    // không được bắt nhầm Nguyễn Hữu Trung.
+    if (c === s) return 1000;
+    if (f && c === f) return 950;
+
+    // Nếu candidate chỉ là 1 từ ngắn, chỉ cho match tên ô, không match tên đệm trong họ tên đầy đủ.
+    const isShortSingleWord = !norm(candidate).includes(' ') && c.length <= 5;
+    if (isShortSingleWord) {
+      if (s.includes(c) || c.includes(s)) return 700;
+      return 0;
+    }
+
+    if (f.length >= 5 && f.includes(c)) return 520;
+    if (f.length >= 5 && c.includes(f)) return 510;
+    if (s.length >= 3 && c.includes(s)) return 460;
+    if (c.length >= 3 && s.includes(c)) return 450;
+    return 0;
   }
 
   function run() {
     injectStyle();
     const cands = candidates();
-    let matched = false;
-    document.querySelectorAll(`${W} .stable-seat-cell`).forEach((cell) => {
+    let bestCell = null;
+    let bestScore = 0;
+
+    const cells = Array.from(document.querySelectorAll(`${W} .stable-seat-cell`));
+    cells.forEach((cell) => {
       const shortName = (cell.dataset.shortName || cell.textContent || '').replace(/\s+/g, ' ').trim();
       const fullName = (cell.dataset.fullName || '').trim();
-      const ok = !matched && shortName && shortName !== 'Trống' && cands.some((cand) => isMatch(cand, shortName, fullName));
-      cell.classList.toggle('seat-self-match', !!ok);
-      if (ok) matched = true;
+      const score = shortName && shortName !== 'Trống'
+        ? Math.max(0, ...cands.map((cand) => scoreMatch(cand, shortName, fullName)))
+        : 0;
+      if (score > bestScore) {
+        bestScore = score;
+        bestCell = cell;
+      }
     });
+
+    cells.forEach((cell) => cell.classList.toggle('seat-self-match', cell === bestCell && bestScore > 0));
   }
 
   document.addEventListener('DOMContentLoaded', run);
