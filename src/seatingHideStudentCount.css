@@ -1,13 +1,16 @@
 #a3k64-seating-window .stable-seat-heading p {
-  font-size: 0 !important;
+  display: none !important;
 }
 
-#a3k64-seating-window .stable-seat-heading p::after {
-  content: "Bật sửa rồi kéo tên từ danh sách bên trái vào ghế";
-  font-size: 13px;
-  color: #475569;
+#a3k64-seating-window .stable-seat-approve {
+  display: none !important;
 }
 
-.theme-dark #a3k64-seating-window .stable-seat-heading p::after {
-  color: #94a3b8;
+#a3k64-seating-window .stable-seat-aisle {
+  height: calc(100% - 116px) !important;
+  align-self: center !important;
+}
+
+#a3k64-seating-window .stable-room-slot-aisleCenter {
+  height: calc(70% - 86px) !important;
 }
