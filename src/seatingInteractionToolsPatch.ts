@@ -1,8 +1,35 @@
 const SEAT_TOOLS_WINDOW = "#a3k64-seating-window";
 const SEAT_TOOLS_STORAGE = "a3k64-seating-map-v1";
+const SEAT_TOOLS_STYLE_ID = "a3k64-seat-tools-style";
 let seatToolsLoop = 0;
 let seatToolsCount = 0;
 let seatContextBlockBound = false;
+let seatDragBound = false;
+let seatExternalDrag: { type: "student"; name: string } | { type: "seat"; side: "left" | "right"; row: number; seat: number; name: string } | null = null;
+
+function injectSeatToolsStyle() {
+  if (document.getElementById(SEAT_TOOLS_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = SEAT_TOOLS_STYLE_ID;
+  style.textContent = `
+    ${SEAT_TOOLS_WINDOW} .stable-seat-student-list{
+      align-content:start!important;
+      align-items:start!important;
+      grid-auto-rows:min-content!important;
+    }
+    ${SEAT_TOOLS_WINDOW} .stable-seat-student-card{
+      min-height:40px!important;
+      max-height:46px!important;
+      flex:0 0 auto!important;
+      align-self:start!important;
+    }
+    ${SEAT_TOOLS_WINDOW} .seat-unassigned-empty{
+      align-self:start!important;
+      min-height:auto!important;
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 function readSeatStateFromStorage() {
   try {
@@ -127,6 +154,14 @@ function getCellInfo(cell: HTMLElement) {
   return { side, row, seat, name };
 }
 
+function readCellPos(cell: HTMLElement) {
+  const side = cell.dataset.side === "right" ? "right" : cell.dataset.side === "left" ? "left" : null;
+  const row = Number(cell.dataset.row);
+  const seat = Number(cell.dataset.seat);
+  if (!side || !Number.isFinite(row) || !Number.isFinite(seat)) return null;
+  return { side, row, seat };
+}
+
 function removeSeatContextMenu() {
   document.querySelector(".seat-cell-context-menu")?.remove();
 }
@@ -138,6 +173,7 @@ function updateSingleStudentCard(name: string) {
   const card = cards.find((item) => (item.dataset.name || item.querySelector("span")?.textContent || "").trim() === name);
   if (!card) return;
   card.style.display = "";
+  card.draggable = true;
   const small = card.querySelector("small");
   if (small) small.textContent = "Chưa xếp";
   list.querySelector(".seat-unassigned-empty")?.remove();
@@ -153,6 +189,7 @@ function deleteSeatCell(cell: HTMLElement) {
   cell.classList.add("empty");
   updateSingleStudentCard(info.name);
   hideAssignedStudents();
+  enableSeatDragDrop();
   showSeatToast(`Đã xoá ${info.name} khỏi chỗ ngồi.`);
 }
 
@@ -177,6 +214,85 @@ function showSeatContextMenu(event: MouseEvent, cell: HTMLElement) {
     removeSeatContextMenu();
   });
   document.body.appendChild(menu);
+}
+
+function putExternalDragIntoCell(cell: HTMLElement) {
+  if (!seatExternalDrag) return;
+  const target = readCellPos(cell);
+  if (!target) return;
+  const state = normalizeSeatState(readSeatStateFromDom());
+
+  if (seatExternalDrag.type === "seat") {
+    if (seatExternalDrag.side === target.side && seatExternalDrag.row === target.row && seatExternalDrag.seat === target.seat) return;
+    const targetName = state[target.side][target.row][target.seat];
+    state[seatExternalDrag.side][seatExternalDrag.row][seatExternalDrag.seat] = targetName || "";
+    state[target.side][target.row][target.seat] = seatExternalDrag.name;
+  } else {
+    (["left", "right"] as const).forEach((side) => {
+      state[side].forEach((row: string[], rowIndex: number) => {
+        row.forEach((name: string, seatIndex: number) => {
+          if (name === seatExternalDrag!.name) state[side][rowIndex][seatIndex] = "";
+        });
+      });
+    });
+    state[target.side][target.row][target.seat] = seatExternalDrag.name;
+  }
+
+  localStorage.setItem(SEAT_TOOLS_STORAGE, JSON.stringify(state));
+  paintSeatingFromState(state);
+  seatExternalDrag = null;
+  hideAssignedStudents();
+  enableSeatDragDrop();
+}
+
+function enableSeatDragDrop() {
+  document.querySelectorAll<HTMLElement>(`${SEAT_TOOLS_WINDOW} .stable-seat-student-card`).forEach((card) => {
+    if (card.dataset.externalDragBound !== "1") {
+      card.dataset.externalDragBound = "1";
+      card.addEventListener("dragstart", (event) => {
+        if (card.style.display === "none") return;
+        const name = (card.dataset.name || card.querySelector("span")?.textContent || "").trim();
+        if (!name) return;
+        seatExternalDrag = { type: "student", name };
+        event.dataTransfer?.setData("text/plain", name);
+        event.dataTransfer!.effectAllowed = "move";
+        event.stopPropagation();
+        if ("stopImmediatePropagation" in event) event.stopImmediatePropagation();
+      }, true);
+    }
+    if (card.style.display !== "none") card.draggable = true;
+  });
+
+  document.querySelectorAll<HTMLElement>(`${SEAT_TOOLS_WINDOW} .stable-seat-cell`).forEach((cell) => {
+    if (cell.dataset.externalDropBound !== "1") {
+      cell.dataset.externalDropBound = "1";
+      cell.addEventListener("dragstart", (event) => {
+        const pos = readCellPos(cell);
+        const name = (cell.textContent || "").trim();
+        if (!pos || !name || name === "Trống") return;
+        seatExternalDrag = { type: "seat", ...pos, name };
+        event.dataTransfer?.setData("text/plain", name);
+        event.dataTransfer!.effectAllowed = "move";
+        event.stopPropagation();
+        if ("stopImmediatePropagation" in event) event.stopImmediatePropagation();
+      }, true);
+      cell.addEventListener("dragover", (event) => {
+        if (!seatExternalDrag) return;
+        event.preventDefault();
+        event.stopPropagation();
+        cell.classList.add("drag-over");
+      }, true);
+      cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"), true);
+      cell.addEventListener("drop", (event) => {
+        if (!seatExternalDrag) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if ("stopImmediatePropagation" in event) event.stopImmediatePropagation();
+        cell.classList.remove("drag-over");
+        putExternalDragIntoCell(cell);
+      }, true);
+    }
+  });
 }
 
 function blockSeatContextEvent(event: Event) {
@@ -211,6 +327,7 @@ function disableRightClickInSeating() {
     }, true);
     document.addEventListener("click", removeSeatContextMenu, true);
     window.addEventListener("scroll", removeSeatContextMenu, true);
+    window.addEventListener("dragend", () => { seatExternalDrag = null; });
   }
   if (win.dataset.noContextMenu !== "1") {
     win.dataset.noContextMenu = "1";
@@ -231,6 +348,7 @@ function hideAssignedStudents() {
     const name = (card.dataset.name || card.querySelector("span")?.textContent || "").trim();
     const unassigned = Boolean(name) && !assigned.has(name);
     card.style.display = unassigned ? "" : "none";
+    card.draggable = unassigned;
     const small = card.querySelector("small");
     if (small && unassigned) small.textContent = "Chưa xếp";
     if (unassigned) visible += 1;
@@ -250,9 +368,11 @@ function hideAssignedStudents() {
 }
 
 function seatToolsTick() {
+  injectSeatToolsStyle();
   disableRightClickInSeating();
   hideAssignedStudents();
   addRandomButton();
+  enableSeatDragDrop();
 }
 
 function bootSeatToolsPatch() {
