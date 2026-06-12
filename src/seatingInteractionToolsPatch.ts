@@ -2,6 +2,7 @@ const SEAT_TOOLS_WINDOW = "#a3k64-seating-window";
 const SEAT_TOOLS_STORAGE = "a3k64-seating-map-v1";
 let seatToolsLoop = 0;
 let seatToolsCount = 0;
+let seatContextBlockBound = false;
 
 function readSeatStateFromStorage() {
   try {
@@ -51,8 +52,30 @@ function shuffleSeatNames<T>(items: T[]) {
   return next;
 }
 
+function showSeatToast(message: string) {
+  document.querySelector(".seat-tools-toast")?.remove();
+  const toast = document.createElement("div");
+  toast.className = "seat-tools-toast";
+  toast.textContent = message;
+  toast.style.cssText = "position:fixed;left:50%;top:74px;transform:translateX(-50%);z-index:999999;padding:11px 15px;border:1px solid #14b8a6;border-radius:14px;background:rgba(15,23,42,.96);color:#f8fafc;box-shadow:0 18px 55px rgba(0,0,0,.35);font-weight:900;font-size:14px";
+  document.body.appendChild(toast);
+  window.setTimeout(() => toast.remove(), 2400);
+}
+
+function paintSeatingFromState(state: { left: string[][]; right: string[][] }) {
+  document.querySelectorAll<HTMLElement>(`${SEAT_TOOLS_WINDOW} .stable-seat-cell`).forEach((cell) => {
+    const side = cell.dataset.side === "right" ? "right" : cell.dataset.side === "left" ? "left" : null;
+    const row = Number(cell.dataset.row);
+    const seat = Number(cell.dataset.seat);
+    if (!side || !Number.isFinite(row) || !Number.isFinite(seat)) return;
+    const name = state[side]?.[row]?.[seat] || "";
+    cell.textContent = name || "Trống";
+    cell.classList.toggle("empty", !name);
+  });
+}
+
 function randomizeSeating() {
-  const current = normalizeSeatState(readSeatStateFromStorage() || readSeatStateFromDom());
+  const current = normalizeSeatState(readSeatStateFromDom());
   const positions: Array<{ side: "left" | "right"; row: number; seat: number }> = [];
   const names: string[] = [];
 
@@ -66,8 +89,10 @@ function randomizeSeating() {
     });
   });
 
-  if (names.length < 2) return alert("Không đủ học sinh để random.");
-  if (!confirm("Random lại toàn bộ chỗ ngồi hiện tại? Các ô Trống sẽ được giữ nguyên.")) return;
+  if (names.length < 2) {
+    showSeatToast("Không đủ học sinh để random.");
+    return;
+  }
 
   const shuffled = shuffleSeatNames(names);
   positions.forEach((pos, index) => {
@@ -75,7 +100,9 @@ function randomizeSeating() {
   });
 
   localStorage.setItem(SEAT_TOOLS_STORAGE, JSON.stringify(current));
-  location.reload();
+  paintSeatingFromState(current);
+  hideAssignedStudents();
+  showSeatToast("Đã random chỗ ngồi cục bộ. Bấm Lưu sơ đồ để lưu lên sheet.");
 }
 
 function addRandomButton() {
@@ -85,17 +112,37 @@ function addRandomButton() {
   button.type = "button";
   button.dataset.seatRandom = "1";
   button.textContent = "Random";
-  button.title = "Xếp chỗ ngồi ngẫu nhiên";
+  button.title = "Xếp chỗ ngồi ngẫu nhiên cục bộ";
   button.addEventListener("click", randomizeSeating);
   const printButton = tools.querySelector("[data-tool='print']");
   tools.insertBefore(button, printButton || null);
 }
 
+function blockSeatContextEvent(event: Event) {
+  const target = event.target as HTMLElement | null;
+  if (!target?.closest?.(SEAT_TOOLS_WINDOW)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  if ("stopImmediatePropagation" in event) event.stopImmediatePropagation();
+}
+
 function disableRightClickInSeating() {
   const win = document.querySelector<HTMLElement>(SEAT_TOOLS_WINDOW);
-  if (!win || win.dataset.noContextMenu === "1") return;
-  win.dataset.noContextMenu = "1";
-  win.addEventListener("contextmenu", (event) => event.preventDefault());
+  if (!win) return;
+  if (!seatContextBlockBound) {
+    seatContextBlockBound = true;
+    document.addEventListener("contextmenu", blockSeatContextEvent, true);
+    document.addEventListener("mousedown", (event) => {
+      if (event.button === 2) blockSeatContextEvent(event);
+    }, true);
+    document.addEventListener("pointerdown", (event) => {
+      if (event.button === 2) blockSeatContextEvent(event);
+    }, true);
+  }
+  if (win.dataset.noContextMenu !== "1") {
+    win.dataset.noContextMenu = "1";
+    win.addEventListener("contextmenu", blockSeatContextEvent, true);
+  }
 }
 
 function hideAssignedStudents() {
