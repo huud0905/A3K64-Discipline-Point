@@ -1,11 +1,6 @@
-const SEAT_GATE_PATH = "/desktop/seating-chart";
-const SEAT_GATE_WINDOW = "a3k64-seating-window";
-const SEAT_GATE_SHORTCUT = "a3k64-seating-shortcut";
-const SEAT_GATE_TASKBAR = "a3k64-seating-taskbar-button";
-const SEAT_GATE_ALLOWED = ["lop_truong", "bi_thu", "gvcn"];
+const SEAT_GATE_ADMIN_ROLES = ["lop_truong", "bi_thu", "gvcn"];
 let seatGateCount = 0;
 let seatGateTimer = 0;
-let seatGateAlerted = false;
 
 function seatGateRoleText(value: unknown) {
   return String(value || "")
@@ -32,29 +27,12 @@ function seatGateCurrentRole() {
   }
 }
 
-function seatGateCanOpen() {
-  return SEAT_GATE_ALLOWED.includes(seatGateCurrentRole());
-}
-
-function seatGateWarn() {
-  if (seatGateAlerted) return;
-  seatGateAlerted = true;
-  window.setTimeout(() => alert("Bạn chưa có quyền truy cập app Sơ đồ chỗ ngồi."), 50);
-}
-
 function seatGateTick() {
-  if (seatGateCanOpen()) return;
-  document.getElementById(SEAT_GATE_SHORTCUT)?.remove();
-  document.getElementById(SEAT_GATE_TASKBAR)?.remove();
-  const win = document.getElementById(SEAT_GATE_WINDOW);
-  if (win) {
-    win.remove();
-    seatGateWarn();
-  }
-  if (location.pathname === SEAT_GATE_PATH) {
-    history.replaceState({}, "", "/desktop");
-    seatGateWarn();
-  }
+  const role = seatGateCurrentRole();
+  const isAdmin = SEAT_GATE_ADMIN_ROLES.includes(role);
+  document.body.classList.toggle("a3k64-seat-admin", isAdmin);
+  document.body.classList.toggle("a3k64-seat-viewer", !isAdmin);
+  document.body.dataset.seatingRole = role;
 }
 
 function bootSeatGate() {
