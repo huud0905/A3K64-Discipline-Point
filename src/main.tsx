@@ -76,11 +76,9 @@ import './messagesMobileCleanFinal.css';
 import './messagesMobileBackVisibleFix.css';
 import './seatingMapStableApp';
 import './seatingHideStudentCount.css';
-import './seatingSheetDatabasePatch';
 import './seatingRoleGate';
 import './seatingInteractionToolsPatch';
 import './seatingSeatSwapHardPatch';
-import './seatingPrettySelectNoReloadPatch';
 import './seatingRestoreAndControlsPatch';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
