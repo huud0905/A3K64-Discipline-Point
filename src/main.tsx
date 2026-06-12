@@ -83,6 +83,7 @@ import './seatingRestoreAndControlsPatch';
 import './seatingNameHighlightPatch';
 import './seatingCanonicalNamesPatch';
 import './seatingPublishAccessPatch';
+import './seatingPublishModalPolishPatch';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
