@@ -75,6 +75,7 @@ import './messagesMessengerMobileFinal.css';
 import './messagesMobileCleanFinal.css';
 import './messagesMobileBackVisibleFix.css';
 import './seatingInstantAccessShieldPatch';
+import './seatingPersistentLockedShieldPatch';
 import './seatingMapStableApp';
 import './seatingHideStudentCount.css';
 import './seatingRoleGate';
