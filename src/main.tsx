@@ -21,7 +21,7 @@ import './scoreboard-final-fix.css';
 import './scoreboard-theme-animation.css';
 import './scoreboard-final-polish.css';
 import './scoreboardHonorsAndChartPolish.css';
-import './scoreboardMobileLatestFix';
+import './scoreboardMobileLatestFix.css';
 import './scoreboardMobileEmergencyPatch';
 import './scoreboardMobileStudentDetailCardsPatch';
 import './scoreboardMultiGroupFilter.css';
