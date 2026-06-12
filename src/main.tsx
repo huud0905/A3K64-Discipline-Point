@@ -81,6 +81,7 @@ import './seatingRoleGate';
 import './seatingInteractionToolsPatch';
 import './seatingSeatSwapHardPatch';
 import './seatingPrettySelectNoReloadPatch';
+import './seatingRestoreAndControlsPatch';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
