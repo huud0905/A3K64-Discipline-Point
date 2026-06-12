@@ -81,6 +81,7 @@ import './seatingInteractionToolsPatch';
 import './seatingSeatSwapHardPatch';
 import './seatingRestoreAndControlsPatch';
 import './seatingNameHighlightPatch';
+import './seatingCanonicalNamesPatch';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
