@@ -118,12 +118,77 @@ function addRandomButton() {
   tools.insertBefore(button, printButton || null);
 }
 
+function getCellInfo(cell: HTMLElement) {
+  const side = cell.dataset.side === "right" ? "right" : cell.dataset.side === "left" ? "left" : null;
+  const row = Number(cell.dataset.row);
+  const seat = Number(cell.dataset.seat);
+  const name = (cell.textContent || "").trim();
+  if (!side || !Number.isFinite(row) || !Number.isFinite(seat) || !name || name === "Trống") return null;
+  return { side, row, seat, name };
+}
+
+function removeSeatContextMenu() {
+  document.querySelector(".seat-cell-context-menu")?.remove();
+}
+
+function updateSingleStudentCard(name: string) {
+  const list = document.querySelector<HTMLElement>(`${SEAT_TOOLS_WINDOW} .stable-seat-student-list`);
+  if (!list) return;
+  const cards = Array.from(list.querySelectorAll<HTMLElement>(".stable-seat-student-card"));
+  const card = cards.find((item) => (item.dataset.name || item.querySelector("span")?.textContent || "").trim() === name);
+  if (!card) return;
+  card.style.display = "";
+  const small = card.querySelector("small");
+  if (small) small.textContent = "Chưa xếp";
+  list.querySelector(".seat-unassigned-empty")?.remove();
+}
+
+function deleteSeatCell(cell: HTMLElement) {
+  const info = getCellInfo(cell);
+  if (!info) return;
+  const state = normalizeSeatState(readSeatStateFromDom());
+  state[info.side][info.row][info.seat] = "";
+  localStorage.setItem(SEAT_TOOLS_STORAGE, JSON.stringify(state));
+  cell.textContent = "Trống";
+  cell.classList.add("empty");
+  updateSingleStudentCard(info.name);
+  hideAssignedStudents();
+  showSeatToast(`Đã xoá ${info.name} khỏi chỗ ngồi.`);
+}
+
+function showSeatContextMenu(event: MouseEvent, cell: HTMLElement) {
+  const info = getCellInfo(cell);
+  removeSeatContextMenu();
+  if (!info) return;
+  const menu = document.createElement("div");
+  menu.className = "seat-cell-context-menu";
+  menu.innerHTML = `<button type="button" data-action="delete">Xoá</button>`;
+  const x = Math.min(event.clientX, window.innerWidth - 130);
+  const y = Math.min(event.clientY, window.innerHeight - 56);
+  menu.style.cssText = "position:fixed;z-index:999999;min-width:118px;padding:6px;border:1px solid #334155;border-radius:12px;background:#111827;color:#f8fafc;box-shadow:0 20px 55px rgba(0,0,0,.35)";
+  menu.style.left = `${Math.max(8, x)}px`;
+  menu.style.top = `${Math.max(8, y)}px`;
+  const button = menu.querySelector<HTMLButtonElement>("button")!;
+  button.style.cssText = "width:100%;height:34px;border:0;border-radius:9px;background:transparent;color:#f87171;text-align:left;padding:0 12px;font-weight:900;cursor:pointer";
+  button.addEventListener("mouseenter", () => { button.style.background = "rgba(248,113,113,.14)"; });
+  button.addEventListener("mouseleave", () => { button.style.background = "transparent"; });
+  button.addEventListener("click", () => {
+    deleteSeatCell(cell);
+    removeSeatContextMenu();
+  });
+  document.body.appendChild(menu);
+}
+
 function blockSeatContextEvent(event: Event) {
+  const mouseEvent = event as MouseEvent;
   const target = event.target as HTMLElement | null;
-  if (!target?.closest?.(SEAT_TOOLS_WINDOW)) return;
+  const app = target?.closest?.(SEAT_TOOLS_WINDOW);
+  if (!app) return;
+  const cell = target?.closest?.(".stable-seat-cell") as HTMLElement | null;
   event.preventDefault();
   event.stopPropagation();
   if ("stopImmediatePropagation" in event) event.stopImmediatePropagation();
+  if (event.type === "contextmenu" && cell) showSeatContextMenu(mouseEvent, cell);
 }
 
 function disableRightClickInSeating() {
@@ -133,11 +198,19 @@ function disableRightClickInSeating() {
     seatContextBlockBound = true;
     document.addEventListener("contextmenu", blockSeatContextEvent, true);
     document.addEventListener("mousedown", (event) => {
-      if (event.button === 2) blockSeatContextEvent(event);
+      if (event.button === 2 && (event.target as HTMLElement | null)?.closest?.(SEAT_TOOLS_WINDOW)) {
+        event.stopPropagation();
+        if ("stopImmediatePropagation" in event) event.stopImmediatePropagation();
+      }
     }, true);
     document.addEventListener("pointerdown", (event) => {
-      if (event.button === 2) blockSeatContextEvent(event);
+      if (event.button === 2 && (event.target as HTMLElement | null)?.closest?.(SEAT_TOOLS_WINDOW)) {
+        event.stopPropagation();
+        if ("stopImmediatePropagation" in event) event.stopImmediatePropagation();
+      }
     }, true);
+    document.addEventListener("click", removeSeatContextMenu, true);
+    window.addEventListener("scroll", removeSeatContextMenu, true);
   }
   if (win.dataset.noContextMenu !== "1") {
     win.dataset.noContextMenu = "1";
@@ -148,11 +221,18 @@ function disableRightClickInSeating() {
 function hideAssignedStudents() {
   const list = document.querySelector<HTMLElement>(`${SEAT_TOOLS_WINDOW} .stable-seat-student-list`);
   if (!list) return;
+  const state = normalizeSeatState(readSeatStateFromDom());
+  const assigned = new Set<string>();
+  (["left", "right"] as const).forEach((side) => {
+    state[side].forEach((row: string[]) => row.forEach((name: string) => { if (name) assigned.add(name); }));
+  });
   let visible = 0;
   list.querySelectorAll<HTMLElement>(".stable-seat-student-card").forEach((card) => {
-    const label = card.querySelector("small")?.textContent || "";
-    const unassigned = label.includes("Chưa xếp");
+    const name = (card.dataset.name || card.querySelector("span")?.textContent || "").trim();
+    const unassigned = Boolean(name) && !assigned.has(name);
     card.style.display = unassigned ? "" : "none";
+    const small = card.querySelector("small");
+    if (small && unassigned) small.textContent = "Chưa xếp";
     if (unassigned) visible += 1;
   });
   let empty = list.querySelector<HTMLElement>(".seat-unassigned-empty");
