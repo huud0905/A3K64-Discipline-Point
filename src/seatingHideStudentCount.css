@@ -1,16 +1,35 @@
-#a3k64-seating-window .stable-seat-heading p {
+/* Force cleanup for both old and stable seating chart runtimes */
+#a3k64-seating-window .stable-seat-heading p,
+#a3k64-seating-window .a3-seat-heading p,
+#a3k64-seating-window .stable-seat-heading .stable-seat-heading-subtitle,
+#a3k64-seating-window .a3-seat-heading .a3-seat-heading-subtitle {
   display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
 }
 
-#a3k64-seating-window .stable-seat-approve {
+#a3k64-seating-window .stable-seat-approve,
+#a3k64-seating-window .a3-seat-approve {
   display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
 }
 
-#a3k64-seating-window .stable-seat-aisle {
+#a3k64-seating-window .stable-seat-aisle,
+#a3k64-seating-window .a3-seat-aisle {
   height: calc(100% - 116px) !important;
+  max-height: 370px !important;
   align-self: center !important;
 }
 
-#a3k64-seating-window .stable-room-slot-aisleCenter {
+#a3k64-seating-window .stable-room-slot-aisleCenter,
+#a3k64-seating-window .a3-room-slot-aisleCenter {
   height: calc(70% - 86px) !important;
+  max-height: 370px !important;
 }
