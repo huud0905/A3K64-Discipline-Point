@@ -117,6 +117,15 @@ function loadSeatingSelfHighlightLightScript() {
   document.head.appendChild(script);
 }
 
+function loadSeatingAdminViewCss() {
+  if (document.getElementById('a3k64-seating-admin-view-css')) return;
+  const link = document.createElement('link');
+  link.id = 'a3k64-seating-admin-view-css';
+  link.rel = 'stylesheet';
+  link.href = '/seating-admin-view.css';
+  document.head.appendChild(link);
+}
+
 const observer = new MutationObserver(syncOverlayTheme);
 observer.observe(document.documentElement, { attributes: true, childList: true, subtree: true, attributeFilter: ['class', 'data-theme', 'data-mode', 'data-color-scheme', 'style'] });
 if (document.body) observer.observe(document.body, { attributes: true, childList: true, subtree: true, attributeFilter: ['class', 'data-theme', 'data-mode', 'data-color-scheme', 'style'] });
@@ -126,5 +135,6 @@ window.matchMedia?.('(prefers-color-scheme: light)').addEventListener?.('change'
 window.setInterval(syncOverlayTheme, 300);
 syncOverlayTheme();
 loadSeatingSelfHighlightLightScript();
+loadSeatingAdminViewCss();
 
 export {};
