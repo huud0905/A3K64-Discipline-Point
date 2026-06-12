@@ -79,6 +79,7 @@ import './seatingHideStudentCount.css';
 import './seatingSheetDatabasePatch';
 import './seatingRoleGate';
 import './seatingInteractionToolsPatch';
+import './seatingSeatSwapHardPatch';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
