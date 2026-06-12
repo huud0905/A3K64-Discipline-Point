@@ -108,6 +108,15 @@ function syncOverlayTheme() {
   root.dataset.a3OverlayTheme = theme === 'light' ? 'light' : 'dark';
 }
 
+function loadSeatingSelfHighlightLightScript() {
+  if (document.getElementById('a3k64-seating-self-highlight-light-script')) return;
+  const script = document.createElement('script');
+  script.id = 'a3k64-seating-self-highlight-light-script';
+  script.src = '/seating-self-highlight-light.js';
+  script.defer = true;
+  document.head.appendChild(script);
+}
+
 const observer = new MutationObserver(syncOverlayTheme);
 observer.observe(document.documentElement, { attributes: true, childList: true, subtree: true, attributeFilter: ['class', 'data-theme', 'data-mode', 'data-color-scheme', 'style'] });
 if (document.body) observer.observe(document.body, { attributes: true, childList: true, subtree: true, attributeFilter: ['class', 'data-theme', 'data-mode', 'data-color-scheme', 'style'] });
@@ -116,5 +125,6 @@ window.addEventListener('storage', syncOverlayTheme);
 window.matchMedia?.('(prefers-color-scheme: light)').addEventListener?.('change', syncOverlayTheme);
 window.setInterval(syncOverlayTheme, 300);
 syncOverlayTheme();
+loadSeatingSelfHighlightLightScript();
 
 export {};
