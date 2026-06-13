@@ -233,12 +233,58 @@ function injectSeatCtrlStyle() {
     .theme-light ${SEAT_CTRL_WINDOW} .seat-ctrl-trigger,.theme-light ${SEAT_CTRL_WINDOW} .seat-ctrl-btn{background:#fff;color:#0f172a;border-color:#cbd5e1;box-shadow:0 10px 24px rgba(15,23,42,.08)}
     .theme-light ${SEAT_CTRL_WINDOW} .seat-ctrl-menu{background:#fff;border-color:#cbd5e1;box-shadow:0 20px 55px rgba(15,23,42,.16)}
     .theme-light ${SEAT_CTRL_WINDOW} .seat-ctrl-option{color:#0f172a}.theme-light ${SEAT_CTRL_WINDOW} .seat-ctrl-option:hover{background:#e2e8f0}.theme-light ${SEAT_CTRL_WINDOW} .seat-ctrl-option.active{background:#cbd5e1}
+    .seat-create-backdrop{position:fixed;inset:0;z-index:999999;background:rgba(15,23,42,.42);display:flex;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(8px)}
+    .seat-create-modal{width:min(430px,100%);border:1px solid #cbd5e1;border-radius:24px;background:#fff;color:#0f172a;box-shadow:0 28px 90px rgba(15,23,42,.22);padding:18px;display:grid;gap:14px;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif!important}
+    .seat-create-modal h3{margin:0;font-size:20px;font-weight:1000}.seat-create-modal p{margin:0;color:#64748b;font-size:13px;line-height:1.45}.seat-create-modal label{display:grid;gap:7px;font-size:13px;font-weight:950}.seat-create-modal input{height:44px;border:1px solid #cbd5e1;border-radius:15px;background:#fff;color:#0f172a;padding:0 12px;font-weight:900;outline:none}.seat-create-modal input:focus{border-color:var(--desktop-accent,#14b8a6);box-shadow:0 0 0 3px color-mix(in srgb,var(--desktop-accent,#14b8a6) 18%,transparent)}.seat-create-actions{display:flex;justify-content:flex-end;gap:10px}.seat-create-actions button{height:38px;border:1px solid #cbd5e1;border-radius:13px;background:#fff;color:#0f172a;padding:0 14px;font-weight:1000;cursor:pointer}.seat-create-actions .primary{background:var(--desktop-accent,#14b8a6);border-color:transparent;color:#fff}.seat-create-actions button:disabled{opacity:.65;cursor:wait}
+    .theme-dark .seat-create-modal{background:#0f172a;color:#f8fafc;border-color:#334155;box-shadow:0 28px 90px rgba(0,0,0,.42)}.theme-dark .seat-create-modal p{color:#94a3b8}.theme-dark .seat-create-modal input,.theme-dark .seat-create-actions button{background:#111827;color:#f8fafc;border-color:#334155}
   `;
   document.head.appendChild(style);
 }
 
 function seatCtrlCurrentId() {
   return localStorage.getItem(SEAT_CTRL_CURRENT_KEY) || seatCtrlCharts.find((item) => item.active)?.id || seatCtrlCharts[0]?.id || "";
+}
+
+function seatCtrlOpenCreateModal() {
+  injectSeatCtrlStyle();
+  document.querySelector(".seat-create-backdrop")?.remove();
+  const suggested = `Sơ đồ ${seatCtrlCharts.length + 1}`;
+  const backdrop = document.createElement("div");
+  backdrop.className = "seat-create-backdrop";
+  backdrop.innerHTML = `
+    <div class="seat-create-modal">
+      <div><h3>Tạo sơ đồ mới</h3><p>Sơ đồ mới sẽ mặc định ở chế độ Riêng tư cho đến khi bạn công bố.</p></div>
+      <label>Tên sơ đồ mới<input data-name value="${seatCtrlEscape(suggested)}" maxlength="60" /></label>
+      <div class="seat-create-actions"><button data-close>Huỷ</button><button class="primary" data-save>Tạo sơ đồ</button></div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const input = backdrop.querySelector<HTMLInputElement>("[data-name]");
+  const close = () => backdrop.remove();
+  const save = async () => {
+    const title = (input?.value || "").trim();
+    if (!title) {
+      input?.focus();
+      return;
+    }
+    const saveBtn = backdrop.querySelector<HTMLButtonElement>("[data-save]");
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Đang tạo..."; }
+    const chart = await seatCtrlSave(null, title);
+    localStorage.setItem(SEAT_CTRL_CURRENT_KEY, chart.id);
+    try {
+      const key = `a3k64-seating-publish-lite-v1:${chart.id}`;
+      localStorage.setItem(key, JSON.stringify({ chartId: chart.id, chartTitle: title, status: "private", publishAt: "", previewStudents: "" }));
+    } catch {}
+    seatCtrlLastRenderKey = "";
+    await seatCtrlRefresh();
+    seatCtrlToast("Đã tạo sơ đồ mới.");
+    close();
+  };
+  backdrop.querySelector("[data-close]")?.addEventListener("click", close);
+  backdrop.addEventListener("click", (event) => { if (event.target === backdrop) close(); });
+  backdrop.querySelector("[data-save]")?.addEventListener("click", () => void save());
+  input?.addEventListener("keydown", (event) => { if (event.key === "Enter") void save(); });
+  setTimeout(() => { input?.focus(); input?.select(); }, 30);
 }
 
 function seatCtrlRender(force = false) {
@@ -295,15 +341,7 @@ function seatCtrlRender(force = false) {
   newBtn.type = "button";
   newBtn.className = "seat-ctrl-btn";
   newBtn.textContent = "Tạo sơ đồ mới";
-  newBtn.addEventListener("click", async () => {
-    const title = prompt("Tên sơ đồ mới:", `Sơ đồ ${seatCtrlCharts.length + 1}`)?.trim();
-    if (!title) return;
-    const chart = await seatCtrlSave(null, title);
-    localStorage.setItem(SEAT_CTRL_CURRENT_KEY, chart.id);
-    seatCtrlLastRenderKey = "";
-    await seatCtrlRefresh();
-    seatCtrlToast("Đã tạo sơ đồ mới.");
-  });
+  newBtn.addEventListener("click", () => seatCtrlOpenCreateModal());
 
   const search = tools.querySelector("input");
   tools.insertBefore(newBtn, search || tools.firstChild);
