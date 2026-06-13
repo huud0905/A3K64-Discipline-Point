@@ -87,6 +87,7 @@ import './seatingPublishLitePatch';
 import './seatingViewerGateLitePatch';
 import './seatingAccessOverlayFix';
 import './seatingRuntimeStableFix';
+import './lightContextMenusFinalFix.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
