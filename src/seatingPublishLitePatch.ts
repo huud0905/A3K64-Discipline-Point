@@ -7,6 +7,7 @@ let seatPubLiteBooted = false;
 
 type SeatPubLiteStatus = "private" | "preview" | "published";
 type SeatPubMode = "now" | "schedule";
+type SeatPubUiMode = "private" | "preview_publish";
 
 type SeatPubLiteConfig = {
   chartId: string;
@@ -34,8 +35,31 @@ function seatPubLiteLocalKey(chartId = seatPubLiteCurrentChartId()) {
 function seatPubLiteCleanStatus(value: unknown): SeatPubLiteStatus {
   const raw = String(value || "").trim();
   if (raw === "preview") return "preview";
-  if (raw === "published") return "published";
+  if (raw === "published" || raw === "public") return "published";
   return "private";
+}
+
+function seatPubLiteStatusText(value: SeatPubLiteStatus) {
+  if (value === "published") return "Đã công bố";
+  if (value === "preview") return "Xem trước";
+  return "Riêng tư";
+}
+
+function seatPubLiteUiModeText(value: SeatPubUiMode) {
+  return value === "preview_publish" ? "Xem trước + Công bố" : "Riêng tư";
+}
+
+function seatPubLiteModeFromStatus(status: SeatPubLiteStatus): SeatPubUiMode {
+  return status === "private" ? "private" : "preview_publish";
+}
+
+function seatPubLiteEscape(value: unknown) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function seatPubLiteReadLocal(chartId = seatPubLiteCurrentChartId()): SeatPubLiteConfig {
@@ -152,12 +176,13 @@ async function seatPubLiteLoad(chartId = seatPubLiteCurrentChartId()): Promise<S
 
 async function seatPubLiteSave(data: SeatPubLiteConfig): Promise<SeatPubLiteConfig> {
   const chartId = data.chartId || seatPubLiteCurrentChartId();
-  const next = {
+  const status = seatPubLiteCleanStatus(data.status);
+  const next: SeatPubLiteConfig = {
     chartId,
     chartTitle: data.chartTitle || seatPubLiteCurrentChartTitle(),
-    status: seatPubLiteCleanStatus(data.status),
-    publishAt: data.status === "published" ? String(data.publishAt || "") : "",
-    previewStudents: data.status === "preview" ? String(data.previewStudents || "") : "",
+    status,
+    publishAt: status === "published" ? String(data.publishAt || "") : "",
+    previewStudents: status === "private" ? "" : String(data.previewStudents || ""),
     updatedAt: new Date().toISOString(),
     updatedBy: seatPubLiteActor().name,
   };
@@ -190,23 +215,18 @@ function injectSeatPubLiteStyle() {
   const style = document.createElement("style");
   style.id = SEAT_PUB_LITE_STYLE_ID;
   style.textContent = `
-    ${SEAT_PUB_LITE_WINDOW} .seat-pub-lite-btn{height:40px;border:1px solid rgba(148,163,184,.45);border-radius:14px;background:#fff;color:#0f172a;padding:0 13px;font-weight:1000;cursor:pointer;white-space:nowrap;box-shadow:0 10px 24px rgba(15,23,42,.08)}
-    ${SEAT_PUB_LITE_WINDOW} .seat-pub-lite-btn:hover{border-color:var(--desktop-accent,#14b8a6)}
+    ${SEAT_PUB_LITE_WINDOW} .seat-pub-lite-btn{height:40px;border:1px solid rgba(148,163,184,.45);border-radius:14px;background:#fff;color:#0f172a;padding:0 13px;font-weight:900;cursor:pointer;white-space:nowrap;box-shadow:0 10px 24px rgba(15,23,42,.08);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif}
+    ${SEAT_PUB_LITE_WINDOW} .seat-pub-lite-btn:hover{border-color:var(--desktop-accent,#14b8a6);transform:translateY(-1px)}
     .theme-dark ${SEAT_PUB_LITE_WINDOW} .seat-pub-lite-btn{background:#111827;color:#f8fafc;border-color:#334155;box-shadow:0 12px 28px rgba(0,0,0,.2)}
-    .seat-pub-lite-backdrop{position:fixed;inset:0;z-index:999999;background:rgba(15,23,42,.42);display:flex;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(8px)}
-    .seat-pub-lite-modal{width:min(590px,100%);border:1px solid #cbd5e1;border-radius:24px;background:#fff;color:#0f172a;box-shadow:0 28px 90px rgba(15,23,42,.2);padding:18px;display:grid;gap:14px;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif!important}
-    .seat-pub-lite-modal h3{margin:0;font-size:20px;font-weight:1000}.seat-pub-lite-modal p{margin:0;color:#64748b;font-size:13px;line-height:1.45}.seat-pub-lite-meta{font-size:12px;color:#64748b;font-weight:800}.seat-pub-lite-loading{font-weight:950;color:#64748b}.seat-pub-lite-status-pill{display:inline-flex;align-items:center;justify-content:center;min-width:92px;height:30px;border-radius:999px;font-weight:1000;font-size:12px;border:1px solid #cbd5e1;background:#f8fafc;color:#0f172a}.seat-pub-lite-status-pill.preview{background:#fef9c3;color:#854d0e;border-color:#fde68a}.seat-pub-lite-status-pill.on{background:#dcfce7;color:#166534;border-color:#86efac}
-    .seat-pub-lite-grid{display:grid;gap:10px}.seat-pub-lite-label{display:grid;gap:6px;font-weight:950;font-size:13px}.seat-pub-lite-label textarea,.seat-pub-lite-label input{min-height:44px;border:1px solid #cbd5e1;border-radius:15px;background:#fff;color:#0f172a;padding:10px 12px;font-weight:760;outline:none;line-height:1.45}.seat-pub-lite-label textarea{min-height:112px;resize:vertical}.seat-pub-lite-label textarea:focus,.seat-pub-lite-label input:focus{border-color:var(--desktop-accent,#14b8a6);box-shadow:0 0 0 3px color-mix(in srgb,var(--desktop-accent,#14b8a6) 18%,transparent)}
-    .seat-pub-lite-select{position:relative}.seat-pub-lite-trigger{height:44px;border:1px solid #cbd5e1;border-radius:15px;background:#fff;color:#0f172a;display:flex;align-items:center;justify-content:space-between;padding:0 13px;font-weight:950;cursor:pointer}.seat-pub-lite-menu{position:absolute;left:0;right:0;top:calc(100% + 7px);display:none;gap:5px;padding:7px;border:1px solid #cbd5e1;border-radius:16px;background:#fff;box-shadow:0 22px 62px rgba(15,23,42,.18);z-index:3}.seat-pub-lite-select.open .seat-pub-lite-menu{display:grid}.seat-pub-lite-option{height:36px;border:0;border-radius:11px;background:transparent;color:#0f172a;text-align:left;padding:0 12px;font-weight:900;cursor:pointer}.seat-pub-lite-option:hover,.seat-pub-lite-option.active{background:#dbeafe}.seat-pub-lite-radio{display:flex;gap:10px;flex-wrap:wrap}.seat-pub-lite-radio button{height:38px;border:1px solid #cbd5e1;border-radius:13px;background:#fff;color:#0f172a;padding:0 12px;font-weight:950;cursor:pointer}.seat-pub-lite-radio button.active{background:color-mix(in srgb,var(--desktop-accent,#14b8a6) 16%,#fff);border-color:var(--desktop-accent,#14b8a6)}
-    .seat-pub-lite-actions{display:flex;justify-content:flex-end;gap:10px}.seat-pub-lite-actions button,.seat-pub-lite-mini-btn{height:38px;border:1px solid #cbd5e1;border-radius:13px;background:#fff;color:#0f172a;padding:0 14px;font-weight:1000;cursor:pointer}.seat-pub-lite-actions .primary,.seat-pub-lite-mini-btn.primary{background:var(--desktop-accent,#14b8a6);border-color:transparent;color:#fff}.seat-pub-lite-actions button:disabled,.seat-pub-lite-mini-btn:disabled{opacity:.65;cursor:wait}.seat-pub-lite-manage-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;border:1px solid #e2e8f0;border-radius:16px;padding:12px;background:#f8fafc}.seat-pub-lite-manage-title{font-weight:1000}.seat-pub-lite-manage-sub{font-size:12px;color:#64748b;font-weight:800;margin-top:3px}.seat-pub-lite-manage-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
-    .theme-dark .seat-pub-lite-modal{background:#0f172a;color:#f8fafc;border-color:#334155;box-shadow:0 28px 90px rgba(0,0,0,.42)}.theme-dark .seat-pub-lite-modal p,.theme-dark .seat-pub-lite-meta,.theme-dark .seat-pub-lite-manage-sub,.theme-dark .seat-pub-lite-loading{color:#94a3b8}.theme-dark .seat-pub-lite-trigger,.theme-dark .seat-pub-lite-actions button,.theme-dark .seat-pub-lite-mini-btn,.theme-dark .seat-pub-lite-label textarea,.theme-dark .seat-pub-lite-label input,.theme-dark .seat-pub-lite-radio button{background:#111827;color:#f8fafc;border-color:#334155}.theme-dark .seat-pub-lite-radio button.active{background:#0f766e;border-color:#2dd4bf}.theme-dark .seat-pub-lite-menu{background:#1f2937;border-color:#334155}.theme-dark .seat-pub-lite-option{color:#f8fafc}.theme-dark .seat-pub-lite-option:hover,.theme-dark .seat-pub-lite-option.active{background:#334155}.theme-dark .seat-pub-lite-manage-row{background:#111827;border-color:#334155}.theme-dark .seat-pub-lite-status-pill{background:#111827;color:#f8fafc;border-color:#334155}.theme-dark .seat-pub-lite-status-pill.preview{background:#713f12;color:#fef9c3;border-color:#a16207}.theme-dark .seat-pub-lite-status-pill.on{background:#064e3b;color:#bbf7d0;border-color:#047857}
+    .seat-pub-lite-backdrop{position:fixed;inset:0;z-index:999999;background:rgba(15,23,42,.38);display:flex;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(10px);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif!important}
+    .seat-pub-lite-modal{width:min(640px,100%);border:1px solid rgba(203,213,225,.9);border-radius:28px;background:rgba(255,255,255,.96);color:#0f172a;box-shadow:0 30px 100px rgba(15,23,42,.24);padding:20px;display:grid;gap:16px}
+    .seat-pub-lite-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.seat-pub-lite-title h3{margin:0;font-size:22px;font-weight:950;letter-spacing:-.035em}.seat-pub-lite-title p{margin:5px 0 0;color:#64748b;font-size:13px;line-height:1.45}.seat-pub-lite-meta{font-size:12px;color:#475569;font-weight:780;margin-top:5px}.seat-pub-lite-badge{display:inline-flex;align-items:center;height:32px;border-radius:999px;padding:0 12px;background:color-mix(in srgb,var(--desktop-accent,#14b8a6) 13%,#fff);border:1px solid color-mix(in srgb,var(--desktop-accent,#14b8a6) 42%,#cbd5e1);font-size:12px;font-weight:950;color:#0f172a;white-space:nowrap}.seat-pub-lite-loading{font-weight:900;color:#64748b}.seat-pub-lite-grid{display:grid;gap:12px}.seat-pub-lite-field{display:grid;gap:8px}.seat-pub-lite-field-title{font-size:13px;font-weight:950;color:#0f172a}.seat-pub-lite-help{font-size:12px;font-weight:700;color:#64748b}.seat-pub-lite-field textarea,.seat-pub-lite-field input{min-height:44px;border:1px solid #cbd5e1;border-radius:16px;background:#fff;color:#0f172a;padding:10px 13px;font-weight:700;outline:none;line-height:1.45;font-family:inherit}.seat-pub-lite-field textarea{min-height:110px;resize:vertical}.seat-pub-lite-field textarea:focus,.seat-pub-lite-field input:focus{border-color:var(--desktop-accent,#14b8a6);box-shadow:0 0 0 4px color-mix(in srgb,var(--desktop-accent,#14b8a6) 16%,transparent)}
+    .seat-pub-lite-select{position:relative;width:max-content;min-width:210px}.seat-pub-lite-trigger{width:100%;height:46px;border:1px solid #cbd5e1;border-radius:16px;background:#fff;color:#0f172a;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 14px;font-weight:900;cursor:pointer;font-family:inherit}.seat-pub-lite-trigger:hover{border-color:var(--desktop-accent,#14b8a6)}.seat-pub-lite-chevron{font-size:16px;color:#64748b}.seat-pub-lite-menu{position:absolute;left:0;top:calc(100% + 8px);width:260px;display:none;gap:6px;padding:8px;border:1px solid #cbd5e1;border-radius:18px;background:#fff;box-shadow:0 24px 70px rgba(15,23,42,.2);z-index:20}.seat-pub-lite-select.open .seat-pub-lite-menu{display:grid}.seat-pub-lite-option{height:42px;border:0;border-radius:13px;background:transparent;color:#0f172a;text-align:left;padding:0 13px;font-weight:900;cursor:pointer;font-family:inherit}.seat-pub-lite-option:hover,.seat-pub-lite-option.active{background:color-mix(in srgb,var(--desktop-accent,#14b8a6) 15%,#fff)}
+    .seat-pub-lite-panel{border:1px solid #e2e8f0;border-radius:20px;background:#f8fafc;padding:14px;display:grid;gap:12px}.seat-pub-lite-check{display:flex;align-items:center;gap:10px;font-weight:950;cursor:pointer;user-select:none}.seat-pub-lite-check input{width:18px;height:18px;accent-color:var(--desktop-accent,#14b8a6)}.seat-pub-lite-radio{display:flex;gap:10px;flex-wrap:wrap}.seat-pub-lite-radio button{height:40px;border:1px solid #cbd5e1;border-radius:14px;background:#fff;color:#0f172a;padding:0 13px;font-weight:900;cursor:pointer;font-family:inherit}.seat-pub-lite-radio button.active{background:color-mix(in srgb,var(--desktop-accent,#14b8a6) 16%,#fff);border-color:var(--desktop-accent,#14b8a6)}
+    .seat-pub-lite-actions{display:flex;justify-content:flex-end;gap:10px}.seat-pub-lite-actions button,.seat-pub-lite-mini-btn{height:40px;border:1px solid #cbd5e1;border-radius:14px;background:#fff;color:#0f172a;padding:0 16px;font-weight:950;cursor:pointer;font-family:inherit}.seat-pub-lite-actions .primary,.seat-pub-lite-mini-btn.primary{background:var(--desktop-accent,#14b8a6);border-color:transparent;color:#fff}.seat-pub-lite-actions button:disabled,.seat-pub-lite-mini-btn:disabled{opacity:.65;cursor:wait}.seat-pub-lite-manage-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;border:1px solid #e2e8f0;border-radius:18px;padding:14px;background:#f8fafc}.seat-pub-lite-manage-title{font-weight:950}.seat-pub-lite-manage-sub{font-size:12px;color:#64748b;font-weight:780;margin-top:3px}.seat-pub-lite-manage-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.seat-pub-lite-status-pill{display:inline-flex;align-items:center;justify-content:center;min-width:100px;height:32px;border-radius:999px;font-weight:950;font-size:12px;border:1px solid #cbd5e1;background:#fff;color:#0f172a}.seat-pub-lite-status-pill.preview{background:#fef9c3;color:#854d0e;border-color:#fde68a}.seat-pub-lite-status-pill.on{background:#dcfce7;color:#166534;border-color:#86efac}
+    .theme-dark .seat-pub-lite-modal{background:rgba(15,23,42,.97);color:#f8fafc;border-color:#334155;box-shadow:0 28px 90px rgba(0,0,0,.42)}.theme-dark .seat-pub-lite-title p,.theme-dark .seat-pub-lite-meta,.theme-dark .seat-pub-lite-help,.theme-dark .seat-pub-lite-manage-sub,.theme-dark .seat-pub-lite-loading{color:#94a3b8}.theme-dark .seat-pub-lite-field-title{color:#f8fafc}.theme-dark .seat-pub-lite-trigger,.theme-dark .seat-pub-lite-actions button,.theme-dark .seat-pub-lite-mini-btn,.theme-dark .seat-pub-lite-field textarea,.theme-dark .seat-pub-lite-field input,.theme-dark .seat-pub-lite-radio button{background:#111827;color:#f8fafc;border-color:#334155}.theme-dark .seat-pub-lite-radio button.active{background:#0f766e;border-color:#2dd4bf}.theme-dark .seat-pub-lite-menu{background:#1f2937;border-color:#334155}.theme-dark .seat-pub-lite-option{color:#f8fafc}.theme-dark .seat-pub-lite-option:hover,.theme-dark .seat-pub-lite-option.active{background:#334155}.theme-dark .seat-pub-lite-panel,.theme-dark .seat-pub-lite-manage-row{background:#111827;border-color:#334155}.theme-dark .seat-pub-lite-status-pill,.theme-dark .seat-pub-lite-badge{background:#111827;color:#f8fafc;border-color:#334155}.theme-dark .seat-pub-lite-status-pill.preview{background:#713f12;color:#fef9c3;border-color:#a16207}.theme-dark .seat-pub-lite-status-pill.on{background:#064e3b;color:#bbf7d0;border-color:#047857}
   `;
   document.head.appendChild(style);
-}
-
-function statusText(value: SeatPubLiteStatus) {
-  if (value === "preview") return "Xem trước";
-  return value === "published" ? "Công bố" : "Riêng tư";
 }
 
 function formatMeta(config: SeatPubLiteConfig) {
@@ -217,81 +237,100 @@ function formatMeta(config: SeatPubLiteConfig) {
   return parts.join(" • ");
 }
 
-function renderStatusSelect(status: SeatPubLiteStatus) {
-  return `<div class="seat-pub-lite-select"><button type="button" class="seat-pub-lite-trigger"><span>${statusText(status)}</span><span>⌄</span></button><div class="seat-pub-lite-menu"><button type="button" class="seat-pub-lite-option" data-value="private">Riêng tư</button><button type="button" class="seat-pub-lite-option" data-value="preview">Xem trước</button><button type="button" class="seat-pub-lite-option" data-value="published">Công bố</button></div></div>`;
+function renderModeSelect(mode: SeatPubUiMode) {
+  return `<div class="seat-pub-lite-select"><button type="button" class="seat-pub-lite-trigger" data-mode-trigger><span>${seatPubLiteUiModeText(mode)}</span><span class="seat-pub-lite-chevron">⌄</span></button><div class="seat-pub-lite-menu"><button type="button" class="seat-pub-lite-option" data-value="private">Riêng tư</button><button type="button" class="seat-pub-lite-option" data-value="preview_publish">Xem trước + Công bố</button></div></div>`;
 }
 
-function bindStatusSelect(backdrop: HTMLElement, getStatus: () => SeatPubLiteStatus, setStatus: (value: SeatPubLiteStatus) => void, onSync?: () => void) {
+function bindModeSelect(backdrop: HTMLElement, getMode: () => SeatPubUiMode, setMode: (value: SeatPubUiMode) => void, onSync?: () => void) {
   const select = backdrop.querySelector<HTMLElement>(".seat-pub-lite-select");
   const triggerText = backdrop.querySelector<HTMLElement>(".seat-pub-lite-trigger span");
   const sync = () => {
-    if (triggerText) triggerText.textContent = statusText(getStatus());
-    backdrop.querySelectorAll<HTMLElement>(".seat-pub-lite-option").forEach((node) => node.classList.toggle("active", node.dataset.value === getStatus()));
+    if (triggerText) triggerText.textContent = seatPubLiteUiModeText(getMode());
+    backdrop.querySelectorAll<HTMLElement>(".seat-pub-lite-option").forEach((node) => node.classList.toggle("active", node.dataset.value === getMode()));
     onSync?.();
   };
   sync();
   backdrop.querySelector(".seat-pub-lite-trigger")?.addEventListener("click", (event) => {
     event.preventDefault();
+    event.stopPropagation();
     select?.classList.toggle("open");
   });
   backdrop.querySelectorAll<HTMLElement>(".seat-pub-lite-option").forEach((option) => {
-    option.addEventListener("click", () => {
-      setStatus(seatPubLiteCleanStatus(option.dataset.value));
+    option.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setMode(option.dataset.value === "preview_publish" ? "preview_publish" : "private");
       select?.classList.remove("open");
       sync();
     });
   });
+  backdrop.addEventListener("click", (event) => {
+    if (!(event.target as HTMLElement).closest(".seat-pub-lite-select")) select?.classList.remove("open");
+  });
 }
 
 function previewBlock(visible: boolean, value: string) {
-  return `<label class="seat-pub-lite-label" data-preview-wrap style="display:${visible ? "grid" : "none"}">Học sinh được xem trước <span style="font-weight:700;color:#94a3b8">mỗi dòng 1 tên hoặc Gmail</span><textarea data-preview placeholder="Ví dụ:\nĐinh Mạnh Hữu\nhuud09052009@gmail.com">${String(value || "")}</textarea></label>`;
+  return `<div class="seat-pub-lite-field" data-preview-wrap style="display:${visible ? "grid" : "none"}"><div><div class="seat-pub-lite-field-title">Danh sách xem trước</div><div class="seat-pub-lite-help">Mỗi dòng 1 tên hoặc Gmail. Người trong danh sách này được mở công cụ sửa sơ đồ.</div></div><textarea data-preview placeholder="Ví dụ:\nĐinh Mạnh Hữu\nhuud09052009@gmail.com">${seatPubLiteEscape(value)}</textarea></div>`;
 }
 
-function publishBlock(visible: boolean, mode: SeatPubMode, publishAt: string) {
+function publishBlock(visible: boolean, enabled: boolean, mode: SeatPubMode, publishAt: string) {
   const localValue = publishAt ? new Date(publishAt).toISOString().slice(0, 16) : "";
-  return `<div data-publish-wrap style="display:${visible ? "grid" : "none"};gap:10px"><label class="seat-pub-lite-label">Loại công bố<div class="seat-pub-lite-radio"><button type="button" data-pub-mode="now" class="${mode === "now" ? "active" : ""}">Công bố ngay</button><button type="button" data-pub-mode="schedule" class="${mode === "schedule" ? "active" : ""}">Công bố theo hẹn giờ</button></div></label><label class="seat-pub-lite-label" data-pub-time-wrap style="display:${mode === "schedule" ? "grid" : "none"}">Giờ công bố<input type="datetime-local" data-publish-at value="${localValue}" /></label></div>`;
+  return `<div class="seat-pub-lite-panel" data-publish-wrap style="display:${visible ? "grid" : "none"}"><label class="seat-pub-lite-check"><input type="checkbox" data-publish-enabled ${enabled ? "checked" : ""}/><span>Công bố sơ đồ</span></label><div data-publish-inner style="display:${enabled ? "grid" : "none"};gap:10px"><div class="seat-pub-lite-field"><div class="seat-pub-lite-field-title">Cách công bố</div><div class="seat-pub-lite-radio"><button type="button" data-pub-mode="now" class="${mode === "now" ? "active" : ""}">Công bố ngay</button><button type="button" data-pub-mode="schedule" class="${mode === "schedule" ? "active" : ""}">Công bố theo hẹn giờ</button></div></div><div class="seat-pub-lite-field" data-pub-time-wrap style="display:${mode === "schedule" ? "grid" : "none"}"><div class="seat-pub-lite-field-title">Giờ công bố</div><input type="datetime-local" data-publish-at value="${localValue}" /></div></div></div>`;
 }
 
 function openSeatPubLiteModal() {
   injectSeatPubLiteStyle();
   let current = seatPubLiteReadLocal();
   document.querySelector(".seat-pub-lite-backdrop")?.remove();
-  let status = current.status;
+  let uiMode: SeatPubUiMode = seatPubLiteModeFromStatus(current.status);
+  let publishEnabled = current.status === "published";
   let mode: SeatPubMode = current.status === "published" && current.publishAt ? "schedule" : "now";
   const backdrop = document.createElement("div");
   backdrop.className = "seat-pub-lite-backdrop";
   backdrop.innerHTML = `
-    <div class="seat-pub-lite-modal">
-      <div><h3>Cài đặt công bố sơ đồ</h3><p>${current.chartTitle || seatPubLiteCurrentChartTitle()}</p><div class="seat-pub-lite-meta">${formatMeta(current)}</div></div>
-      <div class="seat-pub-lite-grid"><label class="seat-pub-lite-label">Trạng thái${renderStatusSelect(status)}</label>${previewBlock(status === "preview", current.previewStudents)}${publishBlock(status === "published", mode, current.publishAt)}</div>
-      <div class="seat-pub-lite-actions"><button data-close>Huỷ</button><button class="primary" data-save>Lưu cài đặt</button></div>
+    <div class="seat-pub-lite-modal" role="dialog" aria-modal="true">
+      <div class="seat-pub-lite-head"><div class="seat-pub-lite-title"><h3>Cài đặt công bố sơ đồ</h3><p>${seatPubLiteEscape(current.chartTitle || seatPubLiteCurrentChartTitle())}</p><div class="seat-pub-lite-meta">${seatPubLiteEscape(formatMeta(current))}</div></div><span class="seat-pub-lite-badge">${seatPubLiteStatusText(current.status)}</span></div>
+      <div class="seat-pub-lite-grid"><div class="seat-pub-lite-field"><div class="seat-pub-lite-field-title">Trạng thái</div>${renderModeSelect(uiMode)}</div>${previewBlock(uiMode === "preview_publish", current.previewStudents)}${publishBlock(uiMode === "preview_publish", publishEnabled, mode, current.publishAt)}</div>
+      <div class="seat-pub-lite-actions"><button type="button" data-close>Huỷ</button><button type="button" class="primary" data-save>Lưu cài đặt</button></div>
     </div>
   `;
   document.body.appendChild(backdrop);
+
   const meta = backdrop.querySelector<HTMLElement>(".seat-pub-lite-meta");
+  const badge = backdrop.querySelector<HTMLElement>(".seat-pub-lite-badge");
   const syncBlocks = () => {
     const preview = backdrop.querySelector<HTMLElement>("[data-preview-wrap]");
     const publish = backdrop.querySelector<HTMLElement>("[data-publish-wrap]");
+    const publishInner = backdrop.querySelector<HTMLElement>("[data-publish-inner]");
     const time = backdrop.querySelector<HTMLElement>("[data-pub-time-wrap]");
-    if (preview) preview.style.display = status === "preview" ? "grid" : "none";
-    if (publish) publish.style.display = status === "published" ? "grid" : "none";
-    if (time) time.style.display = status === "published" && mode === "schedule" ? "grid" : "none";
+    if (preview) preview.style.display = uiMode === "preview_publish" ? "grid" : "none";
+    if (publish) publish.style.display = uiMode === "preview_publish" ? "grid" : "none";
+    if (publishInner) publishInner.style.display = uiMode === "preview_publish" && publishEnabled ? "grid" : "none";
+    if (time) time.style.display = uiMode === "preview_publish" && publishEnabled && mode === "schedule" ? "grid" : "none";
     backdrop.querySelectorAll<HTMLElement>("[data-pub-mode]").forEach((btn) => btn.classList.toggle("active", btn.dataset.pubMode === mode));
+    if (badge) badge.textContent = uiMode === "private" ? "Riêng tư" : publishEnabled ? "Sẽ công bố" : "Xem trước";
   };
-  bindStatusSelect(backdrop, () => status, (value) => { status = value; }, syncBlocks);
+
+  bindModeSelect(backdrop, () => uiMode, (value) => { uiMode = value; if (value === "private") publishEnabled = false; }, syncBlocks);
+  backdrop.querySelector<HTMLInputElement>("[data-publish-enabled]")?.addEventListener("change", (event) => { publishEnabled = (event.currentTarget as HTMLInputElement).checked; syncBlocks(); });
   backdrop.querySelectorAll<HTMLElement>("[data-pub-mode]").forEach((btn) => btn.addEventListener("click", () => { mode = btn.dataset.pubMode === "schedule" ? "schedule" : "now"; syncBlocks(); }));
 
   seatPubLiteLoad().then((config) => {
     current = config;
-    status = config.status;
+    uiMode = seatPubLiteModeFromStatus(config.status);
+    publishEnabled = config.status === "published";
     mode = config.status === "published" && config.publishAt ? "schedule" : "now";
     if (meta) meta.textContent = formatMeta(config);
+    const title = backdrop.querySelector<HTMLElement>(".seat-pub-lite-title p");
+    if (title) title.textContent = config.chartTitle || seatPubLiteCurrentChartTitle();
     const textarea = backdrop.querySelector<HTMLTextAreaElement>("[data-preview]");
     if (textarea) textarea.value = config.previewStudents;
+    const checkbox = backdrop.querySelector<HTMLInputElement>("[data-publish-enabled]");
+    if (checkbox) checkbox.checked = publishEnabled;
     const timeInput = backdrop.querySelector<HTMLInputElement>("[data-publish-at]");
     if (timeInput) timeInput.value = config.publishAt ? new Date(config.publishAt).toISOString().slice(0, 16) : "";
-    backdrop.querySelector<HTMLElement>(".seat-pub-lite-trigger span")!.textContent = statusText(status);
-    backdrop.querySelectorAll<HTMLElement>(".seat-pub-lite-option").forEach((node) => node.classList.toggle("active", node.dataset.value === status));
+    backdrop.querySelector<HTMLElement>(".seat-pub-lite-trigger span")!.textContent = seatPubLiteUiModeText(uiMode);
+    backdrop.querySelectorAll<HTMLElement>(".seat-pub-lite-option").forEach((node) => node.classList.toggle("active", node.dataset.value === uiMode));
     syncBlocks();
   });
 
@@ -300,8 +339,9 @@ function openSeatPubLiteModal() {
   backdrop.addEventListener("click", (event) => { if (event.target === backdrop) close(); });
   backdrop.querySelector<HTMLButtonElement>("[data-save]")?.addEventListener("click", async () => {
     const saveBtn = backdrop.querySelector<HTMLButtonElement>("[data-save]");
-    const previewStudents = backdrop.querySelector<HTMLTextAreaElement>("[data-preview]")?.value || "";
+    const previewStudents = uiMode === "preview_publish" ? (backdrop.querySelector<HTMLTextAreaElement>("[data-preview]")?.value || "") : "";
     const rawTime = backdrop.querySelector<HTMLInputElement>("[data-publish-at]")?.value || "";
+    const status: SeatPubLiteStatus = uiMode === "private" ? "private" : publishEnabled ? "published" : "preview";
     const publishAt = status === "published" && mode === "schedule" && rawTime ? new Date(rawTime).toISOString() : "";
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Đang lưu..."; }
     await seatPubLiteSave({ ...current, chartId: seatPubLiteCurrentChartId(), chartTitle: seatPubLiteCurrentChartTitle(), status, publishAt, previewStudents });
@@ -314,7 +354,7 @@ async function openSeatPubManageModal() {
   document.querySelector(".seat-pub-lite-backdrop")?.remove();
   const backdrop = document.createElement("div");
   backdrop.className = "seat-pub-lite-backdrop";
-  backdrop.innerHTML = `<div class="seat-pub-lite-modal"><div><h3>QL công bố</h3><p>Quản lí trạng thái công bố của sơ đồ hiện tại.</p></div><div class="seat-pub-lite-loading">Đang tải dữ liệu...</div><div class="seat-pub-lite-actions"><button data-close>Đóng</button></div></div>`;
+  backdrop.innerHTML = `<div class="seat-pub-lite-modal"><div class="seat-pub-lite-title"><h3>Quản lý công bố</h3><p>Quản lý trạng thái công bố của sơ đồ hiện tại.</p></div><div class="seat-pub-lite-loading">Đang tải dữ liệu...</div><div class="seat-pub-lite-actions"><button data-close>Đóng</button></div></div>`;
   document.body.appendChild(backdrop);
   const close = () => backdrop.remove();
   backdrop.querySelector("[data-close]")?.addEventListener("click", close);
@@ -324,13 +364,12 @@ async function openSeatPubManageModal() {
   if (!document.body.contains(backdrop)) return;
   const cls = config.status === "published" ? "on" : config.status === "preview" ? "preview" : "";
   const sub = `${formatMeta(config)}${config.publishAt ? ` • Hẹn giờ: ${new Date(config.publishAt).toLocaleString("vi-VN")}` : ""}`;
-  backdrop.querySelector(".seat-pub-lite-modal")!.innerHTML = `<div><h3>QL công bố</h3><p>${config.chartTitle || seatPubLiteCurrentChartTitle()}</p></div><div class="seat-pub-lite-manage-row"><div><div class="seat-pub-lite-manage-title">Sơ đồ hiện tại</div><div class="seat-pub-lite-manage-sub">${sub}</div></div><span class="seat-pub-lite-status-pill ${cls}">${statusText(config.status)}</span></div><div class="seat-pub-lite-manage-actions"><button class="seat-pub-lite-mini-btn" data-private>Riêng tư</button><button class="seat-pub-lite-mini-btn" data-preview>Xem trước</button><button class="seat-pub-lite-mini-btn primary" data-publish>Công bố ngay</button><button class="seat-pub-lite-mini-btn" data-edit>Sửa</button><button class="seat-pub-lite-mini-btn" data-reset>Đặt lại</button></div><div class="seat-pub-lite-actions"><button data-close>Đóng</button></div>`;
+  backdrop.querySelector(".seat-pub-lite-modal")!.innerHTML = `<div class="seat-pub-lite-title"><h3>Quản lý công bố</h3><p>${seatPubLiteEscape(config.chartTitle || seatPubLiteCurrentChartTitle())}</p></div><div class="seat-pub-lite-manage-row"><div><div class="seat-pub-lite-manage-title">Sơ đồ hiện tại</div><div class="seat-pub-lite-manage-sub">${seatPubLiteEscape(sub)}</div></div><span class="seat-pub-lite-status-pill ${cls}">${seatPubLiteStatusText(config.status)}</span></div><div class="seat-pub-lite-manage-actions"><button class="seat-pub-lite-mini-btn" data-private>Riêng tư</button><button class="seat-pub-lite-mini-btn" data-edit>Xem trước + Công bố</button><button class="seat-pub-lite-mini-btn primary" data-publish>Công bố ngay</button><button class="seat-pub-lite-mini-btn" data-reset>Đặt lại</button></div><div class="seat-pub-lite-actions"><button data-close>Đóng</button></div>`;
   backdrop.querySelector("[data-close]")?.addEventListener("click", close);
   backdrop.querySelector("[data-private]")?.addEventListener("click", async () => { await seatPubLiteSave({ ...config, status: "private", publishAt: "", previewStudents: "" }); close(); });
-  backdrop.querySelector("[data-preview]")?.addEventListener("click", () => { close(); openSeatPubLiteModal(); });
-  backdrop.querySelector("[data-publish]")?.addEventListener("click", async () => { await seatPubLiteSave({ ...config, status: "published", publishAt: "", previewStudents: "" }); close(); });
-  backdrop.querySelector("[data-reset]")?.addEventListener("click", async () => { await seatPubLiteSave({ ...config, status: "private", publishAt: "", previewStudents: "" }); close(); });
   backdrop.querySelector("[data-edit]")?.addEventListener("click", () => { close(); openSeatPubLiteModal(); });
+  backdrop.querySelector("[data-publish]")?.addEventListener("click", async () => { await seatPubLiteSave({ ...config, status: "published", publishAt: "", previewStudents: config.previewStudents || "" }); close(); });
+  backdrop.querySelector("[data-reset]")?.addEventListener("click", async () => { await seatPubLiteSave({ ...config, status: "private", publishAt: "", previewStudents: "" }); close(); });
 }
 
 function seatPubLiteTick() {
@@ -351,7 +390,7 @@ function seatPubLiteTick() {
   manageBtn.className = "seat-pub-lite-btn";
   manageBtn.dataset.seatPubLiteManage = "1";
   manageBtn.textContent = "QL";
-  manageBtn.title = "Quản lí công bố";
+  manageBtn.title = "Quản lý công bố";
   manageBtn.addEventListener("click", openSeatPubManageModal);
 
   const search = tools.querySelector("input");
