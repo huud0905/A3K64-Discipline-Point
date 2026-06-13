@@ -80,6 +80,7 @@ import './seatingRoleGate';
 import './seatingInteractionToolsPatch';
 import './seatingSeatSwapHardPatch';
 import './seatingRestoreAndControlsPatch';
+import './seatingOpenFeedbackPatch';
 import './seatingNameHighlightPatch';
 import './seatingCanonicalNamesPatch';
 import './seatingPublishLitePatch';
