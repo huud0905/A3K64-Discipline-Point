@@ -1,5 +1,6 @@
 const SEAT_ACCESS_FIX_WINDOW = "#a3k64-seating-window";
 const SEAT_ACCESS_FIX_STYLE_ID = "a3k64-seat-access-overlay-fix-style";
+let seatAccessOverlayTimer = 0;
 
 function injectSeatAccessOverlayFixStyle() {
   if (document.getElementById(SEAT_ACCESS_FIX_STYLE_ID)) return;
@@ -74,18 +75,18 @@ function syncSeatAccessOverlayMessage() {
   const win = document.querySelector<HTMLElement>(SEAT_ACCESS_FIX_WINDOW);
   const board = document.querySelector<HTMLElement>(`${SEAT_ACCESS_FIX_WINDOW} .stable-seat-board`);
   if (!win || !board) return;
-  board.dataset.seatGateMessage = win.dataset.seatGateMessage || "Sơ đồ chỗ ngồi đang ở chế độ riêng tư.";
+  const message = win.dataset.seatGateMessage || "Sơ đồ chỗ ngồi đang ở chế độ riêng tư.";
+  if (board.dataset.seatGateMessage !== message) board.dataset.seatGateMessage = message;
 }
 
 function bootSeatAccessOverlayFix() {
   injectSeatAccessOverlayFixStyle();
   syncSeatAccessOverlayMessage();
-  const observer = new MutationObserver(syncSeatAccessOverlayMessage);
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  const bodyObserver = new MutationObserver(syncSeatAccessOverlayMessage);
-  bodyObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-seat-gate-message", "class"] });
   window.addEventListener("a3k64:seating-changed", () => setTimeout(syncSeatAccessOverlayMessage, 80));
-  window.setInterval(syncSeatAccessOverlayMessage, 1200);
+  window.addEventListener("popstate", () => setTimeout(syncSeatAccessOverlayMessage, 80));
+  if (!seatAccessOverlayTimer) {
+    seatAccessOverlayTimer = window.setInterval(syncSeatAccessOverlayMessage, 1200);
+  }
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bootSeatAccessOverlayFix);
