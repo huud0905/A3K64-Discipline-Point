@@ -86,6 +86,7 @@ import './seatingCanonicalNamesPatch';
 import './seatingPublishLitePatch';
 import './seatingViewerGateLitePatch';
 import './seatingAccessOverlayFix';
+import './seatingRuntimeHardFix';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
