@@ -210,6 +210,27 @@ function seatPubLiteRole() {
   return "viewer";
 }
 
+function seatPubLiteDatePart(value: string) {
+  if (!value) return "";
+  const time = new Date(value);
+  if (!Number.isFinite(time.getTime())) return "";
+  return time.toISOString().slice(0, 10);
+}
+
+function seatPubLiteTimePart(value: string) {
+  if (!value) return "";
+  const time = new Date(value);
+  if (!Number.isFinite(time.getTime())) return "";
+  return time.toISOString().slice(11, 16);
+}
+
+function seatPubLiteComposeDateTime(date: string, time: string) {
+  if (!date) return "";
+  const finalTime = time || "07:00";
+  const composed = new Date(`${date}T${finalTime}:00`);
+  return Number.isFinite(composed.getTime()) ? composed.toISOString() : "";
+}
+
 function injectSeatPubLiteStyle() {
   if (document.getElementById(SEAT_PUB_LITE_STYLE_ID)) return;
   const style = document.createElement("style");
@@ -219,12 +240,14 @@ function injectSeatPubLiteStyle() {
     ${SEAT_PUB_LITE_WINDOW} .seat-pub-lite-btn:hover{border-color:var(--desktop-accent,#14b8a6);transform:translateY(-1px)}
     .theme-dark ${SEAT_PUB_LITE_WINDOW} .seat-pub-lite-btn{background:#111827;color:#f8fafc;border-color:#334155;box-shadow:0 12px 28px rgba(0,0,0,.2)}
     .seat-pub-lite-backdrop{position:fixed;inset:0;z-index:999999;background:rgba(15,23,42,.38);display:flex;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(10px);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif!important}
-    .seat-pub-lite-modal{width:min(640px,100%);border:1px solid rgba(203,213,225,.9);border-radius:28px;background:rgba(255,255,255,.96);color:#0f172a;box-shadow:0 30px 100px rgba(15,23,42,.24);padding:20px;display:grid;gap:16px}
-    .seat-pub-lite-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.seat-pub-lite-title h3{margin:0;font-size:22px;font-weight:950;letter-spacing:-.035em}.seat-pub-lite-title p{margin:5px 0 0;color:#64748b;font-size:13px;line-height:1.45}.seat-pub-lite-meta{font-size:12px;color:#475569;font-weight:780;margin-top:5px}.seat-pub-lite-badge{display:inline-flex;align-items:center;height:32px;border-radius:999px;padding:0 12px;background:color-mix(in srgb,var(--desktop-accent,#14b8a6) 13%,#fff);border:1px solid color-mix(in srgb,var(--desktop-accent,#14b8a6) 42%,#cbd5e1);font-size:12px;font-weight:950;color:#0f172a;white-space:nowrap}.seat-pub-lite-loading{font-weight:900;color:#64748b}.seat-pub-lite-grid{display:grid;gap:12px}.seat-pub-lite-field{display:grid;gap:8px}.seat-pub-lite-field-title{font-size:13px;font-weight:950;color:#0f172a}.seat-pub-lite-help{font-size:12px;font-weight:700;color:#64748b}.seat-pub-lite-field textarea,.seat-pub-lite-field input{min-height:44px;border:1px solid #cbd5e1;border-radius:16px;background:#fff;color:#0f172a;padding:10px 13px;font-weight:700;outline:none;line-height:1.45;font-family:inherit}.seat-pub-lite-field textarea{min-height:110px;resize:vertical}.seat-pub-lite-field textarea:focus,.seat-pub-lite-field input:focus{border-color:var(--desktop-accent,#14b8a6);box-shadow:0 0 0 4px color-mix(in srgb,var(--desktop-accent,#14b8a6) 16%,transparent)}
+    .seat-pub-lite-modal{width:min(760px,100%);max-height:min(92vh,780px);overflow:auto;border:1px solid rgba(203,213,225,.9);border-radius:28px;background:rgba(255,255,255,.96);color:#0f172a;box-shadow:0 30px 100px rgba(15,23,42,.24);padding:20px;display:grid;gap:16px}
+    .seat-pub-lite-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.seat-pub-lite-title h3{margin:0;font-size:22px;font-weight:950;letter-spacing:-.035em}.seat-pub-lite-title p{margin:5px 0 0;color:#64748b;font-size:13px;line-height:1.45}.seat-pub-lite-meta{font-size:12px;color:#475569;font-weight:780;margin-top:5px}.seat-pub-lite-badge{display:inline-flex;align-items:center;height:32px;border-radius:999px;padding:0 12px;background:color-mix(in srgb,var(--desktop-accent,#14b8a6) 13%,#fff);border:1px solid color-mix(in srgb,var(--desktop-accent,#14b8a6) 42%,#cbd5e1);font-size:12px;font-weight:950;color:#0f172a;white-space:nowrap}.seat-pub-lite-loading{font-weight:900;color:#64748b}.seat-pub-lite-grid{display:grid;gap:12px}.seat-pub-lite-preview-publish{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(280px,.95fr);gap:12px;align-items:start}.seat-pub-lite-field{display:grid;gap:8px}.seat-pub-lite-field-title{font-size:13px;font-weight:950;color:#0f172a}.seat-pub-lite-help{font-size:12px;font-weight:700;color:#64748b}.seat-pub-lite-field textarea,.seat-pub-lite-field input{min-height:44px;border:1px solid #cbd5e1;border-radius:16px;background:#fff;color:#0f172a;padding:10px 13px;font-weight:700;outline:none;line-height:1.45;font-family:inherit}.seat-pub-lite-field textarea{min-height:154px;resize:vertical}.seat-pub-lite-field textarea:focus,.seat-pub-lite-field input:focus{border-color:var(--desktop-accent,#14b8a6);box-shadow:0 0 0 4px color-mix(in srgb,var(--desktop-accent,#14b8a6) 16%,transparent)}
+    .seat-pub-lite-date-row{display:grid;grid-template-columns:1fr 128px;gap:10px}.seat-pub-lite-date-row input::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.75}.seat-pub-lite-date-row input:hover::-webkit-calendar-picker-indicator{opacity:1}
     .seat-pub-lite-select{position:relative;width:max-content;min-width:210px}.seat-pub-lite-trigger{width:100%;height:46px;border:1px solid #cbd5e1;border-radius:16px;background:#fff;color:#0f172a;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 14px;font-weight:900;cursor:pointer;font-family:inherit}.seat-pub-lite-trigger:hover{border-color:var(--desktop-accent,#14b8a6)}.seat-pub-lite-chevron{font-size:16px;color:#64748b}.seat-pub-lite-menu{position:absolute;left:0;top:calc(100% + 8px);width:260px;display:none;gap:6px;padding:8px;border:1px solid #cbd5e1;border-radius:18px;background:#fff;box-shadow:0 24px 70px rgba(15,23,42,.2);z-index:20}.seat-pub-lite-select.open .seat-pub-lite-menu{display:grid}.seat-pub-lite-option{height:42px;border:0;border-radius:13px;background:transparent;color:#0f172a;text-align:left;padding:0 13px;font-weight:900;cursor:pointer;font-family:inherit}.seat-pub-lite-option:hover,.seat-pub-lite-option.active{background:color-mix(in srgb,var(--desktop-accent,#14b8a6) 15%,#fff)}
     .seat-pub-lite-panel{border:1px solid #e2e8f0;border-radius:20px;background:#f8fafc;padding:14px;display:grid;gap:12px}.seat-pub-lite-check{display:flex;align-items:center;gap:10px;font-weight:950;cursor:pointer;user-select:none}.seat-pub-lite-check input{width:18px;height:18px;accent-color:var(--desktop-accent,#14b8a6)}.seat-pub-lite-radio{display:flex;gap:10px;flex-wrap:wrap}.seat-pub-lite-radio button{height:40px;border:1px solid #cbd5e1;border-radius:14px;background:#fff;color:#0f172a;padding:0 13px;font-weight:900;cursor:pointer;font-family:inherit}.seat-pub-lite-radio button.active{background:color-mix(in srgb,var(--desktop-accent,#14b8a6) 16%,#fff);border-color:var(--desktop-accent,#14b8a6)}
     .seat-pub-lite-actions{display:flex;justify-content:flex-end;gap:10px}.seat-pub-lite-actions button,.seat-pub-lite-mini-btn{height:40px;border:1px solid #cbd5e1;border-radius:14px;background:#fff;color:#0f172a;padding:0 16px;font-weight:950;cursor:pointer;font-family:inherit}.seat-pub-lite-actions .primary,.seat-pub-lite-mini-btn.primary{background:var(--desktop-accent,#14b8a6);border-color:transparent;color:#fff}.seat-pub-lite-actions button:disabled,.seat-pub-lite-mini-btn:disabled{opacity:.65;cursor:wait}.seat-pub-lite-manage-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;border:1px solid #e2e8f0;border-radius:18px;padding:14px;background:#f8fafc}.seat-pub-lite-manage-title{font-weight:950}.seat-pub-lite-manage-sub{font-size:12px;color:#64748b;font-weight:780;margin-top:3px}.seat-pub-lite-manage-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}.seat-pub-lite-status-pill{display:inline-flex;align-items:center;justify-content:center;min-width:100px;height:32px;border-radius:999px;font-weight:950;font-size:12px;border:1px solid #cbd5e1;background:#fff;color:#0f172a}.seat-pub-lite-status-pill.preview{background:#fef9c3;color:#854d0e;border-color:#fde68a}.seat-pub-lite-status-pill.on{background:#dcfce7;color:#166534;border-color:#86efac}
     .theme-dark .seat-pub-lite-modal{background:rgba(15,23,42,.97);color:#f8fafc;border-color:#334155;box-shadow:0 28px 90px rgba(0,0,0,.42)}.theme-dark .seat-pub-lite-title p,.theme-dark .seat-pub-lite-meta,.theme-dark .seat-pub-lite-help,.theme-dark .seat-pub-lite-manage-sub,.theme-dark .seat-pub-lite-loading{color:#94a3b8}.theme-dark .seat-pub-lite-field-title{color:#f8fafc}.theme-dark .seat-pub-lite-trigger,.theme-dark .seat-pub-lite-actions button,.theme-dark .seat-pub-lite-mini-btn,.theme-dark .seat-pub-lite-field textarea,.theme-dark .seat-pub-lite-field input,.theme-dark .seat-pub-lite-radio button{background:#111827;color:#f8fafc;border-color:#334155}.theme-dark .seat-pub-lite-radio button.active{background:#0f766e;border-color:#2dd4bf}.theme-dark .seat-pub-lite-menu{background:#1f2937;border-color:#334155}.theme-dark .seat-pub-lite-option{color:#f8fafc}.theme-dark .seat-pub-lite-option:hover,.theme-dark .seat-pub-lite-option.active{background:#334155}.theme-dark .seat-pub-lite-panel,.theme-dark .seat-pub-lite-manage-row{background:#111827;border-color:#334155}.theme-dark .seat-pub-lite-status-pill,.theme-dark .seat-pub-lite-badge{background:#111827;color:#f8fafc;border-color:#334155}.theme-dark .seat-pub-lite-status-pill.preview{background:#713f12;color:#fef9c3;border-color:#a16207}.theme-dark .seat-pub-lite-status-pill.on{background:#064e3b;color:#bbf7d0;border-color:#047857}
+    @media(max-width:760px){.seat-pub-lite-modal{width:100%;max-height:94vh}.seat-pub-lite-preview-publish,.seat-pub-lite-date-row{grid-template-columns:1fr}.seat-pub-lite-select{width:100%}.seat-pub-lite-menu{width:100%}}
   `;
   document.head.appendChild(style);
 }
@@ -274,8 +297,7 @@ function previewBlock(visible: boolean, value: string) {
 }
 
 function publishBlock(visible: boolean, enabled: boolean, mode: SeatPubMode, publishAt: string) {
-  const localValue = publishAt ? new Date(publishAt).toISOString().slice(0, 16) : "";
-  return `<div class="seat-pub-lite-panel" data-publish-wrap style="display:${visible ? "grid" : "none"}"><label class="seat-pub-lite-check"><input type="checkbox" data-publish-enabled ${enabled ? "checked" : ""}/><span>Công bố sơ đồ</span></label><div data-publish-inner style="display:${enabled ? "grid" : "none"};gap:10px"><div class="seat-pub-lite-field"><div class="seat-pub-lite-field-title">Cách công bố</div><div class="seat-pub-lite-radio"><button type="button" data-pub-mode="now" class="${mode === "now" ? "active" : ""}">Công bố ngay</button><button type="button" data-pub-mode="schedule" class="${mode === "schedule" ? "active" : ""}">Công bố theo hẹn giờ</button></div></div><div class="seat-pub-lite-field" data-pub-time-wrap style="display:${mode === "schedule" ? "grid" : "none"}"><div class="seat-pub-lite-field-title">Giờ công bố</div><input type="datetime-local" data-publish-at value="${localValue}" /></div></div></div>`;
+  return `<div class="seat-pub-lite-panel" data-publish-wrap style="display:${visible ? "grid" : "none"}"><label class="seat-pub-lite-check"><input type="checkbox" data-publish-enabled ${enabled ? "checked" : ""}/><span>Công bố sơ đồ</span></label><div data-publish-inner style="display:${enabled ? "grid" : "none"};gap:10px"><div class="seat-pub-lite-field"><div class="seat-pub-lite-field-title">Cách công bố</div><div class="seat-pub-lite-radio"><button type="button" data-pub-mode="now" class="${mode === "now" ? "active" : ""}">Công bố ngay</button><button type="button" data-pub-mode="schedule" class="${mode === "schedule" ? "active" : ""}">Công bố theo hẹn giờ</button></div></div><div class="seat-pub-lite-field" data-pub-time-wrap style="display:${mode === "schedule" ? "grid" : "none"}"><div class="seat-pub-lite-field-title">Ngày giờ công bố</div><div class="seat-pub-lite-date-row"><input type="date" data-publish-date value="${seatPubLiteDatePart(publishAt)}"/><input type="time" data-publish-time value="${seatPubLiteTimePart(publishAt)}"/></div><div class="seat-pub-lite-help">Lịch nằm trong ô bên phải để không che danh sách xem trước.</div></div></div></div>`;
 }
 
 function openSeatPubLiteModal() {
@@ -285,12 +307,14 @@ function openSeatPubLiteModal() {
   let uiMode: SeatPubUiMode = seatPubLiteModeFromStatus(current.status);
   let publishEnabled = current.status === "published";
   let mode: SeatPubMode = current.status === "published" && current.publishAt ? "schedule" : "now";
+  let userTouched = false;
+  const markTouched = () => { userTouched = true; };
   const backdrop = document.createElement("div");
   backdrop.className = "seat-pub-lite-backdrop";
   backdrop.innerHTML = `
     <div class="seat-pub-lite-modal" role="dialog" aria-modal="true">
       <div class="seat-pub-lite-head"><div class="seat-pub-lite-title"><h3>Cài đặt công bố sơ đồ</h3><p>${seatPubLiteEscape(current.chartTitle || seatPubLiteCurrentChartTitle())}</p><div class="seat-pub-lite-meta">${seatPubLiteEscape(formatMeta(current))}</div></div><span class="seat-pub-lite-badge">${seatPubLiteStatusText(current.status)}</span></div>
-      <div class="seat-pub-lite-grid"><div class="seat-pub-lite-field"><div class="seat-pub-lite-field-title">Trạng thái</div>${renderModeSelect(uiMode)}</div>${previewBlock(uiMode === "preview_publish", current.previewStudents)}${publishBlock(uiMode === "preview_publish", publishEnabled, mode, current.publishAt)}</div>
+      <div class="seat-pub-lite-grid"><div class="seat-pub-lite-field"><div class="seat-pub-lite-field-title">Trạng thái</div>${renderModeSelect(uiMode)}</div><div class="seat-pub-lite-preview-publish">${previewBlock(uiMode === "preview_publish", current.previewStudents)}${publishBlock(uiMode === "preview_publish", publishEnabled, mode, current.publishAt)}</div></div>
       <div class="seat-pub-lite-actions"><button type="button" data-close>Huỷ</button><button type="button" class="primary" data-save>Lưu cài đặt</button></div>
     </div>
   `;
@@ -311,24 +335,30 @@ function openSeatPubLiteModal() {
     if (badge) badge.textContent = uiMode === "private" ? "Riêng tư" : publishEnabled ? "Sẽ công bố" : "Xem trước";
   };
 
-  bindModeSelect(backdrop, () => uiMode, (value) => { uiMode = value; if (value === "private") publishEnabled = false; }, syncBlocks);
-  backdrop.querySelector<HTMLInputElement>("[data-publish-enabled]")?.addEventListener("change", (event) => { publishEnabled = (event.currentTarget as HTMLInputElement).checked; syncBlocks(); });
-  backdrop.querySelectorAll<HTMLElement>("[data-pub-mode]").forEach((btn) => btn.addEventListener("click", () => { mode = btn.dataset.pubMode === "schedule" ? "schedule" : "now"; syncBlocks(); }));
+  bindModeSelect(backdrop, () => uiMode, (value) => { markTouched(); uiMode = value; if (value === "private") publishEnabled = false; }, syncBlocks);
+  backdrop.querySelector<HTMLTextAreaElement>("[data-preview]")?.addEventListener("input", markTouched);
+  backdrop.querySelector<HTMLInputElement>("[data-publish-enabled]")?.addEventListener("change", (event) => { markTouched(); publishEnabled = (event.currentTarget as HTMLInputElement).checked; syncBlocks(); });
+  backdrop.querySelectorAll<HTMLElement>("[data-pub-mode]").forEach((btn) => btn.addEventListener("click", () => { markTouched(); mode = btn.dataset.pubMode === "schedule" ? "schedule" : "now"; syncBlocks(); }));
+  backdrop.querySelector<HTMLInputElement>("[data-publish-date]")?.addEventListener("input", markTouched);
+  backdrop.querySelector<HTMLInputElement>("[data-publish-time]")?.addEventListener("input", markTouched);
 
   seatPubLiteLoad().then((config) => {
     current = config;
-    uiMode = seatPubLiteModeFromStatus(config.status);
-    publishEnabled = config.status === "published";
-    mode = config.status === "published" && config.publishAt ? "schedule" : "now";
     if (meta) meta.textContent = formatMeta(config);
     const title = backdrop.querySelector<HTMLElement>(".seat-pub-lite-title p");
     if (title) title.textContent = config.chartTitle || seatPubLiteCurrentChartTitle();
+    if (userTouched) return;
+    uiMode = seatPubLiteModeFromStatus(config.status);
+    publishEnabled = config.status === "published";
+    mode = config.status === "published" && config.publishAt ? "schedule" : "now";
     const textarea = backdrop.querySelector<HTMLTextAreaElement>("[data-preview]");
     if (textarea) textarea.value = config.previewStudents;
     const checkbox = backdrop.querySelector<HTMLInputElement>("[data-publish-enabled]");
     if (checkbox) checkbox.checked = publishEnabled;
-    const timeInput = backdrop.querySelector<HTMLInputElement>("[data-publish-at]");
-    if (timeInput) timeInput.value = config.publishAt ? new Date(config.publishAt).toISOString().slice(0, 16) : "";
+    const dateInput = backdrop.querySelector<HTMLInputElement>("[data-publish-date]");
+    if (dateInput) dateInput.value = seatPubLiteDatePart(config.publishAt);
+    const timeInput = backdrop.querySelector<HTMLInputElement>("[data-publish-time]");
+    if (timeInput) timeInput.value = seatPubLiteTimePart(config.publishAt);
     backdrop.querySelector<HTMLElement>(".seat-pub-lite-trigger span")!.textContent = seatPubLiteUiModeText(uiMode);
     backdrop.querySelectorAll<HTMLElement>(".seat-pub-lite-option").forEach((node) => node.classList.toggle("active", node.dataset.value === uiMode));
     syncBlocks();
@@ -340,9 +370,10 @@ function openSeatPubLiteModal() {
   backdrop.querySelector<HTMLButtonElement>("[data-save]")?.addEventListener("click", async () => {
     const saveBtn = backdrop.querySelector<HTMLButtonElement>("[data-save]");
     const previewStudents = uiMode === "preview_publish" ? (backdrop.querySelector<HTMLTextAreaElement>("[data-preview]")?.value || "") : "";
-    const rawTime = backdrop.querySelector<HTMLInputElement>("[data-publish-at]")?.value || "";
+    const rawDate = backdrop.querySelector<HTMLInputElement>("[data-publish-date]")?.value || "";
+    const rawTime = backdrop.querySelector<HTMLInputElement>("[data-publish-time]")?.value || "";
     const status: SeatPubLiteStatus = uiMode === "private" ? "private" : publishEnabled ? "published" : "preview";
-    const publishAt = status === "published" && mode === "schedule" && rawTime ? new Date(rawTime).toISOString() : "";
+    const publishAt = status === "published" && mode === "schedule" ? seatPubLiteComposeDateTime(rawDate, rawTime) : "";
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Đang lưu..."; }
     await seatPubLiteSave({ ...current, chartId: seatPubLiteCurrentChartId(), chartTitle: seatPubLiteCurrentChartTitle(), status, publishAt, previewStudents });
     close();
