@@ -10,15 +10,27 @@ let seatViewGuardBound = false;
 let seatViewLastAllowed = false;
 
 type SeatViewGateStatus = "private" | "preview" | "published";
-type SeatViewGateConfig = {
-  status: SeatViewGateStatus;
-  previewStudents: string;
-  publishAt: string;
-  chartId: string;
-  updatedAt?: string;
-  updatedBy?: string;
-};
+type SeatViewGateConfig = { status: SeatViewGateStatus; previewStudents: string; publishAt: string; chartId: string; updatedAt?: string; updatedBy?: string };
 type SeatViewGateMode = "admin" | "preview-editor" | "public-viewer" | "denied";
+
+function seatViewGateWindow() {
+  return document.querySelector<HTMLElement>(SEAT_VIEW_GATE_WINDOW);
+}
+
+function seatViewGateWindowVisible() {
+  const win = seatViewGateWindow();
+  if (!win) return false;
+  const rect = win.getBoundingClientRect();
+  const style = window.getComputedStyle(win);
+  return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+}
+
+function seatViewGateClearGlobalUi() {
+  const root = document.documentElement;
+  root.classList.remove("a3-seat-viewer-checking", "a3-seat-viewer-denied", "a3-seat-viewer-readonly", "a3-seat-preview-editor");
+  document.getElementById("a3-seat-view-gate-toast")?.remove();
+  seatViewLastAllowed = false;
+}
 
 function seatViewGateCurrentChartId() {
   return localStorage.getItem(SEAT_VIEW_CHART_KEY) || "default";
@@ -29,13 +41,7 @@ function seatViewGateLocalKey(chartId = seatViewGateCurrentChartId()) {
 }
 
 function seatViewGateNorm(value: unknown) {
-  return String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/[^a-z0-9@._-]+/g, " ")
-    .trim();
+  return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/[^a-z0-9@._-]+/g, " ").trim();
 }
 
 function seatViewGateCompact(value: unknown) {
@@ -117,12 +123,10 @@ function seatViewGateGas(action: string): Promise<any | null> {
     const url = new URL(SEAT_VIEW_GATE_GAS_URL);
     let done = false;
     let timeout = 0;
-
     url.searchParams.set("action", action);
     url.searchParams.set("callback", callbackName);
     url.searchParams.set("t", String(Date.now()));
     url.searchParams.set("payload", JSON.stringify({ chartId: seatViewGateCurrentChartId() }));
-
     callbacks[callbackName] = (json: any) => {
       if (done) return;
       done = true;
@@ -132,7 +136,6 @@ function seatViewGateGas(action: string): Promise<any | null> {
       if (json?.ok === false || json?.data?.ok === false) reject(new Error(String(json.error || json.data?.error || "Backend lỗi")));
       else resolve(json?.data || json);
     };
-
     script.onerror = () => {
       if (done) return;
       done = true;
@@ -141,7 +144,6 @@ function seatViewGateGas(action: string): Promise<any | null> {
       script.remove();
       reject(new Error("Không gọi được Apps Script"));
     };
-
     timeout = window.setTimeout(() => {
       if (done) return;
       done = true;
@@ -149,7 +151,6 @@ function seatViewGateGas(action: string): Promise<any | null> {
       script.remove();
       reject(new Error("Apps Script phản hồi quá lâu"));
     }, 6000);
-
     script.src = url.toString();
     document.head.appendChild(script);
   });
@@ -184,10 +185,7 @@ function seatViewGateUserTokens() {
 }
 
 function seatViewGatePreviewAllowed(config: SeatViewGateConfig) {
-  const preview = String(config.previewStudents || "")
-    .split(/[\n,;]+/)
-    .map((item) => seatViewGateCompact(item))
-    .filter(Boolean);
+  const preview = String(config.previewStudents || "").split(/[\n,;]+/).map((item) => seatViewGateCompact(item)).filter(Boolean);
   if (!preview.length) return false;
   const users = seatViewGateUserTokens();
   return users.some((user) => preview.some((token) => user.includes(token) || token.includes(user)));
@@ -208,14 +206,13 @@ function seatViewGateMode(config: SeatViewGateConfig): SeatViewGateMode {
 }
 
 function seatViewGateDeniedText(config: SeatViewGateConfig) {
-  if (config.status === "published" && config.publishAt && !seatViewGatePublishPassed(config)) {
-    return "Sơ đồ đã được lên lịch công bố.\nMở lúc " + new Date(config.publishAt).toLocaleString("vi-VN") + ".";
-  }
+  if (config.status === "published" && config.publishAt && !seatViewGatePublishPassed(config)) return "Sơ đồ đã được lên lịch công bố.\nMở lúc " + new Date(config.publishAt).toLocaleString("vi-VN") + ".";
   if (config.status === "preview") return "Sơ đồ đang ở chế độ xem trước.\nTài khoản này chưa nằm trong danh sách được xem.";
   return "Sơ đồ chỗ ngồi đang ở chế độ riêng tư.";
 }
 
 function seatViewGateToast(message: string, mode: "checking" | "ok" = "checking") {
+  if (!seatViewGateWindowVisible()) return;
   document.getElementById("a3-seat-view-gate-toast")?.remove();
   const toast = document.createElement("div");
   toast.id = "a3-seat-view-gate-toast";
@@ -281,7 +278,7 @@ function seatViewGateSetState(state: "allowed" | "denied", message = "", readonl
   root.classList.toggle("a3-seat-viewer-denied", state === "denied");
   root.classList.toggle("a3-seat-viewer-readonly", readonly);
   root.classList.toggle("a3-seat-preview-editor", state === "allowed" && !readonly && !seatViewGateIsAdmin());
-  const win = document.querySelector<HTMLElement>(SEAT_VIEW_GATE_WINDOW);
+  const win = seatViewGateWindow();
   if (win) win.dataset.seatGateMessage = message;
   seatViewLastAllowed = state === "allowed";
   seatViewGateApplyReadonlyDom();
@@ -290,23 +287,29 @@ function seatViewGateSetState(state: "allowed" | "denied", message = "", readonl
 async function seatViewGateCheck() {
   injectSeatViewGateStyle();
   seatViewGateBindReadonlyGuard();
+  if (!seatViewGateWindowVisible()) {
+    seatViewGateClearGlobalUi();
+    return;
+  }
   if (seatViewGateIsAdmin()) {
     seatViewGateSetState("allowed", "", false);
     return;
   }
-
-  if (!document.documentElement.classList.contains("a3-seat-viewer-denied")) {
-    seatViewGateToast("Đang kiểm tra quyền xem sơ đồ...");
-  }
-
+  if (!seatViewLastAllowed && !document.documentElement.classList.contains("a3-seat-viewer-denied")) seatViewGateToast("Đang kiểm tra quyền xem sơ đồ...");
   const config = await seatViewGateLoad();
+  if (!seatViewGateWindowVisible()) {
+    seatViewGateClearGlobalUi();
+    return;
+  }
   const mode = seatViewGateMode(config);
   if (mode === "preview-editor") {
+    const wasAllowed = seatViewLastAllowed;
     seatViewGateSetState("allowed", "", false);
-    if (!seatViewLastAllowed) seatViewGateToast("Đã xác nhận quyền xem trước.", "ok");
+    if (!wasAllowed) seatViewGateToast("Đã xác nhận quyền xem trước.", "ok");
   } else if (mode === "public-viewer") {
+    const wasAllowed = seatViewLastAllowed;
     seatViewGateSetState("allowed", "", true);
-    if (!seatViewLastAllowed) seatViewGateToast("Sơ đồ đã được công bố.", "ok");
+    if (!wasAllowed) seatViewGateToast("Sơ đồ đã được công bố.", "ok");
   } else if (mode === "admin") {
     seatViewGateSetState("allowed", "", false);
   } else {
