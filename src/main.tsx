@@ -74,8 +74,6 @@ import './messagesMessengerMobileController';
 import './messagesMessengerMobileFinal.css';
 import './messagesMobileCleanFinal.css';
 import './messagesMobileBackVisibleFix.css';
-import './seatingInstantAccessShieldPatch';
-import './seatingPersistentLockedShieldPatch';
 import './seatingMapStableApp';
 import './seatingHideStudentCount.css';
 import './seatingRoleGate';
@@ -84,8 +82,6 @@ import './seatingSeatSwapHardPatch';
 import './seatingRestoreAndControlsPatch';
 import './seatingNameHighlightPatch';
 import './seatingCanonicalNamesPatch';
-import './seatingPublishAccessPatch';
-import './seatingPublishModalPolishPatch';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
