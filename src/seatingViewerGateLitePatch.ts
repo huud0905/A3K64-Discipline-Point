@@ -6,9 +6,7 @@ let seatViewGateCount = 0;
 let seatViewGateTimer = 0;
 
 type SeatViewGateConfig = {
-  status: "private" | "preview" | "published";
-  publishAt: string;
-  previewStudents: string;
+  status: "private" | "published";
 };
 
 function seatViewGateNorm(value: unknown) {
@@ -17,55 +15,41 @@ function seatViewGateNorm(value: unknown) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/đ/g, "d")
-    .replace(/[^a-z0-9@._-]+/g, " ")
-    .trim();
-}
-
-function seatViewGateCompact(value: unknown) {
-  return seatViewGateNorm(value).replace(/\s+/g, "");
+    .replace(/[^a-z0-9_]+/g, "_");
 }
 
 function seatViewGateActor() {
   try {
     const session = JSON.parse(localStorage.getItem("a3k64-login-session-v1") || "null");
     const user = session?.user || session || {};
-    return {
-      name: String(user.name || user.fullName || user.studentName || user.displayName || user.hoTen || user.username || ""),
-      email: String(user.email || ""),
-      username: String(user.username || ""),
-      role: String(user.role || user.userRole || ""),
-    };
+    return { role: String(user.role || user.userRole || "") };
   } catch {
-    return { name: "", email: "", username: "", role: "" };
+    return { role: "" };
   }
 }
 
 function seatViewGateIsAdmin() {
-  const role = seatViewGateNorm(seatViewGateActor().role).replace(/\s+/g, "_");
+  const role = seatViewGateNorm(seatViewGateActor().role);
   return role.includes("gvcn") || role.includes("lop_truong") || role.includes("bi_thu") || role.includes("admin");
+}
+
+function seatViewGateCleanStatus(value: unknown): "private" | "published" {
+  return String(value || "") === "published" ? "published" : "private";
 }
 
 function seatViewGateLocal(): SeatViewGateConfig {
   try {
     const data = JSON.parse(localStorage.getItem(SEAT_VIEW_GATE_LOCAL_KEY) || "{}");
-    return {
-      status: ["private", "preview", "published"].includes(data.status) ? data.status : "private",
-      publishAt: String(data.publishAt || ""),
-      previewStudents: String(data.previewStudents || ""),
-    };
+    return { status: seatViewGateCleanStatus(data.status) };
   } catch {
-    return { status: "private", publishAt: "", previewStudents: "" };
+    return { status: "private" };
   }
 }
 
 function seatViewGateNormalize(raw: any): SeatViewGateConfig | null {
   const source = raw?.access || raw?.data?.access || raw?.config || raw?.data?.config || raw;
-  if (!source || !["private", "preview", "published"].includes(source.status)) return null;
-  return {
-    status: source.status,
-    publishAt: String(source.publishAt || source.publish_at || ""),
-    previewStudents: String(source.previewStudents || source.preview_students || ""),
-  };
+  if (!source) return null;
+  return { status: seatViewGateCleanStatus(source.status) };
 }
 
 function seatViewGateGas(action: string): Promise<any | null> {
@@ -128,50 +112,9 @@ async function seatViewGateLoad() {
   return seatViewGateLocal();
 }
 
-function seatViewGateUserTokens() {
-  const actor = seatViewGateActor();
-  const out = new Set<string>();
-  [actor.name, actor.email, actor.username].forEach((value) => {
-    if (value) out.add(value);
-    const beforeAt = String(value || "").split("@")[0];
-    if (beforeAt) out.add(beforeAt);
-    const noDigits = beforeAt.replace(/[0-9_.-]+/g, " ").trim();
-    if (noDigits) out.add(noDigits);
-  });
-  return Array.from(out).map(seatViewGateCompact).filter(Boolean);
-}
-
-function seatViewGatePreviewAllowed(config: SeatViewGateConfig) {
-  const preview = String(config.previewStudents || "")
-    .split(/[\n,;]+/)
-    .map((item) => seatViewGateCompact(item))
-    .filter(Boolean);
-  if (!preview.length) return false;
-  const users = seatViewGateUserTokens();
-  return users.some((user) => preview.some((token) => user.includes(token) || token.includes(user)));
-}
-
-function seatViewGatePublishPassed(config: SeatViewGateConfig) {
-  if (!config.publishAt) return false;
-  const date = new Date(config.publishAt);
-  if (Number.isNaN(date.getTime())) return false;
-  return Date.now() >= date.getTime();
-}
-
 function seatViewGateCanView(config: SeatViewGateConfig) {
   if (seatViewGateIsAdmin()) return true;
-  if (config.status === "published") return true;
-  if (seatViewGatePublishPassed(config)) return true;
-  if (config.status === "preview" && seatViewGatePreviewAllowed(config)) return true;
-  return false;
-}
-
-function seatViewGateTimeText(config: SeatViewGateConfig) {
-  if (!config.publishAt) return "Chưa có lịch công bố.";
-  const date = new Date(config.publishAt);
-  if (Number.isNaN(date.getTime())) return "Chưa có lịch công bố.";
-  if (Date.now() >= date.getTime()) return "Đã đến giờ công bố.";
-  return "Mở lúc " + date.toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" });
+  return config.status === "published";
 }
 
 function injectSeatViewGateStyle() {
@@ -221,7 +164,7 @@ async function seatViewGateCheck() {
   if (seatViewGateCanView(config)) {
     seatViewGateSetState("allowed");
   } else {
-    seatViewGateSetState("denied", "Sơ đồ chỗ ngồi chưa được công bố.\A" + seatViewGateTimeText(config));
+    seatViewGateSetState("denied", "Sơ đồ chỗ ngồi đang ở chế độ riêng tư.");
   }
 }
 
