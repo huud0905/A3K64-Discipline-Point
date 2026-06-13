@@ -83,7 +83,6 @@ import './seatingRestoreAndControlsPatch';
 import './seatingNameHighlightPatch';
 import './seatingCanonicalNamesPatch';
 import './seatingPublishLitePatch';
-import './seatingNoDefaultRequestGuard';
 import './seatingViewerGateLitePatch';
 import './seatingAccessOverlayFix';
 
