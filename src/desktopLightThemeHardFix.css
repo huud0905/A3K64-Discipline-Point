@@ -78,3 +78,126 @@ body:has(.win-root.theme-light),
   background: var(--desktop-accent, #059669) !important;
   border-color: transparent !important;
 }
+
+body:has(.win-root.theme-light) #a3-seat-fix-toast,
+body:has(.win-root.theme-light) #a3-seat-runtime-toast,
+body:has(.win-root.theme-light) #a3k64-seat-opening-toast,
+body:has(.win-root.theme-light) #a3-seat-fix-saving-toast,
+body:has(.win-root.theme-light) #a3-seat-saving-toast,
+body:has(.win-root.theme-light) .seat-tools-toast,
+body:has(.win-root.theme-light) .seat-ctrl-toast,
+.theme-light #a3-seat-fix-toast,
+.theme-light #a3-seat-runtime-toast,
+.theme-light #a3k64-seat-opening-toast,
+.theme-light #a3-seat-fix-saving-toast,
+.theme-light #a3-seat-saving-toast,
+.theme-light .seat-tools-toast,
+.theme-light .seat-ctrl-toast {
+  background: rgba(255, 255, 255, 0.985) !important;
+  color: #0f172a !important;
+  border-color: rgba(20, 184, 166, 0.72) !important;
+  box-shadow: 0 20px 58px rgba(15, 23, 42, 0.18) !important;
+}
+
+body:has(.win-root.theme-light) #a3-seat-fix-toast .spin,
+body:has(.win-root.theme-light) #a3-seat-runtime-toast .seat-runtime-spin,
+body:has(.win-root.theme-light) #a3-seat-fix-toast .seat-runtime-spin,
+body:has(.win-root.theme-light) #a3k64-seat-opening-toast .seat-open-spin,
+body:has(.win-root.theme-light) #a3-seat-fix-saving-toast .spin,
+body:has(.win-root.theme-light) #a3-seat-saving-toast .spin,
+body:has(.win-root.theme-light) #a3-seat-runtime-toast .spin,
+.theme-light #a3-seat-fix-toast .spin,
+.theme-light #a3-seat-runtime-toast .seat-runtime-spin,
+.theme-light #a3-seat-fix-toast .seat-runtime-spin,
+.theme-light #a3k64-seat-opening-toast .seat-open-spin,
+.theme-light #a3-seat-fix-saving-toast .spin,
+.theme-light #a3-seat-saving-toast .spin,
+.theme-light #a3-seat-runtime-toast .spin {
+  border-color: rgba(15, 23, 42, 0.16) !important;
+  border-top-color: var(--desktop-accent, #14b8a6) !important;
+}
+
+body:has(.win-root.theme-light) #a3-seat-fix-toast.done .spin,
+body:has(.win-root.theme-light) #a3-seat-runtime-toast.done .seat-runtime-spin,
+body:has(.win-root.theme-light) #a3-seat-fix-toast.done .seat-runtime-spin,
+body:has(.win-root.theme-light) #a3k64-seat-opening-toast.done .seat-open-spin,
+body:has(.win-root.theme-light) #a3-seat-fix-saving-toast.done .spin,
+body:has(.win-root.theme-light) #a3-seat-saving-toast.done .spin,
+body:has(.win-root.theme-light) #a3-seat-runtime-toast.done .spin,
+.theme-light #a3-seat-fix-toast.done .spin,
+.theme-light #a3-seat-runtime-toast.done .seat-runtime-spin,
+.theme-light #a3-seat-fix-toast.done .seat-runtime-spin,
+.theme-light #a3k64-seat-opening-toast.done .seat-open-spin,
+.theme-light #a3-seat-fix-saving-toast.done .spin,
+.theme-light #a3-seat-saving-toast.done .spin,
+.theme-light #a3-seat-runtime-toast.done .spin {
+  background: var(--desktop-accent, #14b8a6) !important;
+  border-color: var(--desktop-accent, #14b8a6) !important;
+  box-shadow: inset 0 0 0 4px #ffffff !important;
+}
+
+body:has(.win-root.theme-light) .seat-cell-context-menu,
+.theme-light .seat-cell-context-menu {
+  background: rgba(255, 255, 255, 0.985) !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 20px 55px rgba(15, 23, 42, 0.18) !important;
+}
+
+body:has(.win-root.theme-light) .seat-cell-context-menu button,
+.theme-light .seat-cell-context-menu button {
+  color: #dc2626 !important;
+  background: transparent !important;
+}
+
+body:has(.win-root.theme-light) .seat-cell-context-menu button:hover,
+.theme-light .seat-cell-context-menu button:hover {
+  background: rgba(220, 38, 38, 0.09) !important;
+}
+
+body:has(.win-root.theme-light) .custom-context-menu,
+body:has(.win-root.theme-light) .task-app-menu,
+.theme-light .custom-context-menu,
+.theme-light .task-app-menu {
+  background: rgba(255, 255, 255, 0.985) !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18) !important;
+  backdrop-filter: blur(18px) !important;
+}
+
+body:has(.win-root.theme-light) .custom-context-menu .context-item,
+body:has(.win-root.theme-light) .custom-context-menu button,
+body:has(.win-root.theme-light) .task-app-menu button,
+.theme-light .custom-context-menu .context-item,
+.theme-light .custom-context-menu button,
+.theme-light .task-app-menu button {
+  color: #0f172a !important;
+  background: transparent !important;
+}
+
+body:has(.win-root.theme-light) .custom-context-menu .context-item:hover,
+body:has(.win-root.theme-light) .custom-context-menu button:hover,
+body:has(.win-root.theme-light) .task-app-menu button:hover,
+.theme-light .custom-context-menu .context-item:hover,
+.theme-light .custom-context-menu button:hover,
+.theme-light .task-app-menu button:hover {
+  background: #f1f5f9 !important;
+}
+
+body:has(.win-root.theme-light) .custom-context-menu .context-divider,
+.theme-light .custom-context-menu .context-divider {
+  background: #e2e8f0 !important;
+}
+
+body:has(.win-root.theme-light) .custom-context-menu .context-shortcut,
+.theme-light .custom-context-menu .context-shortcut {
+  color: #64748b !important;
+}
+
+body:has(.win-root.theme-light) .custom-context-menu .context-left svg,
+body:has(.win-root.theme-light) .task-app-menu svg,
+.theme-light .custom-context-menu .context-left svg,
+.theme-light .task-app-menu svg {
+  color: var(--desktop-accent, #14b8a6) !important;
+}
