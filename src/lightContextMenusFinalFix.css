@@ -2,11 +2,15 @@
 body:has(.win-root.theme-light) #a3-seat-fix-toast,
 body:has(.win-root.theme-light) #a3-seat-runtime-toast,
 body:has(.win-root.theme-light) #a3k64-seat-opening-toast,
+body:has(.win-root.theme-light) #a3-seat-fix-saving-toast,
 body:has(.win-root.theme-light) .seat-tools-toast,
+body:has(.win-root.theme-light) .seat-ctrl-toast,
 .theme-light #a3-seat-fix-toast,
 .theme-light #a3-seat-runtime-toast,
 .theme-light #a3k64-seat-opening-toast,
-.theme-light .seat-tools-toast {
+.theme-light #a3-seat-fix-saving-toast,
+.theme-light .seat-tools-toast,
+.theme-light .seat-ctrl-toast {
   background: rgba(255, 255, 255, 0.985) !important;
   color: #0f172a !important;
   border-color: rgba(20, 184, 166, 0.72) !important;
@@ -17,11 +21,13 @@ body:has(.win-root.theme-light) #a3-seat-fix-toast .spin,
 body:has(.win-root.theme-light) #a3-seat-runtime-toast .seat-runtime-spin,
 body:has(.win-root.theme-light) #a3-seat-fix-toast .seat-runtime-spin,
 body:has(.win-root.theme-light) #a3k64-seat-opening-toast .seat-open-spin,
+body:has(.win-root.theme-light) #a3-seat-fix-saving-toast .spin,
 body:has(.win-root.theme-light) #a3-seat-runtime-toast .spin,
 .theme-light #a3-seat-fix-toast .spin,
 .theme-light #a3-seat-runtime-toast .seat-runtime-spin,
 .theme-light #a3-seat-fix-toast .seat-runtime-spin,
 .theme-light #a3k64-seat-opening-toast .seat-open-spin,
+.theme-light #a3-seat-fix-saving-toast .spin,
 .theme-light #a3-seat-runtime-toast .spin {
   border-color: rgba(15, 23, 42, 0.16) !important;
   border-top-color: var(--desktop-accent, #14b8a6) !important;
@@ -31,11 +37,13 @@ body:has(.win-root.theme-light) #a3-seat-fix-toast.done .spin,
 body:has(.win-root.theme-light) #a3-seat-runtime-toast.done .seat-runtime-spin,
 body:has(.win-root.theme-light) #a3-seat-fix-toast.done .seat-runtime-spin,
 body:has(.win-root.theme-light) #a3k64-seat-opening-toast.done .seat-open-spin,
+body:has(.win-root.theme-light) #a3-seat-fix-saving-toast.done .spin,
 body:has(.win-root.theme-light) #a3-seat-runtime-toast.done .spin,
 .theme-light #a3-seat-fix-toast.done .spin,
 .theme-light #a3-seat-runtime-toast.done .seat-runtime-spin,
 .theme-light #a3-seat-fix-toast.done .seat-runtime-spin,
 .theme-light #a3k64-seat-opening-toast.done .seat-open-spin,
+.theme-light #a3-seat-fix-saving-toast.done .spin,
 .theme-light #a3-seat-runtime-toast.done .spin {
   background: var(--desktop-accent, #14b8a6) !important;
   border-color: var(--desktop-accent, #14b8a6) !important;
