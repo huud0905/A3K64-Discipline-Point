@@ -33,6 +33,7 @@ let seatCtrlCount = 0;
 let seatCtrlCharts: SeatCtrlChart[] = [];
 let seatCtrlLoaded = false;
 let seatCtrlBound = false;
+let seatCtrlLastRenderKey = "";
 
 function seatCtrlEscape(value: string) {
   return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#039;");
@@ -205,7 +206,8 @@ function seatCtrlApply(chart: SeatCtrlChart) {
   if (layout.room) localStorage.setItem(SEAT_CTRL_ROOM_KEY, JSON.stringify(layout.room));
   else localStorage.removeItem(SEAT_CTRL_ROOM_KEY);
   localStorage.setItem(SEAT_CTRL_CURRENT_KEY, chart.id);
-  seatCtrlRender();
+  seatCtrlLastRenderKey = "";
+  seatCtrlRender(true);
   seatCtrlToast(`Đã mở ${chart.title || "sơ đồ"}.`);
 }
 
@@ -239,23 +241,36 @@ function seatCtrlCurrentId() {
   return localStorage.getItem(SEAT_CTRL_CURRENT_KEY) || seatCtrlCharts.find((item) => item.active)?.id || seatCtrlCharts[0]?.id || "";
 }
 
-function seatCtrlRender() {
+function seatCtrlRender(force = false) {
   const tools = document.querySelector<HTMLElement>(`${SEAT_CTRL_WINDOW} .stable-seat-tools`);
   if (!tools) return;
+  if (!force && tools.querySelector(".seat-ctrl-select.open")) return;
+
+  const current = seatCtrlCurrentId();
+  const renderKey = `${current}|${seatCtrlCharts.map((item) => `${item.id}:${item.title}`).join("|")}`;
+  if (!force && renderKey === seatCtrlLastRenderKey && tools.querySelector(".seat-ctrl-select")) return;
+  seatCtrlLastRenderKey = renderKey;
+
   tools.querySelector(".seat-ctrl-select")?.remove();
   tools.querySelectorAll(".seat-ctrl-btn").forEach((node) => node.remove());
 
-  const current = seatCtrlCurrentId();
   const currentTitle = seatCtrlCharts.find((item) => item.id === current)?.title || seatCtrlCharts[0]?.title || "Sơ đồ";
   const select = document.createElement("div");
   select.className = "seat-ctrl-select";
   select.innerHTML = `<button type="button" class="seat-ctrl-trigger"><span>${seatCtrlEscape(currentTitle)}</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button><div class="seat-ctrl-menu">${seatCtrlCharts.map((item) => `<button type="button" class="seat-ctrl-option ${item.id === current ? "active" : ""}" data-id="${seatCtrlEscape(item.id)}">${seatCtrlEscape(item.title || "Sơ đồ")}</button>`).join("")}</div>`;
-  select.querySelector(".seat-ctrl-trigger")?.addEventListener("click", (event) => { event.stopPropagation(); select.classList.toggle("open"); });
+  select.querySelector(".seat-ctrl-trigger")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if ("stopImmediatePropagation" in event) event.stopImmediatePropagation();
+    select.classList.toggle("open");
+  });
   select.querySelectorAll<HTMLButtonElement>(".seat-ctrl-option").forEach((button) => {
     button.addEventListener("click", async (event) => {
+      event.preventDefault();
       event.stopPropagation();
-      select.classList.remove("open");
+      if ("stopImmediatePropagation" in event) event.stopImmediatePropagation();
       const id = button.dataset.id || "";
+      select.classList.remove("open");
       const chart = await seatCtrlGet(id);
       if (!chart) return seatCtrlToast("Không tìm thấy sơ đồ này.");
       seatCtrlApply(chart);
@@ -271,6 +286,7 @@ function seatCtrlRender() {
     const title = seatCtrlCharts.find((item) => item.id === id)?.title || "Sơ đồ hiện tại";
     const chart = await seatCtrlSave(id, title);
     localStorage.setItem(SEAT_CTRL_CURRENT_KEY, chart.id);
+    seatCtrlLastRenderKey = "";
     await seatCtrlRefresh();
     seatCtrlToast("Đã lưu sơ đồ.");
   });
@@ -284,6 +300,7 @@ function seatCtrlRender() {
     if (!title) return;
     const chart = await seatCtrlSave(null, title);
     localStorage.setItem(SEAT_CTRL_CURRENT_KEY, chart.id);
+    seatCtrlLastRenderKey = "";
     await seatCtrlRefresh();
     seatCtrlToast("Đã tạo sơ đồ mới.");
   });
@@ -297,7 +314,8 @@ function seatCtrlRender() {
 async function seatCtrlRefresh() {
   seatCtrlCharts = await seatCtrlList();
   seatCtrlLoaded = true;
-  seatCtrlRender();
+  seatCtrlLastRenderKey = "";
+  seatCtrlRender(true);
 }
 
 function seatCtrlBindReset() {
@@ -324,7 +342,7 @@ function bootSeatRestoreControls() {
   seatCtrlBindReset();
   void seatCtrlRefresh();
   seatCtrlLoop = window.setInterval(() => {
-    if (document.querySelector(`${SEAT_CTRL_WINDOW} .stable-seat-tools`) && (seatCtrlLoaded || seatCtrlCharts.length)) seatCtrlRender();
+    if (document.querySelector(`${SEAT_CTRL_WINDOW} .stable-seat-tools`) && (seatCtrlLoaded || seatCtrlCharts.length) && !document.querySelector(`${SEAT_CTRL_WINDOW} .seat-ctrl-select.open`)) seatCtrlRender();
     seatCtrlCount += 1;
     if (seatCtrlCount > 240 && seatCtrlLoop) {
       clearInterval(seatCtrlLoop);
