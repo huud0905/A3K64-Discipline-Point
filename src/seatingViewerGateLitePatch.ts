@@ -3,12 +3,21 @@ const SEAT_VIEW_GATE_STYLE_ID = "a3k64-seat-view-gate-lite-style";
 const SEAT_VIEW_GATE_LOCAL_KEY = "a3k64-seating-publish-lite-v1";
 const SEAT_VIEW_CHART_KEY = "a3k64-seating-sheet-current-id-v1";
 const SEAT_VIEW_GATE_GAS_URL = String(import.meta.env.VITE_GAS_WEB_APP_URL || "").trim();
-let seatViewGateCount = 0;
+
 let seatViewGateTimer = 0;
+let seatViewGateCount = 0;
 let seatViewGuardBound = false;
+let seatViewLastAllowed = false;
 
 type SeatViewGateStatus = "private" | "preview" | "published";
-type SeatViewGateConfig = { status: SeatViewGateStatus; previewStudents: string; publishAt: string; chartId: string };
+type SeatViewGateConfig = {
+  status: SeatViewGateStatus;
+  previewStudents: string;
+  publishAt: string;
+  chartId: string;
+  updatedAt?: string;
+  updatedBy?: string;
+};
 type SeatViewGateMode = "admin" | "preview-editor" | "public-viewer" | "denied";
 
 function seatViewGateCurrentChartId() {
@@ -54,9 +63,9 @@ function seatViewGateIsAdmin() {
 }
 
 function seatViewGateCleanStatus(value: unknown): SeatViewGateStatus {
-  const raw = String(value || "").trim();
-  if (raw === "preview") return "preview";
-  if (raw === "published") return "published";
+  const raw = seatViewGateCompact(value);
+  if (raw === "preview" || raw === "xemtruoc") return "preview";
+  if (raw === "published" || raw === "publish" || raw === "public" || raw === "congbo" || raw === "congkhai") return "published";
   return "private";
 }
 
@@ -69,6 +78,8 @@ function seatViewGateLocal(): SeatViewGateConfig {
       status: seatViewGateCleanStatus(data.status),
       previewStudents: String(data.previewStudents || data.preview_students || ""),
       publishAt: String(data.publishAt || data.publish_at || ""),
+      updatedAt: data.updatedAt || data.updated_at,
+      updatedBy: data.updatedBy || data.updated_by,
     };
   } catch {
     return { chartId, status: "private", previewStudents: "", publishAt: "" };
@@ -84,7 +95,17 @@ function seatViewGateNormalize(raw: any): SeatViewGateConfig | null {
     status: seatViewGateCleanStatus(source.status),
     previewStudents: String(source.previewStudents || source.preview_students || ""),
     publishAt: String(source.publishAt || source.publish_at || ""),
+    updatedAt: source.updatedAt || source.updated_at,
+    updatedBy: source.updatedBy || source.updated_by,
   };
+}
+
+function seatViewGatePreferLocal(remote: SeatViewGateConfig | null, local: SeatViewGateConfig) {
+  if (!remote) return local;
+  const localHasAccess = local.status !== "private" || Boolean(local.previewStudents || local.publishAt);
+  const remoteEmptyPrivate = remote.status === "private" && !remote.previewStudents && !remote.publishAt;
+  if (remoteEmptyPrivate && localHasAccess) return local;
+  return remote;
 }
 
 function seatViewGateGas(action: string): Promise<any | null> {
@@ -136,17 +157,17 @@ function seatViewGateGas(action: string): Promise<any | null> {
 
 async function seatViewGateLoad() {
   const chartId = seatViewGateCurrentChartId();
+  const local = seatViewGateLocal();
   try {
     const response = await seatViewGateGas("getSeatingAccess");
-    const config = seatViewGateNormalize(response);
-    if (config) {
-      localStorage.setItem(seatViewGateLocalKey(chartId), JSON.stringify(config));
-      return config;
-    }
+    const remote = seatViewGateNormalize(response);
+    const config = seatViewGatePreferLocal(remote, local);
+    localStorage.setItem(seatViewGateLocalKey(chartId), JSON.stringify(config));
+    return config;
   } catch (error) {
     console.warn("Không đọc được getSeatingAccess, dùng local:", error);
   }
-  return seatViewGateLocal();
+  return local;
 }
 
 function seatViewGateUserTokens() {
@@ -188,10 +209,20 @@ function seatViewGateMode(config: SeatViewGateConfig): SeatViewGateMode {
 
 function seatViewGateDeniedText(config: SeatViewGateConfig) {
   if (config.status === "published" && config.publishAt && !seatViewGatePublishPassed(config)) {
-    return "Sơ đồ đã được lên lịch công bố.\A Mở lúc " + new Date(config.publishAt).toLocaleString("vi-VN") + ".";
+    return "Sơ đồ đã được lên lịch công bố.\nMở lúc " + new Date(config.publishAt).toLocaleString("vi-VN") + ".";
   }
-  if (config.status === "preview") return "Sơ đồ đang ở chế độ xem trước.\A Tài khoản này chưa nằm trong danh sách được xem.";
+  if (config.status === "preview") return "Sơ đồ đang ở chế độ xem trước.\nTài khoản này chưa nằm trong danh sách được xem.";
   return "Sơ đồ chỗ ngồi đang ở chế độ riêng tư.";
+}
+
+function seatViewGateToast(message: string, mode: "checking" | "ok" = "checking") {
+  document.getElementById("a3-seat-view-gate-toast")?.remove();
+  const toast = document.createElement("div");
+  toast.id = "a3-seat-view-gate-toast";
+  toast.className = mode === "ok" ? "ok" : "checking";
+  toast.innerHTML = `<span class="spin"></span><span>${message}</span>`;
+  document.body.appendChild(toast);
+  window.setTimeout(() => toast.remove(), mode === "ok" ? 1200 : 2600);
 }
 
 function injectSeatViewGateStyle() {
@@ -199,15 +230,11 @@ function injectSeatViewGateStyle() {
   const style = document.createElement("style");
   style.id = SEAT_VIEW_GATE_STYLE_ID;
   style.textContent = `
-    html.a3-seat-viewer-checking ${SEAT_VIEW_GATE_WINDOW} .stable-seat-board,
-    html.a3-seat-viewer-checking ${SEAT_VIEW_GATE_WINDOW} .stable-seat-student-panel,
-    html.a3-seat-viewer-checking ${SEAT_VIEW_GATE_WINDOW} .stable-seat-tools,
     html.a3-seat-viewer-denied ${SEAT_VIEW_GATE_WINDOW} .stable-seat-board,
     html.a3-seat-viewer-denied ${SEAT_VIEW_GATE_WINDOW} .stable-seat-student-panel,
     html.a3-seat-viewer-denied ${SEAT_VIEW_GATE_WINDOW} .stable-seat-tools{visibility:hidden!important;opacity:0!important;pointer-events:none!important;}
-    html.a3-seat-viewer-checking ${SEAT_VIEW_GATE_WINDOW}::after,
     html.a3-seat-viewer-denied ${SEAT_VIEW_GATE_WINDOW}::after{white-space:pre-line;content:attr(data-seat-gate-message);position:absolute;inset:76px 22px 22px;z-index:80;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;border:1px solid #cbd5e1;border-radius:22px;background:rgba(255,255,255,.985);color:#0f172a;font-weight:1000;font-size:18px;line-height:1.5;box-shadow:0 24px 70px rgba(15,23,42,.16);}
-    .theme-dark html.a3-seat-viewer-checking ${SEAT_VIEW_GATE_WINDOW}::after,.theme-dark html.a3-seat-viewer-denied ${SEAT_VIEW_GATE_WINDOW}::after,html.a3-overlay-dark.a3-seat-viewer-checking ${SEAT_VIEW_GATE_WINDOW}::after,html.a3-overlay-dark.a3-seat-viewer-denied ${SEAT_VIEW_GATE_WINDOW}::after{border-color:#334155;background:rgba(15,23,42,.985);color:#f8fafc;box-shadow:0 24px 80px rgba(0,0,0,.36);}
+    .theme-dark html.a3-seat-viewer-denied ${SEAT_VIEW_GATE_WINDOW}::after,html.a3-overlay-dark.a3-seat-viewer-denied ${SEAT_VIEW_GATE_WINDOW}::after{border-color:#334155;background:rgba(15,23,42,.985);color:#f8fafc;box-shadow:0 24px 80px rgba(0,0,0,.36);}
     html.a3-seat-viewer-readonly ${SEAT_VIEW_GATE_WINDOW} [data-tool='edit'],
     html.a3-seat-viewer-readonly ${SEAT_VIEW_GATE_WINDOW} [data-tool='reset'],
     html.a3-seat-viewer-readonly ${SEAT_VIEW_GATE_WINDOW} [data-seat-random],
@@ -215,6 +242,12 @@ function injectSeatViewGateStyle() {
     html.a3-seat-viewer-readonly ${SEAT_VIEW_GATE_WINDOW} .seat-pub-lite-btn{display:none!important;}
     html.a3-seat-viewer-readonly ${SEAT_VIEW_GATE_WINDOW} .stable-seat-student-card,
     html.a3-seat-viewer-readonly ${SEAT_VIEW_GATE_WINDOW} .stable-seat-cell{cursor:default!important;}
+    #a3-seat-view-gate-toast{position:fixed;left:50%;top:72px;transform:translateX(-50%);z-index:1000000;display:flex;align-items:center;gap:10px;padding:9px 13px;border:1px solid rgba(20,184,166,.7);border-radius:15px;background:rgba(255,255,255,.985);color:#0f172a;box-shadow:0 18px 50px rgba(15,23,42,.18);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;font-size:13px;font-weight:900;pointer-events:none;}
+    #a3-seat-view-gate-toast .spin{width:14px;height:14px;border-radius:999px;border:2px solid rgba(15,23,42,.16);border-top-color:var(--desktop-accent,#14b8a6);animation:a3SeatGateSpin .72s linear infinite;}
+    #a3-seat-view-gate-toast.ok .spin{animation:none;border-color:var(--desktop-accent,#14b8a6);background:var(--desktop-accent,#14b8a6);box-shadow:inset 0 0 0 4px #fff;}
+    .theme-dark #a3-seat-view-gate-toast,html.a3-overlay-dark #a3-seat-view-gate-toast{background:rgba(15,23,42,.96);color:#f8fafc;box-shadow:0 22px 68px rgba(0,0,0,.36)}
+    .theme-dark #a3-seat-view-gate-toast .spin,html.a3-overlay-dark #a3-seat-view-gate-toast .spin{border-color:rgba(255,255,255,.28);border-top-color:#5eead4}
+    @keyframes a3SeatGateSpin{to{transform:rotate(360deg)}}
   `;
   document.head.appendChild(style);
 }
@@ -242,14 +275,15 @@ function seatViewGateBindReadonlyGuard() {
   });
 }
 
-function seatViewGateSetState(state: "checking" | "allowed" | "denied", message = "", readonly = false) {
+function seatViewGateSetState(state: "allowed" | "denied", message = "", readonly = false) {
   const root = document.documentElement;
-  root.classList.toggle("a3-seat-viewer-checking", state === "checking");
+  root.classList.remove("a3-seat-viewer-checking");
   root.classList.toggle("a3-seat-viewer-denied", state === "denied");
   root.classList.toggle("a3-seat-viewer-readonly", readonly);
   root.classList.toggle("a3-seat-preview-editor", state === "allowed" && !readonly && !seatViewGateIsAdmin());
   const win = document.querySelector<HTMLElement>(SEAT_VIEW_GATE_WINDOW);
   if (win) win.dataset.seatGateMessage = message;
+  seatViewLastAllowed = state === "allowed";
   seatViewGateApplyReadonlyDom();
 }
 
@@ -260,13 +294,19 @@ async function seatViewGateCheck() {
     seatViewGateSetState("allowed", "", false);
     return;
   }
-  seatViewGateSetState("checking", "Đang kiểm tra quyền xem sơ đồ...", true);
+
+  if (!document.documentElement.classList.contains("a3-seat-viewer-denied")) {
+    seatViewGateToast("Đang kiểm tra quyền xem sơ đồ...");
+  }
+
   const config = await seatViewGateLoad();
   const mode = seatViewGateMode(config);
   if (mode === "preview-editor") {
     seatViewGateSetState("allowed", "", false);
+    if (!seatViewLastAllowed) seatViewGateToast("Đã xác nhận quyền xem trước.", "ok");
   } else if (mode === "public-viewer") {
     seatViewGateSetState("allowed", "", true);
+    if (!seatViewLastAllowed) seatViewGateToast("Sơ đồ đã được công bố.", "ok");
   } else if (mode === "admin") {
     seatViewGateSetState("allowed", "", false);
   } else {
@@ -277,7 +317,6 @@ async function seatViewGateCheck() {
 function bootSeatViewGate() {
   injectSeatViewGateStyle();
   seatViewGateBindReadonlyGuard();
-  if (!seatViewGateIsAdmin()) document.documentElement.classList.add("a3-seat-viewer-checking");
   void seatViewGateCheck();
   seatViewGateTimer = window.setInterval(() => {
     void seatViewGateCheck();
