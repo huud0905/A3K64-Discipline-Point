@@ -4,6 +4,11 @@ const SEAT_OPEN_FEEDBACK_TOAST_ID = "a3k64-seat-opening-toast";
 
 let seatOpenFeedbackTimer = 0;
 
+function seatOpenFeedbackWindowVisible() {
+  const win = document.querySelector<HTMLElement>(SEAT_OPEN_FEEDBACK_WINDOW);
+  return Boolean(win && win.offsetParent !== null);
+}
+
 function injectSeatOpenFeedbackStyle() {
   if (document.getElementById(SEAT_OPEN_FEEDBACK_STYLE_ID)) return;
   const style = document.createElement("style");
@@ -14,14 +19,18 @@ function injectSeatOpenFeedbackStyle() {
       z-index:260!important;
     }
     ${SEAT_OPEN_FEEDBACK_WINDOW} .seat-ctrl-menu{
-      min-height:104px!important;
-      padding:8px!important;
-      padding-bottom:10px!important;
-      overflow:visible!important;
+      min-height:0!important;
+      height:auto!important;
+      max-height:260px!important;
+      padding:6px!important;
+      overflow:auto!important;
     }
     ${SEAT_OPEN_FEEDBACK_WINDOW} .seat-ctrl-option{
-      height:39px!important;
+      height:38px!important;
       border-radius:12px!important;
+    }
+    ${SEAT_OPEN_FEEDBACK_WINDOW} .seat-ctrl-option:only-child{
+      margin:0!important;
     }
     .seat-pub-lite-modal{
       width:min(650px,100%)!important;
@@ -67,6 +76,7 @@ function injectSeatOpenFeedbackStyle() {
 }
 
 function showSeatOpeningToast(message: string, done = false) {
+  if (!seatOpenFeedbackWindowVisible()) return;
   injectSeatOpenFeedbackStyle();
   clearTimeout(seatOpenFeedbackTimer);
   document.getElementById(SEAT_OPEN_FEEDBACK_TOAST_ID)?.remove();
