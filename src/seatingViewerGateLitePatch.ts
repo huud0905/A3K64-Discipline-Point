@@ -9,6 +9,7 @@ let seatViewGuardBound = false;
 
 type SeatViewGateStatus = "private" | "preview" | "published";
 type SeatViewGateConfig = { status: SeatViewGateStatus; previewStudents: string; publishAt: string; chartId: string };
+type SeatViewGateMode = "admin" | "preview-editor" | "public-viewer" | "denied";
 
 function seatViewGateCurrentChartId() {
   return localStorage.getItem(SEAT_VIEW_CHART_KEY) || "default";
@@ -178,11 +179,11 @@ function seatViewGatePublishPassed(config: SeatViewGateConfig) {
   return Date.now() >= time;
 }
 
-function seatViewGateCanView(config: SeatViewGateConfig) {
-  if (seatViewGateIsAdmin()) return true;
-  if (config.status === "published" && seatViewGatePublishPassed(config)) return true;
-  if (config.status === "preview" && seatViewGatePreviewAllowed(config)) return true;
-  return false;
+function seatViewGateMode(config: SeatViewGateConfig): SeatViewGateMode {
+  if (seatViewGateIsAdmin()) return "admin";
+  if (seatViewGatePreviewAllowed(config)) return "preview-editor";
+  if (config.status === "published" && seatViewGatePublishPassed(config)) return "public-viewer";
+  return "denied";
 }
 
 function seatViewGateDeniedText(config: SeatViewGateConfig) {
@@ -246,6 +247,7 @@ function seatViewGateSetState(state: "checking" | "allowed" | "denied", message 
   root.classList.toggle("a3-seat-viewer-checking", state === "checking");
   root.classList.toggle("a3-seat-viewer-denied", state === "denied");
   root.classList.toggle("a3-seat-viewer-readonly", readonly);
+  root.classList.toggle("a3-seat-preview-editor", state === "allowed" && !readonly && !seatViewGateIsAdmin());
   const win = document.querySelector<HTMLElement>(SEAT_VIEW_GATE_WINDOW);
   if (win) win.dataset.seatGateMessage = message;
   seatViewGateApplyReadonlyDom();
@@ -260,8 +262,13 @@ async function seatViewGateCheck() {
   }
   seatViewGateSetState("checking", "Đang kiểm tra quyền xem sơ đồ...", true);
   const config = await seatViewGateLoad();
-  if (seatViewGateCanView(config)) {
+  const mode = seatViewGateMode(config);
+  if (mode === "preview-editor") {
+    seatViewGateSetState("allowed", "", false);
+  } else if (mode === "public-viewer") {
     seatViewGateSetState("allowed", "", true);
+  } else if (mode === "admin") {
+    seatViewGateSetState("allowed", "", false);
   } else {
     seatViewGateSetState("denied", seatViewGateDeniedText(config), true);
   }
