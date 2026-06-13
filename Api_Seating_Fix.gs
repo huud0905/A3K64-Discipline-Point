@@ -1,2 +1,2 @@
 // Apps Script seating fix
-function testSeatFix(){return true;}
+function testSeatFix(){var sh='SEATING CHART';return sh;}
