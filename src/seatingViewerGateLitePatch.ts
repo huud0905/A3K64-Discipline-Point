@@ -5,9 +5,8 @@ const SEAT_VIEW_GATE_GAS_URL = String(import.meta.env.VITE_GAS_WEB_APP_URL || ""
 let seatViewGateCount = 0;
 let seatViewGateTimer = 0;
 
-type SeatViewGateConfig = {
-  status: "private" | "published";
-};
+type SeatViewGateStatus = "private" | "preview" | "published";
+type SeatViewGateConfig = { status: SeatViewGateStatus; previewStudents: string };
 
 function seatViewGateNorm(value: unknown) {
   return String(value || "")
@@ -15,41 +14,54 @@ function seatViewGateNorm(value: unknown) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/đ/g, "d")
-    .replace(/[^a-z0-9_]+/g, "_");
+    .replace(/[^a-z0-9@._-]+/g, " ")
+    .trim();
+}
+
+function seatViewGateCompact(value: unknown) {
+  return seatViewGateNorm(value).replace(/\s+/g, "");
 }
 
 function seatViewGateActor() {
   try {
     const session = JSON.parse(localStorage.getItem("a3k64-login-session-v1") || "null");
     const user = session?.user || session || {};
-    return { role: String(user.role || user.userRole || "") };
+    return {
+      name: String(user.name || user.fullName || user.studentName || user.displayName || user.hoTen || user.username || ""),
+      email: String(user.email || ""),
+      username: String(user.username || ""),
+      role: String(user.role || user.userRole || ""),
+    };
   } catch {
-    return { role: "" };
+    return { name: "", email: "", username: "", role: "" };
   }
 }
 
 function seatViewGateIsAdmin() {
-  const role = seatViewGateNorm(seatViewGateActor().role);
+  const role = seatViewGateNorm(seatViewGateActor().role).replace(/\s+/g, "_");
   return role.includes("gvcn") || role.includes("lop_truong") || role.includes("bi_thu") || role.includes("admin");
 }
 
-function seatViewGateCleanStatus(value: unknown): "private" | "published" {
-  return String(value || "") === "published" ? "published" : "private";
+function seatViewGateCleanStatus(value: unknown): SeatViewGateStatus {
+  const raw = String(value || "").trim();
+  if (raw === "preview") return "preview";
+  if (raw === "published") return "published";
+  return "private";
 }
 
 function seatViewGateLocal(): SeatViewGateConfig {
   try {
     const data = JSON.parse(localStorage.getItem(SEAT_VIEW_GATE_LOCAL_KEY) || "{}");
-    return { status: seatViewGateCleanStatus(data.status) };
+    return { status: seatViewGateCleanStatus(data.status), previewStudents: String(data.previewStudents || data.preview_students || "") };
   } catch {
-    return { status: "private" };
+    return { status: "private", previewStudents: "" };
   }
 }
 
 function seatViewGateNormalize(raw: any): SeatViewGateConfig | null {
   const source = raw?.access || raw?.data?.access || raw?.config || raw?.data?.config || raw;
   if (!source) return null;
-  return { status: seatViewGateCleanStatus(source.status) };
+  return { status: seatViewGateCleanStatus(source.status), previewStudents: String(source.previewStudents || source.preview_students || "") };
 }
 
 function seatViewGateGas(action: string): Promise<any | null> {
@@ -112,9 +124,39 @@ async function seatViewGateLoad() {
   return seatViewGateLocal();
 }
 
+function seatViewGateUserTokens() {
+  const actor = seatViewGateActor();
+  const out = new Set<string>();
+  [actor.name, actor.email, actor.username].forEach((value) => {
+    if (value) out.add(value);
+    const beforeAt = String(value || "").split("@")[0];
+    if (beforeAt) out.add(beforeAt);
+    const noDigits = beforeAt.replace(/[0-9_.-]+/g, " ").trim();
+    if (noDigits) out.add(noDigits);
+  });
+  return Array.from(out).map(seatViewGateCompact).filter(Boolean);
+}
+
+function seatViewGatePreviewAllowed(config: SeatViewGateConfig) {
+  const preview = String(config.previewStudents || "")
+    .split(/[\n,;]+/)
+    .map((item) => seatViewGateCompact(item))
+    .filter(Boolean);
+  if (!preview.length) return false;
+  const users = seatViewGateUserTokens();
+  return users.some((user) => preview.some((token) => user.includes(token) || token.includes(user)));
+}
+
 function seatViewGateCanView(config: SeatViewGateConfig) {
   if (seatViewGateIsAdmin()) return true;
-  return config.status === "published";
+  if (config.status === "published") return true;
+  if (config.status === "preview" && seatViewGatePreviewAllowed(config)) return true;
+  return false;
+}
+
+function seatViewGateDeniedText(config: SeatViewGateConfig) {
+  if (config.status === "preview") return "Sơ đồ đang ở chế độ xem trước.\A Tài khoản này chưa nằm trong danh sách được xem.";
+  return "Sơ đồ chỗ ngồi đang ở chế độ riêng tư.";
 }
 
 function injectSeatViewGateStyle() {
@@ -132,8 +174,7 @@ function injectSeatViewGateStyle() {
     }
     html.a3-seat-viewer-checking ${SEAT_VIEW_GATE_WINDOW}::after,
     html.a3-seat-viewer-denied ${SEAT_VIEW_GATE_WINDOW}::after{
-      content:attr(data-seat-gate-message);
-      position:absolute;inset:76px 22px 22px;z-index:80;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;border:1px solid #cbd5e1;border-radius:22px;background:rgba(255,255,255,.985);color:#0f172a;font-weight:1000;font-size:18px;line-height:1.5;box-shadow:0 24px 70px rgba(15,23,42,.16);
+      white-space:pre-line;content:attr(data-seat-gate-message);position:absolute;inset:76px 22px 22px;z-index:80;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;border:1px solid #cbd5e1;border-radius:22px;background:rgba(255,255,255,.985);color:#0f172a;font-weight:1000;font-size:18px;line-height:1.5;box-shadow:0 24px 70px rgba(15,23,42,.16);
     }
     .theme-dark html.a3-seat-viewer-checking ${SEAT_VIEW_GATE_WINDOW}::after,
     .theme-dark html.a3-seat-viewer-denied ${SEAT_VIEW_GATE_WINDOW}::after,
@@ -164,7 +205,7 @@ async function seatViewGateCheck() {
   if (seatViewGateCanView(config)) {
     seatViewGateSetState("allowed");
   } else {
-    seatViewGateSetState("denied", "Sơ đồ chỗ ngồi đang ở chế độ riêng tư.");
+    seatViewGateSetState("denied", seatViewGateDeniedText(config));
   }
 }
 
