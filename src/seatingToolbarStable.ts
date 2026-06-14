@@ -35,6 +35,7 @@ function stbInjectStyle() {
       align-items:center!important;
       gap:8px!important;
       flex-wrap:nowrap!important;
+      line-height:1!important;
     }
     ${STB_WIN} .stable-seat-tools button,
     ${STB_WIN} .stable-seat-tools input,
@@ -43,10 +44,29 @@ function stbInjectStyle() {
       min-height:40px!important;
       box-sizing:border-box!important;
       align-self:center!important;
+      margin-top:0!important;
+      margin-bottom:0!important;
+      line-height:1!important;
+      vertical-align:middle!important;
     }
-    ${STB_WIN} [data-seat-pub-lite]{order:1!important;min-width:82px!important;justify-content:center!important;}
-    ${STB_WIN} [data-seat-pub-lite-manage]{order:2!important;min-width:48px!important;justify-content:center!important;}
-    ${STB_WIN} .seat-ctrl-select{order:3!important;min-width:190px!important;align-self:center!important;}
+    ${STB_WIN} [data-seat-pub-lite],
+    ${STB_WIN} [data-seat-pub-lite-manage]{
+      display:inline-flex!important;
+      align-items:center!important;
+      justify-content:center!important;
+      padding-top:0!important;
+      padding-bottom:0!important;
+      position:relative!important;
+      top:2px!important;
+      transform:none!important;
+    }
+    ${STB_WIN} [data-seat-pub-lite]:hover,
+    ${STB_WIN} [data-seat-pub-lite-manage]:hover{
+      transform:none!important;
+    }
+    ${STB_WIN} [data-seat-pub-lite]{order:1!important;min-width:82px!important;}
+    ${STB_WIN} [data-seat-pub-lite-manage]{order:2!important;min-width:48px!important;}
+    ${STB_WIN} .seat-ctrl-select{order:3!important;min-width:190px!important;align-self:center!important;display:flex!important;align-items:center!important;}
     ${STB_WIN} .stable-seat-tools input{order:20!important;min-width:190px!important;}
     ${STB_WIN} button.stb-admin-disabled{
       opacity:.45!important;
@@ -104,6 +124,13 @@ function stbSyncToolbar() {
   const isAdmin = stbIsAdmin();
   tools.querySelectorAll<HTMLButtonElement>("button").forEach((btn) => {
     stbOrderButton(btn);
+    if (btn.dataset.seatPubLite || btn.dataset.seatPubLiteManage) {
+      btn.style.display = "inline-flex";
+      btn.style.alignItems = "center";
+      btn.style.justifyContent = "center";
+      btn.style.position = "relative";
+      btn.style.top = "2px";
+    }
     if (!stbAdminOnlyButton(btn)) return;
     stbSetDisabled(btn, !isAdmin);
   });
