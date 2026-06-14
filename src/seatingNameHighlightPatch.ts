@@ -4,6 +4,9 @@ let seatNameLoop = 0;
 let seatNameCount = 0;
 let seatNameSearchBound = false;
 
+void import("./seatingPreviewPermissions");
+void import("./seatingPreviewPermissionControls");
+
 const SEAT_FULL_NAMES: Record<string, string> = {
   "Hằng": "Nguyễn Thị Hằng",
   "Thiện": "Nguyễn Minh Thiện",
