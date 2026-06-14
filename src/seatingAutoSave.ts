@@ -2,6 +2,8 @@ const SAS_WIN = "#a3k64-seating-window";
 const SAS_MAP_KEY = "a3k64-seating-map-v1";
 const SAS_ROOM_KEY = "a3k64-stable-room-slot-map-v1";
 const SAS_CURRENT_KEY = "a3k64-seating-sheet-current-id-v1";
+const SAS_DIRTY_KEY = "a3k64-seat-local-dirty-until-v1";
+const SAS_SAVING_KEY = "a3k64-seat-autosave-saving-v1";
 const SAS_GAS_URL = String(import.meta.env.VITE_GAS_WEB_APP_URL || "").trim();
 const SAS_DELAY_MS = 1800;
 
@@ -65,6 +67,23 @@ function sasChartId() {
   return id && id !== "default" ? id : "";
 }
 
+function sasMarkDirty(reason = "local-edit", ms = 90000) {
+  const until = Date.now() + ms;
+  localStorage.setItem(SAS_DIRTY_KEY, String(until));
+  document.documentElement.dataset.seatLocalDirty = "1";
+  document.documentElement.dataset.seatLocalDirtyReason = reason;
+  window.dispatchEvent(new CustomEvent("a3k64:seating-local-dirty", { detail: { reason, until } }));
+}
+
+function sasClearDirtySoon(delay = 1800) {
+  window.setTimeout(() => {
+    localStorage.removeItem(SAS_DIRTY_KEY);
+    localStorage.removeItem(SAS_SAVING_KEY);
+    delete document.documentElement.dataset.seatLocalDirty;
+    delete document.documentElement.dataset.seatLocalDirtyReason;
+  }, delay);
+}
+
 function sasReadJson(key: string, fallback: any) {
   try {
     const raw = localStorage.getItem(key);
@@ -86,7 +105,7 @@ function sasSeatsFromDom(): SasSeats | null {
     const side = cell.dataset.side === "right" ? "right" : cell.dataset.side === "left" ? "left" : null;
     const row = Number(cell.dataset.row);
     const seat = Number(cell.dataset.seat);
-    if (!side || !Number.isFinite(row) || !Number.isFinite(seat) || row < 0 || row > 6 || seat < 0 || seat > 3) return;
+    if (!side || !Number.isFinite(row) || row < 0 || row > 6 || !Number.isFinite(seat) || seat < 0 || seat > 3) return;
     const text = (cell.textContent || "").replace(/\s+/g, " ").trim();
     seats[side][row][seat] = text && text !== "Trống" ? text : "";
   });
@@ -192,9 +211,12 @@ async function sasSaveNow() {
   if (!nowSignature || nowSignature === sasLastSignature) return;
   if (sasSaving) {
     sasQueued = true;
+    sasMarkDirty("queued-save", 90000);
     return;
   }
   sasSaving = true;
+  localStorage.setItem(SAS_SAVING_KEY, "1");
+  sasMarkDirty("saving", 90000);
   sasToast("Đang tự lưu sơ đồ...", "save");
   try {
     const layout = sasSnapshot();
@@ -212,12 +234,16 @@ async function sasSaveNow() {
     if (chart?.id) localStorage.setItem(SAS_CURRENT_KEY, String(chart.id));
     sasLastSignature = sasSignature();
     sasToast(`Đã tự lưu lúc ${new Date().toLocaleTimeString("vi-VN")}`, "ok");
-    window.dispatchEvent(new CustomEvent("a3k64:seating-autosaved", { detail: { chart } }));
+    window.dispatchEvent(new CustomEvent("a3k64:seating-autosaved", { detail: { chart, source: "frontend-autosave" } }));
+    sasClearDirtySoon(1800);
   } catch (error) {
     console.error("Tự lưu sơ đồ thất bại:", error);
+    localStorage.removeItem(SAS_SAVING_KEY);
+    sasMarkDirty("save-failed", 120000);
     sasToast("Tự lưu thất bại, bấm Lưu sơ đồ để thử lại.", "error");
   } finally {
     sasSaving = false;
+    localStorage.removeItem(SAS_SAVING_KEY);
     if (sasQueued) {
       sasQueued = false;
       sasSchedule("queued");
@@ -228,6 +254,7 @@ async function sasSaveNow() {
 function sasSchedule(reason = "change") {
   if (!sasCanAutoSave() || !sasWindowVisible()) return;
   if (Date.now() < sasIgnoreUntil) return;
+  sasMarkDirty(reason, 90000);
   const nextSignature = sasSignature();
   if (!nextSignature || nextSignature === sasLastSignature) return;
   clearTimeout(sasTimer);
@@ -253,10 +280,12 @@ function sasBindUserEvents() {
   }, true);
   document.addEventListener("drop", (event) => {
     if (!(event.target as HTMLElement | null)?.closest?.(SAS_WIN)) return;
+    sasMarkDirty("drop", 90000);
     setTimeout(() => sasSchedule("drop"), 220);
   }, true);
   document.addEventListener("dragend", (event) => {
     if (!(event.target as HTMLElement | null)?.closest?.(SAS_WIN)) return;
+    sasMarkDirty("dragend", 90000);
     setTimeout(() => sasSchedule("dragend"), 260);
   }, true);
   document.addEventListener("click", (event) => {
@@ -269,10 +298,12 @@ function sasBindUserEvents() {
     const inSeat = Boolean(target.closest(SAS_WIN));
     const text = sasNorm(target.closest("button")?.textContent || target.textContent || "");
     if (inSeat && (text.includes("random") || text.includes("khoiphuc"))) {
+      sasMarkDirty("button", 90000);
       setTimeout(() => sasSchedule("button"), 260);
       return;
     }
     if (text === "xoa" || text.includes("xoa")) {
+      sasMarkDirty("delete", 90000);
       setTimeout(() => sasSchedule("delete"), 260);
     }
   }, true);
@@ -288,11 +319,12 @@ function sasBoot() {
   window.addEventListener("a3k64:seating-changed", (event: Event) => {
     const detail = (event as CustomEvent).detail || {};
     const source = String(detail?.source || "");
-    if (!source || source.includes("backend") || source.includes("sync") || source.includes("open")) {
+    if (source.includes("backend") || source.includes("sync") || source.includes("open")) {
       sasIgnoreBackendPaint(1800);
       return;
     }
-    if (source.includes("user") || source.includes("drag") || source.includes("random") || source.includes("restore")) {
+    if (!source || source.includes("user") || source.includes("drag") || source.includes("random") || source.includes("restore") || source.includes("delete")) {
+      sasMarkDirty(source || "local-change", 90000);
       setTimeout(() => sasSchedule("event"), 160);
     }
   });
