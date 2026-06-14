@@ -15,8 +15,10 @@ let sndObserver: MutationObserver | null = null;
 let sndModalObserver: MutationObserver | null = null;
 
 function sndPanel() {
-  return document.querySelector<HTMLElement>(`${SND_WIN} .stable-seat-student-panel`)
-    || document.querySelector<HTMLElement>(`${SND_WIN} [class*='student-panel']`);
+  return document.querySelector<HTMLElement>(`${SND_WIN} .stable-seat-students`)
+    || document.querySelector<HTMLElement>(`${SND_WIN} .stable-seat-student-panel`)
+    || document.querySelector<HTMLElement>(`${SND_WIN} [class*='student-panel']`)
+    || document.querySelector<HTMLElement>(`${SND_WIN} [class*='students']`);
 }
 
 function sndBoardWindow() {
@@ -41,6 +43,7 @@ function sndEnsureStudentListBox(panel: HTMLElement) {
 function sndEnsureDock() {
   const panel = sndPanel();
   if (!panel) return null;
+  panel.classList.add("seat-left-panel-split");
   let dock = panel.querySelector<HTMLElement>(`#${SND_DOCK_ID}`);
   if (!dock) {
     dock = document.createElement("div");
@@ -108,14 +111,17 @@ function sndStyle() {
   const style = document.createElement("style");
   style.id = "a3-seat-notification-dock-style";
   style.textContent = `
-    ${SND_WIN} .stable-seat-student-panel{
+    ${SND_WIN} .stable-seat-students.seat-left-panel-split,
+    ${SND_WIN} .stable-seat-student-panel.seat-left-panel-split{
       display:flex!important;
       flex-direction:column!important;
       gap:10px!important;
       align-items:stretch!important;
+      overflow:hidden!important;
     }
     #${SND_DOCK_ID}{
       width:100%;
+      flex:0 0 auto;
       order:-999;
       box-sizing:border-box;
       border:1px solid #cbd5e1;
@@ -123,13 +129,14 @@ function sndStyle() {
       background:rgba(255,255,255,.96);
       padding:10px;
       display:grid;
+      grid-template-rows:auto minmax(0,1fr);
       gap:8px;
-      min-height:142px;
+      min-height:146px;
       max-height:176px;
       overflow:hidden;
       box-shadow:0 12px 26px rgba(15,23,42,.06);
     }
-    #${SND_DOCK_ID}:has(.seat-notice-list:empty){min-height:74px;}
+    #${SND_DOCK_ID}:has(.seat-notice-list:empty){min-height:96px;}
     #${SND_DOCK_ID} .seat-notice-head{
       display:flex;
       align-items:center;
@@ -164,12 +171,13 @@ function sndStyle() {
       display:grid;
       gap:7px;
       overflow:auto;
-      max-height:116px;
+      max-height:118px;
+      min-height:0;
       padding-right:2px;
     }
     #${SND_DOCK_ID} .seat-notice-list:empty::before{
       content:"Chưa có thông báo.";
-      min-height:34px;
+      min-height:42px;
       border:1px dashed #cbd5e1;
       border-radius:13px;
       display:flex;
@@ -188,10 +196,13 @@ function sndStyle() {
       background:rgba(255,255,255,.96);
       padding:12px;
       box-sizing:border-box;
-      overflow:auto;
+      overflow:hidden;
       display:flex;
       flex-direction:column;
       gap:12px;
+    }
+    #${SND_LIST_ID} .stable-seat-student-list{
+      gap:10px!important;
     }
     #${SND_LIST_ID} .stable-seat-student-card,
     #${SND_LIST_ID} [class*='student-card']{
@@ -243,11 +254,12 @@ function sndStyle() {
       backdrop-filter:none!important;
       -webkit-backdrop-filter:none!important;
     }
-    ${SND_WIN}.seat-local-modal-open .stable-seat-main{
+    ${SND_WIN}.seat-local-modal-open .stable-seat-board{
       filter:blur(8px)!important;
       opacity:.62!important;
       transition:filter .16s ease,opacity .16s ease!important;
     }
+    ${SND_WIN}.seat-local-modal-open .stable-seat-students,
     ${SND_WIN}.seat-local-modal-open .stable-seat-student-panel,
     ${SND_WIN}.seat-local-modal-open .stable-seat-tools,
     ${SND_WIN}.seat-local-modal-open .stable-seat-title,
@@ -295,7 +307,7 @@ function sndBoot() {
   sndObserver.observe(document.body, { childList: true, subtree: true });
   sndModalObserver = new MutationObserver(() => sndSyncModalBlur());
   sndModalObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
-  window.setInterval(() => { sndScanToasts(); sndSyncModalBlur(); }, 500);
+  window.setInterval(() => { sndScanToasts(); sndSyncModalBlur(); }, 350);
   window.addEventListener("a3k64:seating-changed", () => setTimeout(sndScanToasts, 60));
   window.addEventListener("a3k64:seating-autosaved", () => setTimeout(sndScanToasts, 60));
 }
