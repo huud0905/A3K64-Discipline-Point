@@ -1,3 +1,1 @@
-void import("./seatingPublishSourceOfTruth");
-
 export {};
