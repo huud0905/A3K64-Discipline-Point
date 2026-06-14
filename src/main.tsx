@@ -89,6 +89,7 @@ import './seatingPublishLitePatch';
 import './seatingToolbarStable';
 import './seatingEditNoRerenderPatch';
 import './seatingAutoSave';
+import './seatingNotificationDock';
 import './seatingViewerGateLitePatch';
 import './seatingPrivacyWording';
 import './seatingPublishCleanUiFix';
