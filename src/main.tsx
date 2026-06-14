@@ -84,6 +84,7 @@ import './seatingOpenFeedbackPatch';
 import './seatingNameHighlightPatch';
 import './seatingCanonicalNamesPatch';
 import './seatingPublishLitePatch';
+import './seatingPublishBackend';
 import './seatingViewerGateLitePatch';
 import './seatingAccessOverlay';
 import './seatingRuntimeControls';
