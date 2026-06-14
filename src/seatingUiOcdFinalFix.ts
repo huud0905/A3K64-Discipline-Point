@@ -4,6 +4,7 @@ const SOF_LIST_ID = "a3-seat-student-list-box";
 const SOF_SELECTORS = [
   "#a3-seat-autosave-toast",
   "#a3k64-seat-opening-toast",
+  ".hard-seat-swap-toast",
   ".seat-ctrl-toast",
   ".seat-docked-toast",
   "#a3-seat-pub-toast",
@@ -71,13 +72,13 @@ function sofLooksLikeLegacyToast(el: HTMLElement) {
   const text = (el.textContent || "").replace(/\s+/g, " ").trim();
   if (!text || text.length > 150) return false;
   const folded = sofFold(text);
-  const seatWords = ["so do", "cho ngoi", "tu luu", "dang luu", "da luu", "dang cho tu luu", "da xoa", "da mo", "da tai", "cau hinh", "backend"];
+  const seatWords = ["so do", "cho ngoi", "doi cho", "da doi", "da chuyen", "tu luu", "dang luu", "da luu", "dang cho tu luu", "da xoa", "da mo", "da tai", "cau hinh", "backend"];
   if (!seatWords.some((word) => folded.includes(word))) return false;
   const css = getComputedStyle(el);
   const rect = el.getBoundingClientRect();
   const fixedOrAbs = css.position === "fixed" || css.position === "absolute";
   const toastSized = rect.width > 80 && rect.width < 520 && rect.height > 22 && rect.height < 120;
-  const nearTop = rect.top >= 0 && rect.top < 150;
+  const nearTop = rect.top >= 0 && rect.top < 170;
   const highLayer = Number(css.zIndex || 0) >= 1000 || (el.getAttribute("style") || "").includes("z-index");
   return fixedOrAbs && toastSized && (nearTop || highLayer);
 }
@@ -128,6 +129,7 @@ function sofScan() {
   Array.from(document.body.children).forEach((child) => {
     if (child instanceof HTMLElement) sofDockToast(child);
   });
+  document.querySelectorAll<HTMLElement>(".hard-seat-swap-toast").forEach(sofDockToast);
   sofNeutralizeBackdrop();
   const win = document.querySelector<HTMLElement>(SOF_WIN);
   if (win) win.classList.toggle("seat-local-modal-open", Boolean(document.querySelector(".seat-pub-lite-backdrop")));
@@ -187,6 +189,7 @@ function sofStyle() {
     #${SOF_DOCK_ID} .seat-docked-toast,
     #${SOF_DOCK_ID} #a3-seat-autosave-toast,
     #${SOF_DOCK_ID} #a3k64-seat-opening-toast,
+    #${SOF_DOCK_ID} .hard-seat-swap-toast,
     #${SOF_DOCK_ID} .seat-ctrl-toast,
     #${SOF_DOCK_ID} #a3-seat-pub-toast,
     #${SOF_DOCK_ID} #a3-spt-toast,
@@ -216,10 +219,26 @@ function sofStyle() {
       opacity:1!important;
     }
     ${SOF_WIN}.seat-local-modal-open .stable-seat-board{
-      filter:blur(8px)!important;
-      opacity:.62!important;
+      position:relative!important;
+      filter:none!important;
+      opacity:1!important;
+      overflow:hidden!important;
+    }
+    ${SOF_WIN}.seat-local-modal-open .stable-seat-board > *{
+      filter:blur(14px) grayscale(.18)!important;
+      opacity:.16!important;
       transition:filter .16s ease,opacity .16s ease!important;
     }
+    ${SOF_WIN}.seat-local-modal-open .stable-seat-board::before{
+      content:""!important;
+      position:absolute!important;
+      inset:0!important;
+      z-index:80!important;
+      border-radius:18px!important;
+      background:rgba(255,255,255,.92)!important;
+      pointer-events:none!important;
+    }
+    .seat-pub-lite-modal{position:relative!important;z-index:1000002!important;}
     .seat-pub-lite-backdrop{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
     .seat-pub-lite-backdrop::before,.seat-pub-lite-backdrop::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:transparent!important;}
     .theme-dark #${SOF_DOCK_ID},html.a3-overlay-dark #${SOF_DOCK_ID},.theme-dark #${SOF_LIST_ID},html.a3-overlay-dark #${SOF_LIST_ID}{background:rgba(15,23,42,.96)!important;border-color:#334155!important;box-shadow:0 12px 30px rgba(0,0,0,.24)!important;}
