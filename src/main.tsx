@@ -87,6 +87,7 @@ import './seatingNameHighlightPatch';
 import './seatingCanonicalNamesPatch';
 import './seatingPublishLitePatch';
 import './seatingToolbarStable';
+import './seatingEditNoRerenderPatch';
 import './seatingViewerGateLitePatch';
 import './seatingPrivacyWording';
 import './seatingPublishCleanUiFix';
