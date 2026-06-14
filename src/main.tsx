@@ -90,6 +90,7 @@ import './seatingToolbarStable';
 import './seatingEditNoRerenderPatch';
 import './seatingAutoSave';
 import './seatingNotificationDock';
+import './seatingUiOcdFinalFix';
 import './seatingViewerGateLitePatch';
 import './seatingPrivacyWording';
 import './seatingPublishCleanUiFix';
