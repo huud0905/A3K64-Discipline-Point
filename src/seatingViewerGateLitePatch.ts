@@ -10,7 +10,7 @@ let seatViewGuardBound = false;
 let seatViewLastAllowed = false;
 
 type SeatViewGateStatus = "private" | "preview" | "published";
-type SeatViewGateConfig = { status: SeatViewGateStatus; previewStudents: string; publishAt: string; chartId: string; updatedAt?: string; updatedBy?: string };
+type SeatViewGateConfig = { status: SeatViewGateStatus; previewStudents: string; publishAt: string; chartId: string; updatedAt?: string; updatedBy?: string; backendOk?: boolean };
 type SeatViewGateMode = "admin" | "preview-editor" | "public-viewer" | "denied";
 
 function seatViewGateWindow() {
@@ -71,25 +71,12 @@ function seatViewGateIsAdmin() {
 function seatViewGateCleanStatus(value: unknown): SeatViewGateStatus {
   const raw = seatViewGateCompact(value);
   if (raw === "preview" || raw === "xemtruoc") return "preview";
-  if (raw === "published" || raw === "publish" || raw === "public" || raw === "congbo" || raw === "congkhai") return "published";
+  if (raw === "published" || raw === "publish" || raw === "public" || raw === "congbo" || raw === "congkhai" || raw === "scheduled" || raw === "hengio") return "published";
   return "private";
 }
 
-function seatViewGateLocal(): SeatViewGateConfig {
-  const chartId = seatViewGateCurrentChartId();
-  try {
-    const data = JSON.parse(localStorage.getItem(seatViewGateLocalKey(chartId)) || localStorage.getItem(SEAT_VIEW_GATE_LOCAL_KEY) || "{}");
-    return {
-      chartId,
-      status: seatViewGateCleanStatus(data.status),
-      previewStudents: String(data.previewStudents || data.preview_students || ""),
-      publishAt: String(data.publishAt || data.publish_at || ""),
-      updatedAt: data.updatedAt || data.updated_at,
-      updatedBy: data.updatedBy || data.updated_by,
-    };
-  } catch {
-    return { chartId, status: "private", previewStudents: "", publishAt: "" };
-  }
+function seatViewGatePrivate(chartId = seatViewGateCurrentChartId(), backendOk = false): SeatViewGateConfig {
+  return { chartId, status: "private", previewStudents: "", publishAt: "", backendOk };
 }
 
 function seatViewGateNormalize(raw: any): SeatViewGateConfig | null {
@@ -103,19 +90,12 @@ function seatViewGateNormalize(raw: any): SeatViewGateConfig | null {
     publishAt: String(source.publishAt || source.publish_at || ""),
     updatedAt: source.updatedAt || source.updated_at,
     updatedBy: source.updatedBy || source.updated_by,
+    backendOk: true,
   };
 }
 
-function seatViewGatePreferLocal(remote: SeatViewGateConfig | null, local: SeatViewGateConfig) {
-  if (!remote) return local;
-  const localHasAccess = local.status !== "private" || Boolean(local.previewStudents || local.publishAt);
-  const remoteEmptyPrivate = remote.status === "private" && !remote.previewStudents && !remote.publishAt;
-  if (remoteEmptyPrivate && localHasAccess) return local;
-  return remote;
-}
-
 function seatViewGateGas(action: string): Promise<any | null> {
-  if (!SEAT_VIEW_GATE_GAS_URL) return Promise.resolve(null);
+  if (!SEAT_VIEW_GATE_GAS_URL) return Promise.reject(new Error("Thiếu VITE_GAS_WEB_APP_URL"));
   return new Promise((resolve, reject) => {
     const callbackName = `__a3k64SeatGate_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const callbacks = window as typeof window & Record<string, unknown>;
@@ -158,17 +138,17 @@ function seatViewGateGas(action: string): Promise<any | null> {
 
 async function seatViewGateLoad() {
   const chartId = seatViewGateCurrentChartId();
-  const local = seatViewGateLocal();
   try {
     const response = await seatViewGateGas("getSeatingAccess");
     const remote = seatViewGateNormalize(response);
-    const config = seatViewGatePreferLocal(remote, local);
-    localStorage.setItem(seatViewGateLocalKey(chartId), JSON.stringify(config));
-    return config;
+    if (remote) {
+      localStorage.setItem(seatViewGateLocalKey(chartId), JSON.stringify(remote));
+      return remote;
+    }
   } catch (error) {
-    console.warn("Không đọc được getSeatingAccess, dùng local:", error);
+    console.warn("Không đọc được quyền công bố từ backend, chặn xem để an toàn:", error);
   }
-  return local;
+  return seatViewGatePrivate(chartId, false);
 }
 
 function seatViewGateUserTokens() {
@@ -200,12 +180,14 @@ function seatViewGatePublishPassed(config: SeatViewGateConfig) {
 
 function seatViewGateMode(config: SeatViewGateConfig): SeatViewGateMode {
   if (seatViewGateIsAdmin()) return "admin";
+  if (!config.backendOk) return "denied";
   if (seatViewGatePreviewAllowed(config)) return "preview-editor";
   if (config.status === "published" && seatViewGatePublishPassed(config)) return "public-viewer";
   return "denied";
 }
 
 function seatViewGateDeniedText(config: SeatViewGateConfig) {
+  if (!config.backendOk) return "Không xác minh được quyền xem từ backend.\nVui lòng tải lại hoặc báo quản trị viên.";
   if (config.status === "published" && config.publishAt && !seatViewGatePublishPassed(config)) return "Sơ đồ đã được lên lịch công bố.\nMở lúc " + new Date(config.publishAt).toLocaleString("vi-VN") + ".";
   if (config.status === "preview") return "Sơ đồ đang ở chế độ xem trước.\nTài khoản này chưa nằm trong danh sách được xem.";
   return "Sơ đồ chỗ ngồi đang ở chế độ riêng tư.";
@@ -330,6 +312,7 @@ function bootSeatViewGate() {
     }
   }, 15000);
   window.addEventListener("a3k64:seating-changed", () => setTimeout(() => void seatViewGateCheck(), 80));
+  window.addEventListener("a3k64:seating-access-updated", () => setTimeout(() => void seatViewGateCheck(), 80));
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bootSeatViewGate);
