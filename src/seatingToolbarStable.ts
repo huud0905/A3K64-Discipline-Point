@@ -4,6 +4,12 @@ let stbTimer = 0;
 
 type StbMode = "admin" | "preview" | "viewer";
 
+type StbAccess = {
+  status: string;
+  preview: string;
+  publishAt: string;
+};
+
 function stbActorRole() {
   try {
     const session = JSON.parse(localStorage.getItem("a3k64-login-session-v1") || "null");
@@ -39,7 +45,8 @@ function stbInjectStyle() {
   style.id = "a3-seat-toolbar-stable-style";
   style.textContent = `
     ${STB_WIN} .seat-pub-lite-btn.stb-admin-disabled,
-    ${STB_WIN} .seat-ctrl-btn.stb-admin-disabled{
+    ${STB_WIN} .seat-ctrl-btn.stb-admin-disabled,
+    ${STB_WIN} button.stb-admin-disabled{
       opacity:.45!important;
       filter:grayscale(.25)!important;
       cursor:not-allowed!important;
@@ -47,9 +54,14 @@ function stbInjectStyle() {
       background:#f1f5f9!important;
       color:#64748b!important;
       border-color:#cbd5e1!important;
+      transform:none!important;
     }
     .theme-dark ${STB_WIN} .seat-pub-lite-btn.stb-admin-disabled,
-    html.a3-overlay-dark ${STB_WIN} .seat-pub-lite-btn.stb-admin-disabled{
+    .theme-dark ${STB_WIN} .seat-ctrl-btn.stb-admin-disabled,
+    .theme-dark ${STB_WIN} button.stb-admin-disabled,
+    html.a3-overlay-dark ${STB_WIN} .seat-pub-lite-btn.stb-admin-disabled,
+    html.a3-overlay-dark ${STB_WIN} .seat-ctrl-btn.stb-admin-disabled,
+    html.a3-overlay-dark ${STB_WIN} button.stb-admin-disabled{
       background:#111827!important;
       color:#64748b!important;
       border-color:#334155!important;
@@ -63,7 +75,21 @@ function stbEscape(v: unknown) {
   return String(v || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
 }
 
-function stbLocalAccess() {
+function stbFold(v: unknown) {
+  return String(v || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/[\s_-]+/g, "");
+}
+
+function stbStatusText(status: string, publishAt = "") {
+  const raw = stbFold(status);
+  if (["published", "publish", "public", "congbo", "congkhai", "scheduled", "hengio", "dahengio"].includes(raw)) {
+    const time = new Date(publishAt || "").getTime();
+    return Number.isFinite(time) && time > Date.now() ? "Hẹn giờ công bố" : "Đã công bố";
+  }
+  if (raw === "preview" || raw === "xemtruoc") return "Xem trước";
+  return "Riêng tư";
+}
+
+function stbLocalAccess(): StbAccess {
   const chartId = localStorage.getItem("a3k64-seating-sheet-current-id-v1") || "default";
   try {
     const data = JSON.parse(localStorage.getItem(`a3k64-seating-publish-lite-v1:${chartId}`) || "{}");
@@ -96,7 +122,7 @@ function stbOpenPublishModal() {
   backdrop.innerHTML = `
     <div class="seat-pub-lite-modal" role="dialog" aria-modal="true">
       <div class="seat-pub-lite-head">
-        <div class="seat-pub-lite-title"><h3>Cài đặt công bố sơ đồ</h3><p>${stbEscape(document.querySelector<HTMLElement>(`${STB_WIN} .seat-ctrl-trigger span`)?.textContent || "Sơ đồ hiện tại")}</p><div class="seat-pub-lite-meta">Bản ổn định: lưu bắt buộc lên backend.</div></div>
+        <div class="seat-pub-lite-title"><h3>Cài đặt công bố sơ đồ</h3><p>${stbEscape(document.querySelector<HTMLElement>(`${STB_WIN} .seat-ctrl-trigger span`)?.textContent || "Sơ đồ hiện tại")}</p><div class="seat-pub-lite-meta">Lưu trực tiếp lên backend.</div></div>
         <span class="seat-pub-lite-badge">${publishEnabled ? (schedule ? "Hẹn giờ công bố" : "Sẽ công bố") : uiMode === "preview_publish" ? "Xem trước" : "Riêng tư"}</span>
       </div>
       <div class="seat-pub-lite-grid">
@@ -145,30 +171,64 @@ function stbOpenPublishModal() {
 
 function stbOpenManageModal() {
   document.querySelector(".seat-pub-lite-backdrop")?.remove();
+  const access = stbLocalAccess();
+  const statusText = stbStatusText(access.status, access.publishAt);
   const backdrop = document.createElement("div");
   backdrop.className = "seat-pub-lite-backdrop";
-  backdrop.innerHTML = `<div class="seat-pub-lite-modal"><div class="seat-pub-lite-title"><h3>Quản lý công bố</h3><p>${stbEscape(document.querySelector<HTMLElement>(`${STB_WIN} .seat-ctrl-trigger span`)?.textContent || "Sơ đồ hiện tại")}</p></div><div class="seat-pub-lite-manage-row"><div><div class="seat-pub-lite-manage-title">Trạng thái hiện tại</div><div class="seat-pub-lite-manage-sub">Dùng backend làm nguồn quyền xem.</div></div><span class="seat-pub-lite-status-pill">${stbEscape(stbLocalAccess().status)}</span></div><div class="seat-pub-lite-manage-actions"><button class="seat-pub-lite-mini-btn" data-edit>Sửa cài đặt</button><button class="seat-pub-lite-mini-btn primary" data-publish-now>Công bố ngay</button><button class="seat-pub-lite-mini-btn" data-preview>Chỉ xem trước</button><button class="seat-pub-lite-mini-btn" data-private>Đưa về riêng tư</button></div><div class="seat-pub-lite-actions"><button data-close>Đóng</button></div></div>`;
+  backdrop.innerHTML = `<div class="seat-pub-lite-modal"><div class="seat-pub-lite-title"><h3>Quản lý công bố</h3><p>${stbEscape(document.querySelector<HTMLElement>(`${STB_WIN} .seat-ctrl-trigger span`)?.textContent || "Sơ đồ hiện tại")}</p></div><div class="seat-pub-lite-manage-row"><div><div class="seat-pub-lite-manage-title">Trạng thái hiện tại</div></div><span class="seat-pub-lite-status-pill">${stbEscape(statusText)}</span></div><div class="seat-pub-lite-manage-actions"><button class="seat-pub-lite-mini-btn" data-edit>Sửa cài đặt</button><button class="seat-pub-lite-mini-btn primary" data-publish-now>Công bố ngay</button><button class="seat-pub-lite-mini-btn" data-preview>Chỉ xem trước</button><button class="seat-pub-lite-mini-btn" data-private>Đưa về riêng tư</button></div><div class="seat-pub-lite-actions"><button data-close>Đóng</button></div></div>`;
   document.body.appendChild(backdrop);
   backdrop.querySelector("[data-close]")?.addEventListener("click", () => backdrop.remove());
   backdrop.addEventListener("click", (e) => { if (e.target === backdrop) backdrop.remove(); });
   backdrop.querySelector("[data-edit]")?.addEventListener("click", () => { backdrop.remove(); stbOpenPublishModal(); });
 }
 
-function stbButton(label: string, adminOnly: boolean, onClick: () => void) {
+function stbMakeButton(label: string, onClick: () => void) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "seat-pub-lite-btn";
   btn.textContent = label;
+  btn.dataset.stbOwned = "1";
   if (label === "Công bố") btn.dataset.seatPubLite = "stable";
   if (label === "QL") btn.dataset.seatPubLiteManage = "stable";
-  if (adminOnly && stbMode() !== "admin") {
-    btn.disabled = true;
-    btn.classList.add("stb-admin-disabled");
-    btn.title = "Chỉ quản trị viên được dùng công cụ này";
-  } else {
-    btn.addEventListener("click", onClick);
+  btn.addEventListener("click", onClick);
+  return btn;
+}
+
+function stbSetDisabled(btn: HTMLButtonElement, disabled: boolean) {
+  btn.disabled = disabled;
+  btn.classList.toggle("stb-admin-disabled", disabled);
+  btn.title = disabled ? "Chỉ quản trị viên được dùng công cụ này" : "";
+}
+
+function stbEnsureStableButton(tools: HTMLElement, selector: string, label: string, onClick: () => void, before: Element | null) {
+  let btn = tools.querySelector<HTMLButtonElement>(selector);
+  if (!btn || btn.dataset.stbOwned !== "1") {
+    const next = stbMakeButton(label, onClick);
+    if (btn) btn.replaceWith(next);
+    else tools.insertBefore(next, before || tools.firstChild);
+    btn = next;
   }
   return btn;
+}
+
+function stbNormText(v: unknown) {
+  return String(v || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/\s+/g, " ").trim();
+}
+
+function stbIsAdminOnlyButton(btn: HTMLButtonElement) {
+  const text = stbNormText(btn.textContent);
+  return text.includes("tao so do moi") || text.includes("khoi phuc") || text === "random";
+}
+
+function stbDimAdminOnlyTools(tools: HTMLElement, mode: StbMode) {
+  const disabled = mode !== "admin";
+  tools.querySelectorAll<HTMLButtonElement>("button").forEach((btn) => {
+    if (btn.dataset.seatPubLite || btn.dataset.seatPubLiteManage) return;
+    if (!stbIsAdminOnlyButton(btn)) return;
+    btn.disabled = disabled;
+    btn.classList.toggle("stb-admin-disabled", disabled);
+    btn.title = disabled ? "Chỉ quản trị viên được dùng công cụ này" : "";
+  });
 }
 
 function stbSyncToolbar() {
@@ -177,25 +237,13 @@ function stbSyncToolbar() {
   const mode = stbMode();
   const tools = document.querySelector<HTMLElement>(`${STB_WIN} .stable-seat-tools`);
   if (!tools) return;
-  const shouldShow = mode === "admin" || mode === "preview";
-  let pub = tools.querySelector<HTMLButtonElement>("[data-seat-pub-lite]");
-  let manage = tools.querySelector<HTMLButtonElement>("[data-seat-pub-lite-manage]");
-  if (!shouldShow) return;
   const search = tools.querySelector("input");
-  if (!pub) {
-    pub = stbButton("Công bố", true, stbOpenPublishModal);
-    tools.insertBefore(pub, search || tools.firstChild);
-  }
-  if (!manage) {
-    manage = stbButton("QL", true, stbOpenManageModal);
-    tools.insertBefore(manage, search || tools.firstChild);
-  }
-  [pub, manage].forEach((btn) => {
-    const disabled = mode !== "admin";
-    btn.disabled = disabled;
-    btn.classList.toggle("stb-admin-disabled", disabled);
-    btn.title = disabled ? "Chỉ quản trị viên được dùng công cụ này" : "";
-  });
+  const pub = stbEnsureStableButton(tools, "[data-seat-pub-lite]", "Công bố", stbOpenPublishModal, search || tools.firstChild);
+  const manage = stbEnsureStableButton(tools, "[data-seat-pub-lite-manage]", "QL", stbOpenManageModal, search || tools.firstChild);
+  const adminDisabled = mode !== "admin";
+  stbSetDisabled(pub, adminDisabled);
+  stbSetDisabled(manage, adminDisabled);
+  stbDimAdminOnlyTools(tools, mode);
 }
 
 function stbBoot() {
