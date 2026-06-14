@@ -81,6 +81,7 @@ import './seatingRoleGate';
 import './seatingInteractionToolsPatch';
 import './seatingSeatSwapHardPatch';
 import './seatingRestoreAndControlsPatch';
+import './seatingBackendActiveSync';
 import './seatingOpenFeedbackPatch';
 import './seatingNameHighlightPatch';
 import './seatingCanonicalNamesPatch';
