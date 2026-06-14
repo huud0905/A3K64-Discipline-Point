@@ -88,6 +88,7 @@ import './seatingPublishBackendOnly';
 import './seatingToolbarStable';
 import './seatingViewerGateLitePatch';
 import './seatingPrivacyWording';
+import './seatingPublishCleanUiFix';
 import './seatingAccessOverlay';
 import './seatingRuntimeControls';
 
