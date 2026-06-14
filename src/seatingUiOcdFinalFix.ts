@@ -5,6 +5,7 @@ const SOF_SELECTORS = [
   "#a3-seat-autosave-toast",
   "#a3k64-seat-opening-toast",
   ".seat-ctrl-toast",
+  ".seat-docked-toast",
   "#a3-seat-pub-toast",
   "#a3-spt-toast",
   "#a3-seat-privacy-toast",
@@ -13,9 +14,21 @@ const SOF_SELECTORS = [
 let sofBooted = false;
 let sofObserver: MutationObserver | null = null;
 
+function sofFold(v: unknown) {
+  return String(v || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+}
+
 function sofPanel() {
   return document.querySelector<HTMLElement>(`${SOF_WIN} .stable-seat-students`)
     || document.querySelector<HTMLElement>(`${SOF_WIN} .stable-seat-student-panel`);
+}
+
+function sofSeatVisible() {
+  const win = document.querySelector<HTMLElement>(SOF_WIN);
+  if (!win) return false;
+  const rect = win.getBoundingClientRect();
+  const css = getComputedStyle(win);
+  return rect.width > 0 && rect.height > 0 && css.display !== "none" && css.visibility !== "hidden";
 }
 
 function sofEnsureBoxes() {
@@ -46,8 +59,31 @@ function sofEnsureBoxes() {
   return dock.querySelector<HTMLElement>("[data-notice-list]") || dock;
 }
 
-function sofIsToast(el: HTMLElement) {
+function sofIsKnownToast(el: HTMLElement) {
   return SOF_SELECTORS.some((selector) => el.matches(selector));
+}
+
+function sofLooksLikeLegacyToast(el: HTMLElement) {
+  if (!sofSeatVisible()) return false;
+  if (el.closest(`#${SOF_DOCK_ID}`)) return false;
+  if (el.matches(".seat-pub-lite-backdrop,.seat-pub-lite-modal,.seat-create-backdrop,.seat-create-modal")) return false;
+  if (el.closest(".seat-pub-lite-backdrop,.seat-pub-lite-modal,.seat-create-backdrop,.seat-create-modal")) return false;
+  const text = (el.textContent || "").replace(/\s+/g, " ").trim();
+  if (!text || text.length > 150) return false;
+  const folded = sofFold(text);
+  const seatWords = ["so do", "cho ngoi", "tu luu", "dang luu", "da luu", "dang cho tu luu", "da xoa", "da mo", "da tai", "cau hinh", "backend"];
+  if (!seatWords.some((word) => folded.includes(word))) return false;
+  const css = getComputedStyle(el);
+  const rect = el.getBoundingClientRect();
+  const fixedOrAbs = css.position === "fixed" || css.position === "absolute";
+  const toastSized = rect.width > 80 && rect.width < 520 && rect.height > 22 && rect.height < 120;
+  const nearTop = rect.top >= 0 && rect.top < 150;
+  const highLayer = Number(css.zIndex || 0) >= 1000 || (el.getAttribute("style") || "").includes("z-index");
+  return fixedOrAbs && toastSized && (nearTop || highLayer);
+}
+
+function sofIsToast(el: HTMLElement) {
+  return sofIsKnownToast(el) || sofLooksLikeLegacyToast(el);
 }
 
 function sofAddClose(el: HTMLElement) {
@@ -70,9 +106,18 @@ function sofDockToast(el: HTMLElement) {
   const list = sofEnsureBoxes();
   if (!list) return;
   el.classList.add("seat-docked-toast");
-  el.removeAttribute("style");
+  el.style.cssText = "";
   sofAddClose(el);
   list.appendChild(el);
+}
+
+function sofNeutralizeBackdrop() {
+  document.querySelectorAll<HTMLElement>(".seat-pub-lite-backdrop").forEach((backdrop) => {
+    backdrop.style.background = "transparent";
+    backdrop.style.backdropFilter = "none";
+    (backdrop.style as any).webkitBackdropFilter = "none";
+    backdrop.style.pointerEvents = "auto";
+  });
 }
 
 function sofScan() {
@@ -80,6 +125,10 @@ function sofScan() {
   SOF_SELECTORS.forEach((selector) => {
     document.querySelectorAll<HTMLElement>(selector).forEach(sofDockToast);
   });
+  Array.from(document.body.children).forEach((child) => {
+    if (child instanceof HTMLElement) sofDockToast(child);
+  });
+  sofNeutralizeBackdrop();
   const win = document.querySelector<HTMLElement>(SOF_WIN);
   if (win) win.classList.toggle("seat-local-modal-open", Boolean(document.querySelector(".seat-pub-lite-backdrop")));
 }
@@ -100,6 +149,8 @@ function sofStyle() {
       flex-direction:column!important;
       gap:10px!important;
       overflow:hidden!important;
+      filter:none!important;
+      opacity:1!important;
     }
     #${SOF_DOCK_ID},#${SOF_LIST_ID}{
       width:100%!important;
@@ -155,12 +206,22 @@ function sofStyle() {
     #${SOF_DOCK_ID} .seat-docked-toast > span:last-of-type{grid-column:2!important;}
     #${SOF_LIST_ID} .stable-seat-student-list{gap:10px!important;}
     #${SOF_LIST_ID} .stable-seat-student-card,#${SOF_LIST_ID} [class*='student-card']{margin-bottom:3px!important;}
-    ${SOF_WIN}.seat-local-modal-open .stable-seat-board,
-    ${SOF_WIN}.seat-local-modal-open .stable-seat-main{filter:blur(8px)!important;opacity:.62!important;transition:filter .16s ease,opacity .16s ease!important;}
+    ${SOF_WIN}.seat-local-modal-open .stable-seat-main,
+    ${SOF_WIN}.seat-local-modal-open .stable-seat-body,
     ${SOF_WIN}.seat-local-modal-open .stable-seat-students,
     ${SOF_WIN}.seat-local-modal-open .stable-seat-student-panel,
-    ${SOF_WIN}.seat-local-modal-open .stable-seat-tools{filter:none!important;opacity:1!important;}
+    ${SOF_WIN}.seat-local-modal-open .stable-seat-tools,
+    ${SOF_WIN}.seat-local-modal-open .stable-seat-title{
+      filter:none!important;
+      opacity:1!important;
+    }
+    ${SOF_WIN}.seat-local-modal-open .stable-seat-board{
+      filter:blur(8px)!important;
+      opacity:.62!important;
+      transition:filter .16s ease,opacity .16s ease!important;
+    }
     .seat-pub-lite-backdrop{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
+    .seat-pub-lite-backdrop::before,.seat-pub-lite-backdrop::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:transparent!important;}
     .theme-dark #${SOF_DOCK_ID},html.a3-overlay-dark #${SOF_DOCK_ID},.theme-dark #${SOF_LIST_ID},html.a3-overlay-dark #${SOF_LIST_ID}{background:rgba(15,23,42,.96)!important;border-color:#334155!important;box-shadow:0 12px 30px rgba(0,0,0,.24)!important;}
     .theme-dark #${SOF_DOCK_ID} .seat-notice-head,html.a3-overlay-dark #${SOF_DOCK_ID} .seat-notice-head{color:#f8fafc!important;}
   `;
@@ -183,7 +244,7 @@ function sofBoot() {
     sofScan();
   });
   sofObserver.observe(document.body, { childList: true, subtree: true });
-  window.setInterval(sofScan, 250);
+  window.setInterval(sofScan, 180);
   window.addEventListener("a3k64:seating-changed", () => setTimeout(sofScan, 40));
   window.addEventListener("a3k64:seating-autosaved", () => setTimeout(sofScan, 40));
 }
