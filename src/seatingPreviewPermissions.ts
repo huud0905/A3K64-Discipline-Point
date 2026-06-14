@@ -12,6 +12,8 @@ type SppMode = "view" | "edit";
 type SppPerm = "move" | "save" | "create" | "restore" | "random" | "export";
 type SppAccess = { chartId: string; chartTitle: string; status: SppStatus; previewStudents: string; publishAt: string; previewMode: SppMode; previewPermissions: Partial<Record<SppPerm, boolean>>; updatedAt?: string; updatedBy?: string; backendOk?: boolean };
 
+type SppChart = { id?: string; title?: string; active?: boolean };
+
 const SPP_PERMS: Array<{ key: SppPerm; label: string }> = [
   { key: "move", label: "Đổi chỗ / kéo thả" },
   { key: "save", label: "Lưu sơ đồ" },
@@ -21,18 +23,26 @@ const SPP_PERMS: Array<{ key: SppPerm; label: string }> = [
   { key: "export", label: "Xuất/in" },
 ];
 
-function sppChartId() { return localStorage.getItem(SPP_CHART_KEY) || "default"; }
-function sppTitle() { return document.querySelector<HTMLElement>(`${SPP_WIN} .seat-ctrl-trigger span`)?.textContent?.trim() || "Sơ đồ hiện tại"; }
-function sppKey(id = sppChartId()) { return `${SPP_KEY}:${id || "default"}`; }
+function sppModalTitle() { return document.querySelector<HTMLElement>(".seat-pub-lite-backdrop .seat-pub-lite-title p")?.textContent?.trim() || ""; }
+function sppChartId() { return localStorage.getItem(SPP_CHART_KEY) || ""; }
+function sppTitle() { return sppModalTitle() || document.querySelector<HTMLElement>(`${SPP_WIN} .seat-ctrl-trigger span`)?.textContent?.trim() || "Sơ đồ hiện tại"; }
+function sppKey(id = sppChartId()) { return `${SPP_KEY}:${id || sppTitle() || "default"}`; }
 function sppFold(v: unknown) { return String(v || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/[^a-z0-9@._-]+/g, " ").trim(); }
 function sppCompact(v: unknown) { return sppFold(v).replace(/\s+/g, ""); }
 function sppStatus(v: unknown): SppStatus { const x = sppCompact(v); if (x === "preview" || x === "xemtruoc") return "preview"; if (["published", "publish", "public", "congbo", "congkhai", "scheduled", "hengio"].includes(x)) return "published"; return "private"; }
 function sppMode(v: unknown): SppMode { const x = sppCompact(v); return x === "edit" || x === "sua" ? "edit" : "view"; }
 function sppHtml(v: unknown) { return String(v || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;"); }
 function sppInputToIso(v: string) { if (!v) return ""; const d = new Date(v); return Number.isFinite(d.getTime()) ? d.toISOString() : ""; }
-function sppDateMs(v: string) { const t = new Date(v || "").getTime(); return Number.isFinite(t) ? t : 0; }
 
-function sppActor() { try { const s = JSON.parse(localStorage.getItem("a3k64-login-session-v1") || "null"); const u = s?.user || s || {}; return { name: String(u.name || u.fullName || u.studentName || u.displayName || u.hoTen || u.username || ""), email: String(u.email || ""), username: String(u.username || ""), role: String(u.role || u.userRole || "") }; } catch { return { name: "", email: "", username: "", role: "" }; } }
+function sppActor() {
+  try {
+    const s = JSON.parse(localStorage.getItem("a3k64-login-session-v1") || "null");
+    const u = s?.user || s || {};
+    return { name: String(u.name || u.fullName || u.studentName || u.displayName || u.hoTen || u.username || ""), email: String(u.email || ""), username: String(u.username || ""), role: String(u.role || u.userRole || "") };
+  } catch {
+    return { name: "", email: "", username: "", role: "" };
+  }
+}
 function sppAdmin() { const role = sppFold(sppActor().role).replace(/\s+/g, "_"); return role.includes("gvcn") || role.includes("lop_truong") || role.includes("bi_thu") || role.includes("admin"); }
 
 function sppParsePerms(raw: unknown): Partial<Record<SppPerm, boolean>> {
@@ -55,7 +65,7 @@ function sppLocal(): SppAccess {
   try { return sppNormalize(JSON.parse(localStorage.getItem(sppKey()) || "{}"), false) || { chartId: sppChartId(), chartTitle: sppTitle(), status: "private", previewStudents: "", publishAt: "", previewMode: "view", previewPermissions: {} }; }
   catch { return { chartId: sppChartId(), chartTitle: sppTitle(), status: "private", previewStudents: "", publishAt: "", previewMode: "view", previewPermissions: {} }; }
 }
-function sppSaveLocal(a: SppAccess) { localStorage.setItem(sppKey(a.chartId), JSON.stringify(a)); }
+function sppSaveLocal(a: SppAccess) { localStorage.setItem(sppKey(a.chartId), JSON.stringify(a)); if (a.chartId && a.chartId !== "default") localStorage.setItem(SPP_CHART_KEY, a.chartId); }
 
 function sppGas(action: string, payload?: unknown): Promise<any> {
   if (!SPP_GAS) return Promise.reject(new Error("Thiếu VITE_GAS_WEB_APP_URL"));
@@ -107,6 +117,24 @@ function sppEnhanceModal() {
   panel.querySelectorAll<HTMLInputElement>("[data-spp-mode]").forEach((r) => r.addEventListener("change", () => { const edit = modal.querySelector<HTMLInputElement>("[data-spp-mode='edit']")?.checked; const opt = modal.querySelector<HTMLElement>("[data-spp-edit-options]"); if (opt) opt.style.display = edit ? "grid" : "none"; }));
 }
 
+async function sppResolveRealChart(input: SppAccess): Promise<SppAccess> {
+  const title = String(input.chartTitle || sppTitle()).trim();
+  const currentId = String(input.chartId || sppChartId()).trim();
+  if (currentId && currentId !== "default") return { ...input, chartId: currentId, chartTitle: title || input.chartTitle };
+  try {
+    const res = await sppGas("listSeatingCharts", {});
+    const charts: SppChart[] = res?.charts || res?.data?.charts || [];
+    const titleKey = sppCompact(title);
+    const exact = charts.find((c) => sppCompact(c.title) === titleKey);
+    const active = charts.find((c) => c.active);
+    const fallback = exact || active || charts[0];
+    if (fallback?.id) return { ...input, chartId: String(fallback.id), chartTitle: String(fallback.title || title || input.chartTitle) };
+  } catch (error) {
+    console.warn("Không lấy được danh sách sơ đồ để resolve id:", error);
+  }
+  return { ...input, chartId: "", chartTitle: title || input.chartTitle };
+}
+
 function sppReadModal(): SppAccess | null {
   const modal = document.querySelector<HTMLElement>(".seat-pub-lite-backdrop .seat-pub-lite-modal");
   if (!modal || !modal.querySelector("button[data-save]")) return null;
@@ -132,8 +160,12 @@ function sppManage(action: string): SppAccess {
 }
 
 async function sppSave(a: SppAccess) {
-  const next = { ...a, previewPermissions: a.previewMode === "edit" ? a.previewPermissions : {}, updatedAt: new Date().toISOString(), updatedBy: sppActor().name };
-  const res = await sppGas("saveSeatingAccess", { ...next, preview_mode: next.previewMode, preview_permissions: JSON.stringify(next.previewPermissions), actor: sppActor() });
+  const resolved = await sppResolveRealChart(a);
+  const next = { ...resolved, previewPermissions: resolved.previewMode === "edit" ? resolved.previewPermissions : {}, updatedAt: new Date().toISOString(), updatedBy: sppActor().name };
+  const payload: any = { ...next, preview_mode: next.previewMode, preview_permissions: JSON.stringify(next.previewPermissions), actor: sppActor() };
+  if (!payload.chartId || payload.chartId === "default") delete payload.chartId;
+  if (!payload.chart_id || payload.chart_id === "default") delete payload.chart_id;
+  const res = await sppGas("saveSeatingAccess", payload);
   const saved = sppNormalize(res, true);
   if (!saved) throw new Error("Backend không trả dữ liệu quyền xem trước.");
   if (saved.status !== next.status) throw new Error("Backend không lưu đúng trạng thái công bố.");
@@ -150,7 +182,8 @@ function sppAllowed(a: SppAccess) { const list = String(a.previewStudents || "")
 async function sppCheck() {
   if (sppAdmin()) return;
   try {
-    const res = await sppGas("getSeatingAccess", { chartId: sppChartId(), chartTitle: sppTitle() });
+    const resolved = await sppResolveRealChart({ ...sppLocal(), chartId: sppChartId(), chartTitle: sppTitle() });
+    const res = await sppGas("getSeatingAccess", { chartId: resolved.chartId, chartTitle: resolved.chartTitle });
     const a = sppNormalize(res, true);
     if (!a) return;
     sppSaveLocal(a);
@@ -187,7 +220,7 @@ function sppBind() {
       if (!config) return;
       const old = btn.textContent || "Lưu";
       btn.disabled = true; btn.textContent = "Đang lưu...";
-      sppToast("Đang lưu quyền xem trước lên backend...");
+      sppToast("Đang xác định sơ đồ thật...");
       const saved = await sppSave(config);
       document.querySelector(".seat-pub-lite-backdrop")?.remove();
       sppToast(`${saved.status === "private" ? "Riêng tư" : saved.status === "preview" ? "Xem trước" : "Công bố"} đã lưu.`, true);
