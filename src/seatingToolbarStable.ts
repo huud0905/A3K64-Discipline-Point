@@ -30,6 +30,24 @@ function stbInjectStyle() {
   const style = document.createElement("style");
   style.id = "a3-seat-toolbar-stable-style";
   style.textContent = `
+    ${STB_WIN} .stable-seat-tools{
+      display:flex!important;
+      align-items:center!important;
+      gap:8px!important;
+      flex-wrap:nowrap!important;
+    }
+    ${STB_WIN} .stable-seat-tools button,
+    ${STB_WIN} .stable-seat-tools input,
+    ${STB_WIN} .stable-seat-tools .seat-ctrl-trigger{
+      height:40px!important;
+      min-height:40px!important;
+      box-sizing:border-box!important;
+      align-self:center!important;
+    }
+    ${STB_WIN} [data-seat-pub-lite]{order:1!important;min-width:82px!important;justify-content:center!important;}
+    ${STB_WIN} [data-seat-pub-lite-manage]{order:2!important;min-width:48px!important;justify-content:center!important;}
+    ${STB_WIN} .seat-ctrl-select{order:3!important;min-width:190px!important;align-self:center!important;}
+    ${STB_WIN} .stable-seat-tools input{order:20!important;min-width:190px!important;}
     ${STB_WIN} button.stb-admin-disabled{
       opacity:.45!important;
       filter:grayscale(.25)!important;
@@ -60,6 +78,18 @@ function stbAdminOnlyButton(btn: HTMLButtonElement) {
   return text.includes("tao so do moi") || text.includes("khoi phuc") || text === "random";
 }
 
+function stbOrderButton(btn: HTMLButtonElement) {
+  const text = stbNormText(btn.textContent);
+  if (btn.dataset.seatPubLite) btn.style.order = "1";
+  else if (btn.dataset.seatPubLiteManage) btn.style.order = "2";
+  else if (text.includes("luu so do")) btn.style.order = "4";
+  else if (text.includes("tao so do moi")) btn.style.order = "5";
+  else if (text.includes("bat sua") || text.includes("tat sua")) btn.style.order = "30";
+  else if (text.includes("khoi phuc")) btn.style.order = "31";
+  else if (text === "random") btn.style.order = "32";
+  else if (text.includes("xuat") || text.includes("in")) btn.style.order = "33";
+}
+
 function stbSetDisabled(btn: HTMLButtonElement, disabled: boolean) {
   btn.disabled = disabled;
   btn.classList.toggle("stb-admin-disabled", disabled);
@@ -73,9 +103,14 @@ function stbSyncToolbar() {
   if (!tools) return;
   const isAdmin = stbIsAdmin();
   tools.querySelectorAll<HTMLButtonElement>("button").forEach((btn) => {
+    stbOrderButton(btn);
     if (!stbAdminOnlyButton(btn)) return;
     stbSetDisabled(btn, !isAdmin);
   });
+  const select = tools.querySelector<HTMLElement>(".seat-ctrl-select");
+  if (select) select.style.order = "3";
+  const search = tools.querySelector<HTMLInputElement>("input");
+  if (search) search.style.order = "20";
 }
 
 function stbBoot() {
