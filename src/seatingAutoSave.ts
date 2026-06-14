@@ -3,7 +3,7 @@ const SAS_MAP_KEY = "a3k64-seating-map-v1";
 const SAS_ROOM_KEY = "a3k64-stable-room-slot-map-v1";
 const SAS_CURRENT_KEY = "a3k64-seating-sheet-current-id-v1";
 const SAS_GAS_URL = String(import.meta.env.VITE_GAS_WEB_APP_URL || "").trim();
-const SAS_DELAY_MS = 2000;
+const SAS_DELAY_MS = 1800;
 
 let sasReady = false;
 let sasTimer = 0;
@@ -11,7 +11,6 @@ let sasSaving = false;
 let sasQueued = false;
 let sasLastSignature = "";
 let sasIgnoreUntil = 0;
-let sasObserver: MutationObserver | null = null;
 let sasLastToastTimer = 0;
 
 type SasSeats = { left: string[][]; right: string[][] };
@@ -243,56 +242,59 @@ function sasSeedSignature(delay = 0) {
 function sasIgnoreBackendPaint(ms = 1800) {
   sasIgnoreUntil = Date.now() + ms;
   clearTimeout(sasTimer);
+  document.getElementById("a3-seat-autosave-toast")?.remove();
   window.setTimeout(() => sasSeedSignature(0), ms + 60);
 }
 
 function sasBindUserEvents() {
+  document.addEventListener("dragstart", (event) => {
+    if (!(event.target as HTMLElement | null)?.closest?.(SAS_WIN)) return;
+    clearTimeout(sasTimer);
+  }, true);
   document.addEventListener("drop", (event) => {
     if (!(event.target as HTMLElement | null)?.closest?.(SAS_WIN)) return;
-    setTimeout(() => sasSchedule("drop"), 120);
+    setTimeout(() => sasSchedule("drop"), 220);
   }, true);
   document.addEventListener("dragend", (event) => {
     if (!(event.target as HTMLElement | null)?.closest?.(SAS_WIN)) return;
-    setTimeout(() => sasSchedule("dragend"), 160);
+    setTimeout(() => sasSchedule("dragend"), 260);
   }, true);
   document.addEventListener("click", (event) => {
     const target = event.target as HTMLElement | null;
-    if (!target?.closest?.(SAS_WIN)) return;
-    const text = sasNorm(target.closest("button")?.textContent || target.textContent || "");
-    if (target.closest(".seat-ctrl-option")) {
-      sasIgnoreBackendPaint(2200);
+    if (!target) return;
+    if (target.closest(`${SAS_WIN} .seat-ctrl-option`)) {
+      sasIgnoreBackendPaint(2400);
       return;
     }
-    if (text.includes("random") || text.includes("khoiphuc") || text.includes("xoa")) {
-      setTimeout(() => sasSchedule("button"), 220);
+    const inSeat = Boolean(target.closest(SAS_WIN));
+    const text = sasNorm(target.closest("button")?.textContent || target.textContent || "");
+    if (inSeat && (text.includes("random") || text.includes("khoiphuc"))) {
+      setTimeout(() => sasSchedule("button"), 260);
+      return;
+    }
+    if (text === "xoa" || text.includes("xoa")) {
+      setTimeout(() => sasSchedule("delete"), 260);
     }
   }, true);
-}
-
-function sasBindObserver() {
-  if (sasObserver) return;
-  const root = document.querySelector(`${SAS_WIN} .stable-seat-main`) || document.querySelector(SAS_WIN);
-  if (!root) return;
-  sasObserver = new MutationObserver(() => {
-    if (Date.now() < sasIgnoreUntil) return;
-    setTimeout(() => sasSchedule("mutation"), 80);
-  });
-  sasObserver.observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "style"] });
 }
 
 function sasBoot() {
   if (sasReady) return;
   sasReady = true;
   sasStyle();
-  sasSeedSignature(1600);
+  sasSeedSignature(2000);
   sasBindUserEvents();
-  sasBindObserver();
-  window.setInterval(() => sasBindObserver(), 1200);
-  window.addEventListener("a3k64:seating-backend-synced", () => sasIgnoreBackendPaint(1800));
+  window.addEventListener("a3k64:seating-backend-synced", () => sasIgnoreBackendPaint(2200));
   window.addEventListener("a3k64:seating-changed", (event: Event) => {
     const detail = (event as CustomEvent).detail || {};
-    if (String(detail?.source || "").includes("backend")) sasIgnoreBackendPaint(1800);
-    else setTimeout(() => sasSchedule("event"), 120);
+    const source = String(detail?.source || "");
+    if (!source || source.includes("backend") || source.includes("sync") || source.includes("open")) {
+      sasIgnoreBackendPaint(1800);
+      return;
+    }
+    if (source.includes("user") || source.includes("drag") || source.includes("random") || source.includes("restore")) {
+      setTimeout(() => sasSchedule("event"), 160);
+    }
   });
   window.addEventListener("beforeunload", () => {
     if (sasTimer && sasCanAutoSave()) void sasSaveNow();
