@@ -2,6 +2,8 @@ const SBS_WIN = "#a3k64-seating-window";
 const SBS_MAP_KEY = "a3k64-seating-map-v1";
 const SBS_ROOM_KEY = "a3k64-stable-room-slot-map-v1";
 const SBS_CURRENT_KEY = "a3k64-seating-sheet-current-id-v1";
+const SBS_DIRTY_KEY = "a3k64-seat-local-dirty-until-v1";
+const SBS_SAVING_KEY = "a3k64-seat-autosave-saving-v1";
 const SBS_GAS_URL = String(import.meta.env.VITE_GAS_WEB_APP_URL || "").trim();
 let sbsReady = false;
 let sbsBusy = false;
@@ -46,6 +48,36 @@ function sbsTitle() {
 function sbsStoredId() {
   const id = localStorage.getItem(SBS_CURRENT_KEY) || "";
   return id && id !== "default" ? id : "";
+}
+
+function sbsIsEditOn() {
+  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>(`${SBS_WIN} .stable-seat-tools button`));
+  const editButton = buttons.find((btn) => {
+    const text = sbsNorm(btn.textContent || "");
+    return text.includes("batsua") || text.includes("dangsua") || text.includes("tatsua");
+  });
+  const text = sbsNorm(editButton?.textContent || "");
+  return Boolean(editButton?.classList.contains("primary") || editButton?.dataset.editState === "on" || text.includes("dangsua") || text.includes("tatsua"));
+}
+
+function sbsDirtyUntil() {
+  const value = Number(localStorage.getItem(SBS_DIRTY_KEY) || "0") || 0;
+  if (value && Date.now() > value) {
+    localStorage.removeItem(SBS_DIRTY_KEY);
+    if (document.documentElement.dataset.seatLocalDirty === "1") delete document.documentElement.dataset.seatLocalDirty;
+    return 0;
+  }
+  return value;
+}
+
+function sbsHasLocalDirty() {
+  const saving = localStorage.getItem(SBS_SAVING_KEY) === "1";
+  return saving || sbsDirtyUntil() > Date.now() || document.documentElement.dataset.seatLocalDirty === "1";
+}
+
+function sbsShouldDeferBackendPaint() {
+  if (!sbsIsAdmin()) return false;
+  return sbsIsEditOn() || sbsHasLocalDirty();
 }
 
 function sbsGas(action: string, payload?: unknown): Promise<any> {
@@ -147,15 +179,18 @@ function sbsPaint(seats: SbsSeats) {
 
 async function sbsSyncOnce(force = false) {
   if (sbsBusy || !sbsWindowVisible()) return;
+  if (sbsShouldDeferBackendPaint()) return;
   sbsBusy = true;
   try {
     const listResponse = await sbsGas("listSeatingCharts", {});
+    if (sbsShouldDeferBackendPaint()) return;
     const charts = sbsCharts(listResponse);
     const selected = sbsPickChart(charts);
     if (!selected) return;
     const key = `${selected.id}|${selected.updatedAt || ""}|${selected.version || ""}`;
     if (!force && key && key === sbsLastKey) return;
     const chartResponse = await sbsGas("getSeatingChart", { id: selected.id, chartId: selected.id, title: selected.title, chartTitle: selected.title });
+    if (sbsShouldDeferBackendPaint()) return;
     const chart = chartResponse?.chart || chartResponse?.data?.chart || selected;
     const layout = chart?.layout || selected.layout || {};
     const seats = sbsSeatsFromLayout(layout);
@@ -186,7 +221,12 @@ function sbsBoot() {
       sbsLoop = 0;
     }
   }, 2000);
-  window.addEventListener("a3k64:seating-changed", () => setTimeout(() => void sbsSyncOnce(false), 120));
+  window.addEventListener("a3k64:seating-changed", (event: Event) => {
+    const source = String(((event as CustomEvent).detail || {})?.source || "");
+    if (!source || source.includes("user") || source.includes("drag") || source.includes("restore") || source.includes("random") || source.includes("autosave") || source.includes("backend")) return;
+    setTimeout(() => void sbsSyncOnce(false), 180);
+  });
+  window.addEventListener("a3k64:seating-autosaved", () => setTimeout(() => void sbsSyncOnce(true), 1800));
   window.addEventListener("focus", () => setTimeout(() => void sbsSyncOnce(true), 150));
 }
 
