@@ -1,12 +1,11 @@
+import { upsertStyleTag } from './core/dom';
+
 const SEAT_ACCESS_WINDOW = "#a3k64-seating-window";
 const SEAT_ACCESS_STYLE_ID = "a3k64-seat-access-overlay-style";
 let seatAccessOverlayTimer = 0;
 
 function injectSeatAccessOverlayStyle() {
-  if (document.getElementById(SEAT_ACCESS_STYLE_ID)) return;
-  const style = document.createElement("style");
-  style.id = SEAT_ACCESS_STYLE_ID;
-  style.textContent = `
+  upsertStyleTag(SEAT_ACCESS_STYLE_ID, `
     html.a3-seat-viewer-checking ${SEAT_ACCESS_WINDOW}::after,
     html.a3-seat-viewer-denied ${SEAT_ACCESS_WINDOW}::after{
       content:none!important;
@@ -67,8 +66,7 @@ function injectSeatAccessOverlayStyle() {
     html.a3-seat-viewer-readonly ${SEAT_ACCESS_WINDOW} .seat-ctrl-select{
       display:block!important;
     }
-  `;
-  document.head.appendChild(style);
+  `);
 }
 
 function syncSeatAccessOverlayMessage() {
