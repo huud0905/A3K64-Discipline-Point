@@ -12,7 +12,7 @@ import '../../apps/Seating/runtime/seatingToolbarStable';
 import '../../apps/Seating/runtime/seatingEditNoRerenderPatch';
 import '../../seatingAutoSave';
 import '../../seatingNotificationDock';
-import '../../seatingUiOcdFinalFix';
+import '../../apps/Seating/runtime/seatingUiOcdFinalFix';
 import '../../seatingFinalInteractionFix';
 import '../../seatingPrintExportA4';
 import '../../seatingViewerGateLitePatch';
