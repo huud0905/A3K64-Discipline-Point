@@ -1,4 +1,4 @@
-// Temporary app-runtime wrapper while the large restore/control runtime is migrated safely.
+// Preparing exact blob move for the large restore/control runtime.
 import '../../../seatingRestoreAndControlsPatch';
 
 export {};
