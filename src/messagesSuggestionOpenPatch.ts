@@ -1,17 +1,19 @@
+import { readSavedLoginSession } from './core/auth';
+import { requestJsonp } from './core/network';
+import { readJsonStorage, writeJsonStorage } from './core/storage';
+
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const LOCAL_MESSAGES_KEY = 'a3k64-messages-local-v1';
 const LOCAL_CONTACTS_KEY = 'a3k64-messages-contacts-local-v1';
 
-function safeJson<T>(raw: string | null, fallback: T): T {
-  try { return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; }
-}
+type AnyRecord = Record<string, unknown>;
 
 function normalizeUser(value: unknown) {
   return String(value || '').trim().toLowerCase();
 }
 
 function readSessionUser() {
-  const session = safeJson<{ user?: Record<string, unknown> } | null>(localStorage.getItem('a3k64-login-session-v1'), null);
+  const session = readSavedLoginSession<AnyRecord>();
   const user = session?.user || {};
   const email = normalizeUser(user.email || user.username || user.uid || 'local-user');
   return {
@@ -49,7 +51,7 @@ function normalizeNameKey(value: unknown) {
 function resolveTarget(rawInput: string) {
   const raw = rawInput.trim();
   if (!raw) return null;
-  const contacts = safeJson<Array<Record<string, unknown>>>(localStorage.getItem(LOCAL_CONTACTS_KEY), []);
+  const contacts = readJsonStorage<Array<Record<string, unknown>>>(LOCAL_CONTACTS_KEY, []);
   if (raw.includes('@')) {
     const email = normalizeUser(raw);
     const found = contacts.find((c) => normalizeUser(c.email || c.username || c.gmail) === email);
@@ -66,45 +68,16 @@ function resolveTarget(rawInput: string) {
 }
 
 function gasJsonp(action: string, payload?: unknown): Promise<any | null> {
-  if (!GAS_URL || typeof document === 'undefined') return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const callbackName = `__a3k64TypedMessage_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const script = document.createElement('script');
-    const url = new URL(GAS_URL);
-    const callbacks = window as typeof window & Record<string, unknown>;
-    let settled = false;
-    let timeoutId = 0;
-
-    const finish = (value: unknown) => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timeoutId);
-      delete callbacks[callbackName];
-      script.onerror = null;
-      script.remove();
-      resolve(value);
-    };
-
-    url.searchParams.set('action', action);
-    url.searchParams.set('callback', callbackName);
-    url.searchParams.set('t', String(Date.now()));
-    if (payload !== undefined) url.searchParams.set('payload', JSON.stringify(payload));
-
-    callbacks[callbackName] = (json: unknown) => finish(json);
-    script.onerror = () => finish(null);
-    timeoutId = window.setTimeout(() => finish(null), 8000);
-    script.src = url.toString();
-    document.head.appendChild(script);
-  });
+  return requestJsonp(GAS_URL, { action, payload }, { timeoutMs: 8000, callbackPrefix: '__a3k64TypedMessage' });
 }
 
 function upsertLocalContact(targetId: string, targetName: string) {
-  const contacts = safeJson<Array<Record<string, unknown>>>(localStorage.getItem(LOCAL_CONTACTS_KEY), []);
+  const contacts = readJsonStorage<Array<Record<string, unknown>>>(LOCAL_CONTACTS_KEY, []);
   const next = [
     { email: targetId, name: targetName, displayName: targetName },
     ...contacts.filter((item) => normalizeUser(item.email || item.username || item.gmail) !== targetId),
   ].slice(0, 300);
-  localStorage.setItem(LOCAL_CONTACTS_KEY, JSON.stringify(next));
+  writeJsonStorage(LOCAL_CONTACTS_KEY, next);
 }
 
 function mergeServerMessages(response: any) {
@@ -112,24 +85,24 @@ function mergeServerMessages(response: any) {
   const state = data?.messagesState || data;
   if (!state || !Array.isArray(state.messages)) return false;
 
-  const currentMessages = safeJson<Array<Record<string, unknown>>>(localStorage.getItem(LOCAL_MESSAGES_KEY), []);
+  const currentMessages = readJsonStorage<Array<Record<string, unknown>>>(LOCAL_MESSAGES_KEY, []);
   const map = new Map<string, Record<string, unknown>>();
   [...currentMessages, ...state.messages].forEach((message) => {
     const id = String(message?.id || '');
     if (!id) return;
     map.set(id, { ...map.get(id), ...message, pendingServer: false });
   });
-  localStorage.setItem(LOCAL_MESSAGES_KEY, JSON.stringify([...map.values()]));
+  writeJsonStorage(LOCAL_MESSAGES_KEY, [...map.values()]);
 
   if (Array.isArray(state.contacts)) {
-    const currentContacts = safeJson<Array<Record<string, unknown>>>(localStorage.getItem(LOCAL_CONTACTS_KEY), []);
+    const currentContacts = readJsonStorage<Array<Record<string, unknown>>>(LOCAL_CONTACTS_KEY, []);
     const contactMap = new Map<string, Record<string, unknown>>();
     [...currentContacts, ...state.contacts].forEach((contact) => {
       const email = normalizeUser(contact?.email || contact?.username || contact?.gmail);
       if (!email) return;
       contactMap.set(email, { ...contactMap.get(email), ...contact, email });
     });
-    localStorage.setItem(LOCAL_CONTACTS_KEY, JSON.stringify([...contactMap.values()]));
+    writeJsonStorage(LOCAL_CONTACTS_KEY, [...contactMap.values()]);
   }
 
   window.dispatchEvent(new Event('a3k64-messages-local-change'));
@@ -156,9 +129,9 @@ function createLocalThread(targetName: string) {
     payload: { threadOnly: true },
     pendingServer: true,
   };
-  const messages = safeJson<Array<Record<string, unknown>>>(localStorage.getItem(LOCAL_MESSAGES_KEY), []);
+  const messages = readJsonStorage<Array<Record<string, unknown>>>(LOCAL_MESSAGES_KEY, []);
   const exists = messages.some((item) => item.threadId === message.threadId);
-  localStorage.setItem(LOCAL_MESSAGES_KEY, JSON.stringify(exists ? messages : [...messages, message]));
+  writeJsonStorage(LOCAL_MESSAGES_KEY, exists ? messages : [...messages, message]);
   upsertLocalContact(target.email, target.name);
   window.dispatchEvent(new Event('a3k64-messages-local-change'));
   return message;
