@@ -1,3 +1,3 @@
 import '../../desktopDriveWallpaperSync';
 import '../../desktopDriveErrorPolish';
-import '../../desktopWallpaperStabilityFix';
+import '../desktop/runtime/desktopWallpaperStabilityFix';
