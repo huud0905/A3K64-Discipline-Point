@@ -1,5 +1,5 @@
 import '../../messagesThreadActionsPatch';
 import '../../messagesSuggestionOpenPatch';
-import '../../messagesPermissionRoleGuard';
+import '../../apps/Messages/runtime/messagesPermissionRoleGuard';
 import '../../messagesBubbleActionsPatch';
-import '../../messagesServerReloadHardFix';
+import '../../apps/Messages/runtime/messagesServerReloadHardFix';
