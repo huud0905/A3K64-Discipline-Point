@@ -15,7 +15,7 @@ import '../../apps/Seating/runtime/seatingNotificationDock';
 import '../../apps/Seating/runtime/seatingUiOcdFinalFix';
 import '../../apps/Seating/runtime/seatingFinalInteractionFix';
 import '../../apps/Seating/runtime/seatingPrintExportA4';
-import '../../seatingViewerGateLitePatch';
+import '../../apps/Seating/runtime/seatingViewerGateLitePatch';
 import '../../apps/Seating/runtime/seatingPrivacyWording';
 import '../../apps/Seating/runtime/seatingPublishCleanUiFix';
 import '../../apps/Seating/runtime/seatingAccessOverlay';
