@@ -92,6 +92,7 @@ import './seatingAutoSave';
 import './seatingNotificationDock';
 import './seatingUiOcdFinalFix';
 import './seatingFinalInteractionFix';
+import './seatingPrintExportA4';
 import './seatingViewerGateLitePatch';
 import './seatingPrivacyWording';
 import './seatingPublishCleanUiFix';
