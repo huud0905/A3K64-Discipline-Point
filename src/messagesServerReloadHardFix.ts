@@ -1,3 +1,7 @@
+import { SESSION_KEY } from './core/auth';
+import { requestJsonp } from './core/network';
+import { safeJsonParse, writeJsonStorage } from './core/storage';
+
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
 const LOCAL_MESSAGES_KEY = 'a3k64-messages-local-v1';
 const LOCAL_PRESENCE_KEY = 'a3k64-messages-presence-local-v1';
@@ -5,12 +9,8 @@ const LOCAL_CONTACTS_KEY = 'a3k64-messages-contacts-local-v1';
 
 type AnyRecord = Record<string, unknown>;
 
-function safeJson<T>(raw: string | null, fallback: T): T {
-  try { return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; }
-}
-
 function sessionEmail() {
-  const session = safeJson<{ user?: AnyRecord } | null>(localStorage.getItem('a3k64-login-session-v1'), null);
+  const session = safeJsonParse<{ user?: AnyRecord } | null>(localStorage.getItem(SESSION_KEY), null);
   return String(session?.user?.email || session?.user?.username || session?.user?.uid || '').trim().toLowerCase();
 }
 
@@ -19,40 +19,14 @@ function emitMessagesChange() {
 }
 
 function clearMessagesCache(clearContacts = false) {
-  localStorage.setItem(LOCAL_MESSAGES_KEY, '[]');
-  localStorage.setItem(LOCAL_PRESENCE_KEY, '[]');
-  if (clearContacts) localStorage.setItem(LOCAL_CONTACTS_KEY, '[]');
+  writeJsonStorage(LOCAL_MESSAGES_KEY, []);
+  writeJsonStorage(LOCAL_PRESENCE_KEY, []);
+  if (clearContacts) writeJsonStorage(LOCAL_CONTACTS_KEY, []);
   emitMessagesChange();
 }
 
 function gasJsonp(action: string, payload?: unknown): Promise<any | null> {
-  if (!GAS_URL || typeof document === 'undefined') return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const callbackName = `__a3k64MessagesReload_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const script = document.createElement('script');
-    const url = new URL(GAS_URL);
-    const callbacks = window as typeof window & Record<string, unknown>;
-    let settled = false;
-    let timeoutId = 0;
-    const finish = (value: unknown) => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timeoutId);
-      delete callbacks[callbackName];
-      script.onerror = null;
-      script.remove();
-      resolve(value);
-    };
-    url.searchParams.set('action', action);
-    url.searchParams.set('callback', callbackName);
-    url.searchParams.set('t', String(Date.now()));
-    if (payload !== undefined) url.searchParams.set('payload', JSON.stringify(payload));
-    callbacks[callbackName] = (json: unknown) => finish(json);
-    script.onerror = () => finish(null);
-    timeoutId = window.setTimeout(() => finish(null), 10000);
-    script.src = url.toString();
-    document.head.appendChild(script);
-  });
+  return requestJsonp(GAS_URL, { action, payload }, { timeoutMs: 10000, callbackPrefix: '__a3k64MessagesReload' });
 }
 
 function unwrapState(response: any) {
@@ -79,9 +53,9 @@ async function hardReloadMessagesFromServer(showToast = true) {
   const presence = Array.isArray(state?.presence) ? state.presence : [];
   const contacts = Array.isArray(state?.contacts) ? state.contacts : [];
 
-  localStorage.setItem(LOCAL_MESSAGES_KEY, JSON.stringify(messages));
-  localStorage.setItem(LOCAL_PRESENCE_KEY, JSON.stringify(presence));
-  if (contacts.length) localStorage.setItem(LOCAL_CONTACTS_KEY, JSON.stringify(contacts));
+  writeJsonStorage(LOCAL_MESSAGES_KEY, messages);
+  writeJsonStorage(LOCAL_PRESENCE_KEY, presence);
+  if (contacts.length) writeJsonStorage(LOCAL_CONTACTS_KEY, contacts);
   emitMessagesChange();
 
   app.classList.remove('a3-messages-reloading');
