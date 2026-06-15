@@ -1,3 +1,5 @@
+import { removeStorageKeys } from './core/storage';
+
 /* Ổn định patch hình nền:
    - Tránh React crash NotFoundError khi DOM phụ trợ bị thay đổi ngoài React.
    - Xoá token Drive cũ trước khi bấm các nút Drive để lấy scope/quyền mới sau khi bật Google Drive API. */
@@ -44,8 +46,7 @@ function installSafeDomRemoveGuard() {
 function clearDriveTokenBeforeDriveAction(event: Event) {
   const target = event.target instanceof Element ? event.target : null;
   if (!target?.closest?.("#a3k64-wallpaper-pick,#a3k64-wallpaper-upload,#a3k64-wallpaper-restore")) return;
-  localStorage.removeItem(DRIVE_TOKEN_KEY);
-  localStorage.removeItem(DRIVE_TOKEN_TIME_KEY);
+  removeStorageKeys(DRIVE_TOKEN_KEY, DRIVE_TOKEN_TIME_KEY);
 }
 
 function installWallpaperStabilityFix() {
