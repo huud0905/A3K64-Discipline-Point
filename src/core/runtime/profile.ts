@@ -1,1 +1,1 @@
-import '../../profileWeekScoreChartPatch';
+import '../../apps/Profile/runtime/profileWeekScoreChartPatch';
