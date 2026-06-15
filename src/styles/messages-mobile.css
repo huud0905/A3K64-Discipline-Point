@@ -1,4 +1,4 @@
-@import '../messagesMobileInterfaceFix.css';
-@import '../messagesMessengerMobileFinal.css';
-@import '../messagesMobileCleanFinal.css';
-@import '../messagesMobileBackVisibleFix.css';
+@import './patches/messagesMobileInterfaceFix.css';
+@import './patches/messagesMessengerMobileFinal.css';
+@import './patches/messagesMobileCleanFinal.css';
+@import './patches/messagesMobileBackVisibleFix.css';
