@@ -1,3 +1,5 @@
+import { getSystemTheme } from './core/theme';
+
 function colorLuminance(value: string) {
   const match = String(value || '').match(/rgba?\(([^)]+)\)/i);
   if (!match) return null;
@@ -93,7 +95,7 @@ function computedTheme() {
   const bodyLum = colorLuminance(window.getComputedStyle(document.body).backgroundColor);
   if (bodyLum !== null) return bodyLum > 0.56 ? 'light' : 'dark';
 
-  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  return getSystemTheme();
 }
 
 function detectOverlayTheme() {
