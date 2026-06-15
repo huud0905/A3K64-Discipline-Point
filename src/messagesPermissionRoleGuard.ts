@@ -1,54 +1,33 @@
+import { normalizedElementText, upsertStyleTag } from './core/dom';
+import { readSavedLoginSession } from './core/auth';
+import { normalizeRole } from './core/permissions';
+
 const STYLE_ID = 'a3-message-permission-role-guard-style';
 
-function safeJson<T>(raw: string | null, fallback: T): T {
-  try {
-    return raw ? JSON.parse(raw) as T : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function normalizeRole(value: unknown) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[đĐ]/g, 'd')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 function readRole() {
-  const session = safeJson<{ user?: Record<string, unknown> } | null>(localStorage.getItem('a3k64-login-session-v1'), null);
-  return normalizeRole(session?.user?.role);
+  return normalizeRole(readSavedLoginSession<Record<string, unknown>>()?.user?.role as string | null | undefined);
 }
 
 function canUsePermissionRequests() {
-  return readRole() === 'to truong';
+  return readRole() === 'to_truong' || readRole() === 'to truong';
 }
 
 function ensureStyle() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
-  style.id = STYLE_ID;
-  style.textContent = `
+  upsertStyleTag(STYLE_ID, `
     .messages-native-app.a3-no-permission-requests .messages-segment{grid-template-columns:1fr!important}
     .messages-native-app.a3-no-permission-requests .messages-segment button:nth-child(2){display:none!important}
     .messages-native-app.a3-no-permission-requests .messages-chat-header button:has(svg){display:none!important}
     .messages-native-app.a3-no-permission-requests .messages-permission-panel{display:none!important}
-  `;
-  document.head.appendChild(style);
+  `);
 }
 
 function isRequestPanelOpen(app: Element) {
-  return Boolean(app.querySelector('.messages-permission-panel')) || /Xin quyền hỗ trợ chấm điểm/i.test(app.textContent || '');
+  return Boolean(app.querySelector('.messages-permission-panel')) || /Xin quyền hỗ trợ chấm điểm/i.test(normalizedElementText(app));
 }
 
 function clickChatsTab(app: Element) {
   const buttons = Array.from(app.querySelectorAll<HTMLButtonElement>('.messages-segment button'));
-  const chatButton = buttons.find((button) => /Tin nhắn/i.test(button.textContent || ''));
+  const chatButton = buttons.find((button) => /Tin nhắn/i.test(normalizedElementText(button)));
   chatButton?.click();
 }
 
