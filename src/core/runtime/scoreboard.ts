@@ -1,0 +1,11 @@
+import '../../scoreboardMobilePolish';
+import '../../scoreboardMobileFinalFix';
+import '../../scoreboardMobileOcdFix';
+import '../../scoreboardMobileEmergencyPatch';
+import '../../scoreboardMobileStudentDetailCardsPatch';
+import '../../scoreboardModalInputCleanup';
+import '../../scoreboardExcelExport';
+import '../../scoreboardScreenshotCapture';
+import '../../scoreboardScreenshotAllClassCompact';
+import '../../scoreboardScreenshotGroupFullDetailsFix';
+import '../../scoreboardMobileScoreEditorRuntimeFix';
