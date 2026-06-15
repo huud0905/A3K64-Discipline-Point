@@ -1,3 +1,4 @@
+import { normalizedElementLowerText, upsertStyleTag } from './core/dom';
 import { readNumberStorage, writeTextStorage } from './core/storage';
 
 const A3_SCALE_OPTIONS = [75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
@@ -29,10 +30,7 @@ function applyScale(scale: number) {
 }
 
 function injectStyle() {
-  if (document.getElementById("a3-display-options-style")) return;
-  const style = document.createElement("style");
-  style.id = "a3-display-options-style";
-  style.textContent = `
+  upsertStyleTag('a3-display-options-style', `
     html,body,#root{min-width:var(--a3-scaled-width,100vw)!important;min-height:var(--a3-scaled-height,100vh)!important;background:#050914!important;overflow:auto!important}
     #root>.win-root,.win-root{width:var(--a3-scaled-width,100vw)!important;min-width:var(--a3-scaled-width,100vw)!important;height:var(--a3-scaled-height,100vh)!important;min-height:var(--a3-scaled-height,100vh)!important;background:#050914!important}
     .a3-display-settings-card{max-width:960px;border:1px solid #243044;border-radius:18px;background:#0b1220;overflow:hidden;color:#f8fafc}
@@ -50,12 +48,11 @@ function injectStyle() {
     .theme-light .a3-display-select,.win-root.theme-light .a3-display-select{color:#0f172a;background-color:#fff;border-color:#94a3b8}
     .theme-light .a3-display-select option,.win-root.theme-light .a3-display-select option{color:#0f172a;background:#fff}
     @media(max-width:760px){html,body,#root,#root>.win-root,.win-root{width:100%!important;min-width:100%!important;height:auto!important;min-height:100svh!important}.a3-display-row{display:grid;gap:10px;align-items:start}.a3-display-select{width:100%;min-width:0}.a3-display-settings-title h2{font-size:22px}}
-  `;
-  document.head.appendChild(style);
+  `);
 }
 
 function isDisplayPage(container: Element) {
-  const text = (container.textContent || "").toLowerCase();
+  const text = normalizedElementLowerText(container);
   return text.includes("màn hình") && (text.includes("kích thước hiển thị") || text.includes("các tuỳ chỉnh hiển thị") || text.includes("các tùy chỉnh hiển thị"));
 }
 
