@@ -1,4 +1,4 @@
-import { appendScriptOnce, appendStylesheetOnce } from './core/dom';
+import { appendScriptOnce, appendStylesheetOnce } from './core/dom/style';
 import { getSystemTheme } from './core/theme';
 
 function colorLuminance(value: string) {
