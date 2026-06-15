@@ -1,3 +1,5 @@
+import { normalizedElementText, upsertStyleTag } from './core/dom';
+
 const STYLE_ID = "a3k64-start-menu-list-style";
 
 const REMOVED_APP_LABELS = ["Nhập điểm nhanh", "Xếp hạng", "Cuộc thi hiện tại", "Sơ đồ lớp"];
@@ -259,15 +261,7 @@ const START_MENU_CSS = `
 `;
 
 function injectStartMenuCss() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement("style");
-  style.id = STYLE_ID;
-  style.textContent = START_MENU_CSS;
-  document.head.appendChild(style);
-}
-
-function textOf(element: Element) {
-  return (element.textContent || "").replace(/\s+/g, " ").trim();
+  upsertStyleTag(STYLE_ID, START_MENU_CSS);
 }
 
 function getAppInitial(label: string) {
@@ -282,7 +276,7 @@ function cleanupStartMenu() {
   if (!startMenu) return;
 
   startMenu.querySelectorAll<HTMLButtonElement>(".start-app").forEach((button) => {
-    const label = textOf(button);
+    const label = normalizedElementText(button);
     const shouldRemove = REMOVED_APP_LABELS.some((item) => label.includes(item));
     const shouldKeep = KEEP_APP_LABELS.some((item) => label.includes(item));
 
