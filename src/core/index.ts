@@ -1,6 +1,7 @@
 export * as Auth from './auth';
 export * as Cache from './cache';
 export * as Desktop from './desktop';
+export * as Dom from './dom';
 export * as Firebase from './firebase';
 export * as Gas from './gas';
 export * as Network from './network';
