@@ -1,7 +1,7 @@
-@import '../scoreboard-modal-fix.css';
-@import '../scoreboard-final-fix.css';
+@import './patches/scoreboard-modal-fix.css';
+@import './patches/scoreboard-final-fix.css';
 @import '../scoreboard-theme-animation.css';
-@import '../scoreboard-final-polish.css';
+@import './patches/scoreboard-final-polish.css';
 @import '../scoreboardHonorsAndChartPolish.css';
 @import '../scoreboardMobileLatestFix.css';
 @import '../scoreboardMultiGroupFilter.css';
