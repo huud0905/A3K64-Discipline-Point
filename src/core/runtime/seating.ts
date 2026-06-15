@@ -3,7 +3,7 @@ import '../../apps/Seating/runtime/seatingRoleGate';
 import '../../apps/Seating/runtime/seatingInteractionToolsPatch';
 import '../../apps/Seating/runtime/seatingSeatSwapHardPatch';
 import '../../seatingRestoreAndControlsPatch';
-import '../../seatingBackendActiveSync';
+import '../../apps/Seating/runtime/seatingBackendActiveSync';
 import '../../apps/Seating/runtime/seatingOpenFeedbackPatch';
 import '../../apps/Seating/runtime/seatingNameHighlightPatch';
 import '../../apps/Seating/runtime/seatingCanonicalNamesPatch';
