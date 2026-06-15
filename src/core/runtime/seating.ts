@@ -5,7 +5,7 @@ import '../../seatingSeatSwapHardPatch';
 import '../../seatingRestoreAndControlsPatch';
 import '../../seatingBackendActiveSync';
 import '../../apps/Seating/runtime/seatingOpenFeedbackPatch';
-import '../../seatingNameHighlightPatch';
+import '../../apps/Seating/runtime/seatingNameHighlightPatch';
 import '../../apps/Seating/runtime/seatingCanonicalNamesPatch';
 import '../../seatingPublishLitePatch';
 import '../../seatingToolbarStable';
