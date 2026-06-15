@@ -1,3 +1,5 @@
+import { normalizedElementText, upsertStyleTag } from './core/dom';
+
 const SEAT_RUNTIME_WIN = "#a3k64-seating-window";
 const SEAT_RUNTIME_STYLE = "a3k64-seat-runtime-controls-style";
 
@@ -6,10 +8,7 @@ let seatRuntimeBound = false;
 let seatRuntimeToastTimer = 0;
 
 function seatRuntimeStyle() {
-  if (document.getElementById(SEAT_RUNTIME_STYLE)) return;
-  const style = document.createElement("style");
-  style.id = SEAT_RUNTIME_STYLE;
-  style.textContent = `
+  upsertStyleTag(SEAT_RUNTIME_STYLE, `
     ${SEAT_RUNTIME_WIN}.seat-edit-locked .stable-seat-cell,
     ${SEAT_RUNTIME_WIN}.seat-edit-locked .stable-seat-student-card{
       pointer-events:none!important;
@@ -61,14 +60,13 @@ function seatRuntimeStyle() {
       border-top-color:var(--desktop-accent,#14b8a6)!important;
     }
     @keyframes a3SeatRuntimeSpin{to{transform:rotate(360deg)}}
-  `;
-  document.head.appendChild(style);
+  `);
 }
 
 function seatRuntimeEditOn() {
   const button = document.querySelector<HTMLElement>(`${SEAT_RUNTIME_WIN} [data-tool='edit']`);
   if (!button) return false;
-  return button.classList.contains("primary") || /đang\s*sửa/i.test(button.textContent || "");
+  return button.classList.contains("primary") || /đang\s*sửa/i.test(normalizedElementText(button));
 }
 
 function seatRuntimeSyncEdit() {
@@ -77,7 +75,7 @@ function seatRuntimeSyncEdit() {
   const on = seatRuntimeEditOn();
   win.classList.toggle("seat-edit-locked", !on);
   win.querySelectorAll<HTMLElement>(".stable-seat-cell,.stable-seat-student-card").forEach((node) => {
-    node.draggable = on && !node.classList.contains("empty") && node.textContent?.trim() !== "Trống";
+    node.draggable = on && !node.classList.contains("empty") && normalizedElementText(node) !== "Trống";
     if (!on) node.classList.remove("drag-over");
   });
 }
@@ -112,7 +110,7 @@ function seatRuntimeBind() {
   document.addEventListener("click", (event) => {
     const target = event.target as HTMLElement | null;
     const save = target?.closest?.(`${SEAT_RUNTIME_WIN} .seat-ctrl-btn.primary`) as HTMLElement | null;
-    if (save && /lưu\s*sơ\s*đồ/i.test(save.textContent || "")) seatRuntimeShowSavingToast();
+    if (save && /lưu\s*sơ\s*đồ/i.test(normalizedElementText(save))) seatRuntimeShowSavingToast();
   }, true);
   window.addEventListener("a3k64:seating-changed", () => {
     window.setTimeout(() => document.getElementById("a3-seat-saving-toast")?.remove(), 250);
