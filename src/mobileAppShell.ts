@@ -1,3 +1,5 @@
+import { normalizedElementText, upsertStyleTag } from './core/dom';
+
 const STYLE_ID = "a3k64-mobile-app-shell-style";
 const ACCOUNT_BUTTON_CLASS = "a3-mobile-account-button";
 
@@ -281,11 +283,7 @@ const CSS = `
 `;
 
 function installCss() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement("style");
-  style.id = STYLE_ID;
-  style.textContent = CSS;
-  document.head.appendChild(style);
+  upsertStyleTag(STYLE_ID, CSS);
 }
 
 function isProbablyPhoneOrTablet() {
@@ -314,7 +312,7 @@ function normalizeMobileShortcuts() {
   if (!isMobile()) return;
 
   document.querySelectorAll<HTMLButtonElement>(".desktop-shortcut").forEach((button) => {
-    const text = (button.textContent || "").replace(/\s+/g, " ").trim();
+    const text = normalizedElementText(button);
     const label = button.querySelector("span");
 
     button.classList.remove("a3-hidden-removed-app");
@@ -354,7 +352,7 @@ function ensureAccountButton() {
 
 function openShortcutByTitle(keyword: string) {
   const shortcut = Array.from(document.querySelectorAll<HTMLButtonElement>(".desktop-shortcut")).find((button) =>
-    (button.textContent || button.title || "").includes(keyword)
+    (normalizedElementText(button) || button.title).includes(keyword)
   );
   shortcut?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));
 }
