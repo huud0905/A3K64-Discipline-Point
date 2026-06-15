@@ -4,9 +4,11 @@ export function upsertStyleTag(id: string, css: string) {
   if (!style) {
     style = document.createElement('style');
     style.id = id;
+    style.textContent = css;
     document.head.appendChild(style);
+    return style;
   }
-  style.textContent = css;
+  if (style.textContent !== css) style.textContent = css;
   return style;
 }
 
