@@ -1,3 +1,5 @@
+import { normalizedText } from './core/dom';
+
 const DRIVE_STATUS_ID = "a3k64-wallpaper-status";
 
 function extractActivationUrl(raw: string) {
@@ -7,7 +9,7 @@ function extractActivationUrl(raw: string) {
 
 function makeDriveErrorFriendly(raw: string) {
   if (!raw) return "";
-  const text = raw.trim();
+  const text = normalizedText(raw);
   const lower = text.toLowerCase();
   const isDriveApiDisabled = lower.includes("drive api has not been used") || lower.includes("accessnotconfigured") || lower.includes("service_disabled");
   if (!isDriveApiDisabled) return "";
