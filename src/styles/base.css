@@ -1,2 +1,2 @@
 @import '../index.css';
-@import '../login-responsive-polish.css';
+@import './patches/login-responsive-polish.css';
