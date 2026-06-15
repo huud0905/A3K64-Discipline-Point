@@ -1,9 +1,1 @@
-import './runtime/base';
-import './runtime/desktop';
-import './runtime/scoreboard';
-import './runtime/overlays';
-import './runtime/settings';
-import './runtime/messages';
-import './runtime/wallpaper';
-import './runtime/profile';
-import './runtime/seating';
+import './runtime';
