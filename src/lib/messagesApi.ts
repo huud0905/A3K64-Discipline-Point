@@ -1,3 +1,7 @@
+import { readSavedLoginSession } from '../core/auth';
+import { requestJsonp } from '../core/network';
+import { readJsonStorage, writeJsonStorage } from '../core/storage';
+
 export type ChatUser = {
   id: string;
   email: string;
@@ -87,28 +91,20 @@ function id(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function safeJson<T>(raw: string | null, fallback: T): T {
-  try {
-    return raw ? JSON.parse(raw) as T : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
 function isThreadOnly(message: Partial<ChatMessage>) {
   return !String(message.body || '').trim() && Boolean((message.payload as Record<string, unknown> | undefined)?.threadOnly);
 }
 
 function localMessages() {
-  return safeJson<ChatMessage[]>(localStorage.getItem(LOCAL_MESSAGES_KEY), []);
+  return readJsonStorage<ChatMessage[]>(LOCAL_MESSAGES_KEY, []);
 }
 
 function localPresence() {
-  return safeJson<PresenceRecord[]>(localStorage.getItem(LOCAL_PRESENCE_KEY), []);
+  return readJsonStorage<PresenceRecord[]>(LOCAL_PRESENCE_KEY, []);
 }
 
 function localContacts() {
-  return safeJson<ChatContact[]>(localStorage.getItem(LOCAL_CONTACTS_KEY), []);
+  return readJsonStorage<ChatContact[]>(LOCAL_CONTACTS_KEY, []);
 }
 
 function emitLocalChange() {
@@ -116,12 +112,12 @@ function emitLocalChange() {
 }
 
 function writeLocalMessages(messages: ChatMessage[]) {
-  localStorage.setItem(LOCAL_MESSAGES_KEY, JSON.stringify(messages));
+  writeJsonStorage(LOCAL_MESSAGES_KEY, messages);
   emitLocalChange();
 }
 
 function writeLocalPresence(presence: PresenceRecord[]) {
-  localStorage.setItem(LOCAL_PRESENCE_KEY, JSON.stringify(presence));
+  writeJsonStorage(LOCAL_PRESENCE_KEY, presence);
   emitLocalChange();
 }
 
@@ -137,7 +133,7 @@ function mergeContacts(contacts: ChatContact[]) {
 }
 
 function writeLocalContacts(contacts: ChatContact[]) {
-  localStorage.setItem(LOCAL_CONTACTS_KEY, JSON.stringify(mergeContacts(contacts)));
+  writeJsonStorage(LOCAL_CONTACTS_KEY, mergeContacts(contacts));
   emitLocalChange();
 }
 
@@ -179,36 +175,7 @@ function mergePresence(local: PresenceRecord[], remote: PresenceRecord[]) {
 }
 
 function gasJsonp(action: string, payload?: unknown): Promise<any | null> {
-  if (!GAS_URL || typeof document === 'undefined') return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const callbackName = `__a3k64Messages_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const script = document.createElement('script');
-    const url = new URL(GAS_URL);
-    const callbacks = window as typeof window & Record<string, unknown>;
-    let settled = false;
-    let timeoutId = 0;
-
-    const finish = (value: unknown) => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timeoutId);
-      delete callbacks[callbackName];
-      script.onerror = null;
-      script.remove();
-      resolve(value);
-    };
-
-    url.searchParams.set('action', action);
-    url.searchParams.set('callback', callbackName);
-    url.searchParams.set('t', String(Date.now()));
-    if (payload !== undefined) url.searchParams.set('payload', JSON.stringify(payload));
-
-    callbacks[callbackName] = (json: unknown) => finish(json);
-    script.onerror = () => finish(null);
-    timeoutId = window.setTimeout(() => finish(null), JSONP_TIMEOUT_MS);
-    script.src = url.toString();
-    document.head.appendChild(script);
-  });
+  return requestJsonp(GAS_URL, { action, payload }, { timeoutMs: JSONP_TIMEOUT_MS, callbackPrefix: '__a3k64Messages' });
 }
 
 function unwrapContacts(response: any): ChatContact[] {
@@ -254,8 +221,7 @@ function syncRemoteMessages(action: string, payload?: unknown, user = readSessio
 }
 
 export function readSessionUser(): ChatUser {
-  const session = safeJson<{ user?: Record<string, unknown> } | null>(localStorage.getItem('a3k64-login-session-v1'), null);
-  const user = session?.user || {};
+  const user = readSavedLoginSession<Record<string, unknown>>()?.user || {};
   const email = normalizeUser(user.email || user.username || user.uid || 'local-user');
   return {
     id: String(user.uid || email),
@@ -395,9 +361,9 @@ export async function requestGroupAccess(targetGroup: number, reason: string, we
 
 function saveApprovedPermission(message: ChatMessage) {
   if (!message.requesterGroup || !message.targetGroup) return;
-  const list = safeJson<Array<{ requesterGroup: number; targetGroup: number; week?: number; approvedAt: string; requestId: string }>>(localStorage.getItem(EXTRA_PERMISSION_KEY), []);
+  const list = readJsonStorage<Array<{ requesterGroup: number; targetGroup: number; week?: number; approvedAt: string; requestId: string }>>(EXTRA_PERMISSION_KEY, []);
   const next = [{ requesterGroup: message.requesterGroup, targetGroup: message.targetGroup, week: message.week, approvedAt: nowIso(), requestId: message.id }, ...list.filter((item) => item.requestId !== message.id)].slice(0, 80);
-  localStorage.setItem(EXTRA_PERMISSION_KEY, JSON.stringify(next));
+  writeJsonStorage(EXTRA_PERMISSION_KEY, next);
   window.dispatchEvent(new Event('a3k64-edit-permissions-change'));
 }
 
