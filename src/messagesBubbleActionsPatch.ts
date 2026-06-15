@@ -1,11 +1,11 @@
+import { readSavedLoginSession } from './core/auth';
+import { normalizedElementText } from './core/dom';
+import { readJsonStorage, writeJsonStorage } from './core/storage';
+
 const LOCAL_MESSAGES_KEY = 'a3k64-messages-local-v1';
 
-function safeJson<T>(raw: string | null, fallback: T): T {
-  try { return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; }
-}
-
 function getBubbleText(bubble: Element) {
-  return (bubble.querySelector('p')?.textContent || '').trim();
+  return normalizedElementText(bubble.querySelector('p'));
 }
 
 function setTextareaValue(textarea: HTMLTextAreaElement, value: string) {
@@ -17,8 +17,8 @@ function setTextareaValue(textarea: HTMLTextAreaElement, value: string) {
 }
 
 function readSessionEmail() {
-  const session = safeJson<{ user?: Record<string, unknown> } | null>(localStorage.getItem('a3k64-login-session-v1'), null);
-  return String(session?.user?.email || session?.user?.username || session?.user?.uid || '').trim().toLowerCase();
+  const user = readSavedLoginSession<Record<string, unknown>>()?.user;
+  return String(user?.email || user?.username || user?.uid || '').trim().toLowerCase();
 }
 
 function initialsFromName(name: string) {
@@ -34,13 +34,13 @@ function bubbleSenderName(bubble: HTMLElement) {
 }
 
 function activeThreadName() {
-  return (document.querySelector('.messages-chat-title strong')?.textContent || '').trim();
+  return normalizedElementText(document.querySelector('.messages-chat-title strong'));
 }
 
 function activeThreadIdFromDom() {
   const activeCard = document.querySelector('.messages-thread-card.active');
-  const name = (activeCard?.querySelector('.messages-thread-info strong')?.textContent || activeThreadName()).trim();
-  const lastText = (activeCard?.querySelector('.messages-thread-info p')?.textContent || '').trim();
+  const name = normalizedElementText(activeCard?.querySelector('.messages-thread-info strong')) || activeThreadName();
+  const lastText = normalizedElementText(activeCard?.querySelector('.messages-thread-info p'));
   return { name, lastText };
 }
 
@@ -49,7 +49,7 @@ function markActiveThreadReadLocal() {
   if (!me) return;
   const active = activeThreadIdFromDom();
   if (!active.name) return;
-  const messages = safeJson<Array<Record<string, unknown>>>(localStorage.getItem(LOCAL_MESSAGES_KEY), []);
+  const messages = readJsonStorage<Array<Record<string, unknown>>>(LOCAL_MESSAGES_KEY, []);
   let changed = false;
   const next = messages.map((message) => {
     const to = String(message.to || '').toLowerCase();
@@ -64,7 +64,7 @@ function markActiveThreadReadLocal() {
     return message;
   });
   if (changed) {
-    localStorage.setItem(LOCAL_MESSAGES_KEY, JSON.stringify(next));
+    writeJsonStorage(LOCAL_MESSAGES_KEY, next);
     window.dispatchEvent(new Event('a3k64-messages-local-change'));
   }
 }
