@@ -1,20 +1,18 @@
+import { readJsonStorage, writeJsonStorage } from './core/storage';
+
 const PINNED_APPS_KEY = 'pinned-apps';
 const STYLE_ID = 'a3k64-desktop-interaction-fix-style';
 
 function readPinnedApps(): string[] {
-  try {
-    const value = JSON.parse(localStorage.getItem(PINNED_APPS_KEY) || '[]');
-    return Array.isArray(value) ? value.map(String) : [];
-  } catch {
-    return [];
-  }
+  const value = readJsonStorage<unknown>(PINNED_APPS_KEY, []);
+  return Array.isArray(value) ? value.map(String) : [];
 }
 
 function removeLegacyProfilePin() {
   const current = readPinnedApps();
   const next = current.filter((key) => key !== 'profile');
   if (next.length !== current.length) {
-    localStorage.setItem(PINNED_APPS_KEY, JSON.stringify(next));
+    writeJsonStorage(PINNED_APPS_KEY, next);
   }
 }
 
