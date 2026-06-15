@@ -6,7 +6,14 @@ export type FullAccessRole = typeof FULL_ACCESS_ROLES[number];
 export type ScoreWeekCreatorRole = typeof SCORE_WEEK_CREATOR_ROLES[number];
 
 export function normalizeRole(role?: string | null) {
-  return String(role || STUDENT_ROLE).trim().toLowerCase();
+  return String(role || STUDENT_ROLE)
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || STUDENT_ROLE;
 }
 
 export function hasFullAccessRole(role?: string | null) {
