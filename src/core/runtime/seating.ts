@@ -18,5 +18,5 @@ import '../../seatingPrintExportA4';
 import '../../seatingViewerGateLitePatch';
 import '../../apps/Seating/runtime/seatingPrivacyWording';
 import '../../apps/Seating/runtime/seatingPublishCleanUiFix';
-import '../../seatingAccessOverlay';
-import '../../seatingRuntimeControls';
+import '../../apps/Seating/runtime/seatingAccessOverlay';
+import '../../apps/Seating/runtime/seatingRuntimeControls';
