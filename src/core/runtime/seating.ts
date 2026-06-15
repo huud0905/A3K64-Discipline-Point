@@ -1,4 +1,4 @@
-import '../../seatingMapStableApp';
+import '../../apps/Seating/runtime/seatingMapStableApp';
 import '../../apps/Seating/runtime/seatingRoleGate';
 import '../../apps/Seating/runtime/seatingInteractionToolsPatch';
 import '../../apps/Seating/runtime/seatingSeatSwapHardPatch';
