@@ -4,4 +4,4 @@
 @import '../settingsToggleAccentFix.css';
 @import '../desktopCleanWallpaperMode.css';
 @import '../taskFocusSwitchDarkOnFix.css';
-@import '../profileWeekSwitcherPolish.css';
+@import './patches/profileWeekSwitcherPolish.css';
