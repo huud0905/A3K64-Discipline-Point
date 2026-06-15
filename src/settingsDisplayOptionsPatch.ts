@@ -1,10 +1,12 @@
+import { readNumberStorage, writeTextStorage } from './core/storage';
+
 const A3_SCALE_OPTIONS = [75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
 
 const SCALE_STORAGE_KEY = "a3k64-display-scale";
 const PATCH_FLAG = "data-a3-display-settings-patched";
 
 function getSavedScale() {
-  const raw = Number(localStorage.getItem(SCALE_STORAGE_KEY) || "100");
+  const raw = readNumberStorage(SCALE_STORAGE_KEY, 100);
   return A3_SCALE_OPTIONS.includes(raw) ? raw : 100;
 }
 
@@ -19,7 +21,7 @@ function setAppScaledSize(scale: number) {
 
 function applyScale(scale: number) {
   const safeScale = A3_SCALE_OPTIONS.includes(scale) ? scale : 100;
-  localStorage.setItem(SCALE_STORAGE_KEY, String(safeScale));
+  writeTextStorage(SCALE_STORAGE_KEY, safeScale);
   setAppScaledSize(safeScale);
   document.documentElement.style.setProperty("zoom", `${safeScale}%`);
   (document.body.style as CSSStyleDeclaration & { zoom?: string }).zoom = `${safeScale}%`;
