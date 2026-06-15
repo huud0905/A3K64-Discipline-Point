@@ -1,16 +1,11 @@
-import { SESSION_KEY } from './core/auth';
+import { readSavedLoginSession, SESSION_KEY } from './core/auth';
 import { preloadScoreboardFromGas } from './core/gas';
 
 let started = false;
 let startTimer = 0;
 
 function hasLoginSession() {
-  try {
-    const session = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null') as { user?: unknown; expiresAt?: number } | null;
-    return Boolean(session?.user && (!session.expiresAt || session.expiresAt > Date.now()));
-  } catch {
-    return false;
-  }
+  return Boolean(readSavedLoginSession());
 }
 
 function startPreload(reason = 'idle') {
