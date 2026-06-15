@@ -1,3 +1,4 @@
+import { appendScriptOnce, appendStylesheetOnce } from './core/dom';
 import { getSystemTheme } from './core/theme';
 
 function colorLuminance(value: string) {
@@ -111,21 +112,11 @@ function syncOverlayTheme() {
 }
 
 function loadSeatingSelfHighlightLightScript() {
-  if (document.getElementById('a3k64-seating-self-highlight-light-script')) return;
-  const script = document.createElement('script');
-  script.id = 'a3k64-seating-self-highlight-light-script';
-  script.src = '/seating-self-highlight-light.js';
-  script.defer = true;
-  document.head.appendChild(script);
+  appendScriptOnce('a3k64-seating-self-highlight-light-script', '/seating-self-highlight-light.js', { defer: true });
 }
 
 function loadSeatingAdminViewCss() {
-  if (document.getElementById('a3k64-seating-admin-view-css')) return;
-  const link = document.createElement('link');
-  link.id = 'a3k64-seating-admin-view-css';
-  link.rel = 'stylesheet';
-  link.href = '/seating-admin-view.css';
-  document.head.appendChild(link);
+  appendStylesheetOnce('a3k64-seating-admin-view-css', '/seating-admin-view.css');
 }
 
 const observer = new MutationObserver(syncOverlayTheme);
