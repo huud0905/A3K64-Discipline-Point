@@ -1,5 +1,5 @@
 import '../../seatingMapStableApp';
-import '../../seatingRoleGate';
+import '../../apps/Seating/runtime/seatingRoleGate';
 import '../../seatingInteractionToolsPatch';
 import '../../seatingSeatSwapHardPatch';
 import '../../seatingRestoreAndControlsPatch';
