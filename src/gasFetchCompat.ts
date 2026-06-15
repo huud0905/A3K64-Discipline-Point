@@ -1,3 +1,5 @@
+import { requestJsonp } from './core/network';
+
 type JsonRecord = Record<string, unknown>;
 
 const GAS_URL = import.meta.env.VITE_GAS_WEB_APP_URL?.trim();
@@ -49,49 +51,22 @@ function getActionAndPayload(input: RequestInfo | URL, init?: RequestInit): { ac
   return { action, payload };
 }
 
-function jsonp(action: string, payload?: unknown): Promise<JsonRecord> {
+async function jsonp(action: string, payload?: unknown): Promise<JsonRecord> {
   if (!GAS_URL || typeof document === "undefined") {
-    return Promise.reject(new Error("Chưa cấu hình VITE_GAS_WEB_APP_URL."));
+    throw new Error("Chưa cấu hình VITE_GAS_WEB_APP_URL.");
   }
 
-  return new Promise((resolve, reject) => {
-    const callbackName = `__a3k64GasCompat_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const script = document.createElement("script");
-    const url = new URL(GAS_URL);
-    let timeoutId = 0;
-    let done = false;
+  const data = await requestJsonp<JsonRecord>(
+    GAS_URL,
+    { action, payload },
+    { timeoutMs: JSONP_TIMEOUT_MS, callbackPrefix: "__a3k64GasCompat" }
+  );
 
-    const cleanup = () => {
-      if (done) return;
-      done = true;
-      window.clearTimeout(timeoutId);
-      delete (window as typeof window & Record<string, unknown>)[callbackName];
-      script.remove();
-    };
+  if (!data) {
+    throw new Error("Google Apps Script chưa trả JSONP. Hãy dùng api.gs mới và deploy Web App quyền Anyone.");
+  }
 
-    url.searchParams.set("action", action);
-    url.searchParams.set("callback", callbackName);
-    url.searchParams.set("t", String(Date.now()));
-    if (payload !== undefined) url.searchParams.set("payload", JSON.stringify(payload));
-
-    (window as typeof window & Record<string, unknown>)[callbackName] = (data: JsonRecord) => {
-      cleanup();
-      resolve(data);
-    };
-
-    script.onerror = () => {
-      cleanup();
-      reject(new Error("Google Apps Script chưa trả JSONP. Hãy dùng api.gs mới và deploy Web App quyền Anyone."));
-    };
-
-    timeoutId = window.setTimeout(() => {
-      cleanup();
-      reject(new Error("Google Apps Script phản hồi quá lâu. Kiểm tra deploy Web App hoặc api.gs."));
-    }, JSONP_TIMEOUT_MS);
-
-    script.src = url.toString();
-    document.head.appendChild(script);
-  });
+  return data;
 }
 
 function responseFrom(data: JsonRecord, status = 200) {
