@@ -1,6 +1,6 @@
 import '../../personalizationSync';
 import '../../appDataPreloader';
-import '../../desktopInteractionFix';
+import '../desktop/runtime/desktopInteractionFix';
 import '../../apps/Profile/runtime/profileWeekTableFix';
 import '../../taskViewEnhancer';
 import '../../startMenuListEnhancer';
