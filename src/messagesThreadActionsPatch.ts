@@ -1,23 +1,21 @@
+import { normalizedElementText, upsertStyleTag } from './core/dom';
+import { readJsonStorage, writeJsonStorage } from './core/storage';
+
 const HIDDEN_KEY = 'a3k64-message-hidden-thread-labels-v1';
 const UNREAD_KEY = 'a3k64-message-unread-thread-labels-v1';
 const STYLE_ID = 'a3-message-thread-actions-style';
 
 function readList(key: string) {
-  try {
-    const raw = localStorage.getItem(key);
-    const list = raw ? JSON.parse(raw) : [];
-    return Array.isArray(list) ? list.map(String) : [];
-  } catch {
-    return [];
-  }
+  const list = readJsonStorage<unknown>(key, []);
+  return Array.isArray(list) ? list.map(String) : [];
 }
 
 function writeList(key: string, list: string[]) {
-  localStorage.setItem(key, JSON.stringify(Array.from(new Set(list))));
+  writeJsonStorage(key, Array.from(new Set(list)));
 }
 
 function threadLabel(thread: Element) {
-  return (thread.querySelector('strong')?.textContent || '').trim();
+  return normalizedElementText(thread.querySelector('strong'));
 }
 
 function isHidden(label: string) {
@@ -41,10 +39,7 @@ function isUnread(label: string) {
 }
 
 function ensureStyle() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
-  style.id = STYLE_ID;
-  style.textContent = `
+  upsertStyleTag(STYLE_ID, `
     .messages-thread{position:relative!important;padding-right:42px!important;overflow:visible!important}
     .messages-thread.a3-thread-hidden{display:none!important}
     .a3-thread-more{position:absolute;right:9px;top:9px;width:28px;height:28px;border:1px solid transparent;border-radius:999px;display:grid;place-items:center;color:#94a3b8;background:rgba(15,23,42,.72);opacity:0;pointer-events:none;transition:opacity .15s ease,background .15s ease,border-color .15s ease;z-index:5}
@@ -64,8 +59,7 @@ function ensureStyle() {
     .win-root.theme-light .a3-thread-menu button{color:#0f172a}
     .win-root.theme-light .a3-thread-menu button:hover{background:#e2e8f0}
     .win-root.theme-light .a3-thread-menu button.danger{color:#dc2626}
-  `;
-  document.head.appendChild(style);
+  `);
 }
 
 function closeOtherMenus(current?: Element) {
