@@ -11,7 +11,7 @@ import '../../seatingPublishLitePatch';
 import '../../apps/Seating/runtime/seatingToolbarStable';
 import '../../apps/Seating/runtime/seatingEditNoRerenderPatch';
 import '../../seatingAutoSave';
-import '../../seatingNotificationDock';
+import '../../apps/Seating/runtime/seatingNotificationDock';
 import '../../apps/Seating/runtime/seatingUiOcdFinalFix';
 import '../../apps/Seating/runtime/seatingFinalInteractionFix';
 import '../../seatingPrintExportA4';
