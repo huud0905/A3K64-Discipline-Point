@@ -1,30 +1,18 @@
+import { readSavedLoginSession } from './core/auth';
+import { normalizeRole } from './core/permissions';
+
 const SEAT_GATE_ADMIN_ROLES = ["lop_truong", "bi_thu", "gvcn"];
 let seatGateCount = 0;
 let seatGateTimer = 0;
 
-function seatGateRoleText(value: unknown) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/[\s-]+/g, "_");
-}
-
 function seatGateCurrentRole() {
-  try {
-    const session = JSON.parse(localStorage.getItem("a3k64-login-session-v1") || "null");
-    const user = session?.user || session || {};
-    const role = seatGateRoleText(user.role || user.userRole || "");
-    if (role.includes("gvcn") || role.includes("giao_vien") || role.includes("admin")) return "gvcn";
-    if (role.includes("lop_truong")) return "lop_truong";
-    if (role.includes("bi_thu")) return "bi_thu";
-    if (role.includes("to_truong")) return "to_truong";
-    return role || "hoc_sinh";
-  } catch {
-    return "hoc_sinh";
-  }
+  const user = readSavedLoginSession<Record<string, unknown>>()?.user || {};
+  const role = normalizeRole(String(user.role || user.userRole || ""));
+  if (role.includes("gvcn") || role.includes("giao_vien") || role.includes("admin")) return "gvcn";
+  if (role.includes("lop_truong")) return "lop_truong";
+  if (role.includes("bi_thu")) return "bi_thu";
+  if (role.includes("to_truong")) return "to_truong";
+  return role || "hoc_sinh";
 }
 
 function seatGateTick() {
