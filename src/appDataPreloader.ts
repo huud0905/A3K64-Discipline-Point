@@ -1,6 +1,6 @@
-import { preloadScoreboardFromGas } from './lib/gasApi';
+import { SESSION_KEY } from './core/auth';
+import { preloadScoreboardFromGas } from './core/gas';
 
-const SESSION_KEY = 'a3k64-login-session-v1';
 let started = false;
 let startTimer = 0;
 
