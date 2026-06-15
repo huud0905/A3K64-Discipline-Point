@@ -9,7 +9,7 @@ function readRole() {
 }
 
 function canUsePermissionRequests() {
-  return readRole() === 'to_truong' || readRole() === 'to truong';
+  return readRole() === 'to_truong';
 }
 
 function ensureStyle() {
