@@ -1,2 +1,2 @@
-@import '../messagesMessengerBubblePolish.css';
-@import '../messagesLightModeHardFix.css';
+@import './patches/messagesMessengerBubblePolish.css';
+@import './patches/messagesLightModeHardFix.css';
