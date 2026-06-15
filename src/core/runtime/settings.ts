@@ -1,1 +1,1 @@
-import '../../settingsDisplayOptionsPatch';
+import '../../apps/Settings/runtime/settingsDisplayOptionsPatch';
