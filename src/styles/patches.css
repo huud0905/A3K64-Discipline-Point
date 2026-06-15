@@ -1,0 +1,14 @@
+@import './patches/globalLoadingThemeFix.css';
+@import './patches/login-responsive-polish.css';
+@import './patches/messagesLightModeHardFix.css';
+@import './patches/messagesMessengerBubblePolish.css';
+@import './patches/messagesMessengerMobileFinal.css';
+@import './patches/messagesMobileBackVisibleFix.css';
+@import './patches/messagesMobileCleanFinal.css';
+@import './patches/messagesMobileInterfaceFix.css';
+@import './patches/overlayLightDarkFix.css';
+@import './patches/overlayToastAndFooterFix.css';
+@import './patches/profileWeekSwitcherPolish.css';
+@import './patches/scoreboard-final-fix.css';
+@import './patches/scoreboard-final-polish.css';
+@import './patches/scoreboard-modal-fix.css';
