@@ -1,4 +1,4 @@
-// Temporary app-runtime wrapper while the large publish runtime is migrated safely.
+// Preparing exact blob move for the large publish runtime.
 import '../../../seatingPublishLitePatch';
 
 export {};
