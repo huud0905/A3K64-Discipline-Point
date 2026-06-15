@@ -1,6 +1,8 @@
+import { normalizedElementLowerText } from './core/dom';
+
 function markGlobalLoading() {
   document.querySelectorAll<HTMLElement>('div,section').forEach((el) => {
-    const t = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const t = normalizedElementLowerText(el);
     if (!t.includes('đang xử lý') && !t.includes('dang xu ly')) return;
     const rect = el.getBoundingClientRect();
     const area = rect.width * rect.height;
