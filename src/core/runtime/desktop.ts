@@ -1,7 +1,7 @@
 import '../../personalizationSync';
 import '../../appDataPreloader';
 import '../../desktopInteractionFix';
-import '../../profileWeekTableFix';
+import '../../apps/Profile/runtime/profileWeekTableFix';
 import '../../taskViewEnhancer';
 import '../../startMenuListEnhancer';
 import '../../mobileAppShell';
