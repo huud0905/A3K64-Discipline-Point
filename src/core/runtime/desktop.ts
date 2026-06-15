@@ -1,5 +1,5 @@
 import '../../personalizationSync';
-import '../../appDataPreloader';
+import './base/appDataPreloader';
 import '../desktop/runtime/desktopInteractionFix';
 import '../../apps/Profile/runtime/profileWeekTableFix';
 import '../../taskViewEnhancer';
