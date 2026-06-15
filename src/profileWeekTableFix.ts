@@ -1,3 +1,5 @@
+import { upsertStyleTag } from './core/dom';
+
 function weekFromText(text: string) {
   const match = text.match(/(?:T|Tuần)\s*(\d+)/i);
   return match ? Number(match[1]) : null;
@@ -90,12 +92,7 @@ function installProfileHistoryInlineSelector() {
 }
 
 function injectProfileWeekTableCss() {
-  const oldStyle = document.getElementById('a3k64-profile-week-table-fix-css');
-  oldStyle?.remove();
-
-  const style = document.createElement('style');
-  style.id = 'a3k64-profile-week-table-fix-css';
-  style.textContent = `
+  upsertStyleTag('a3k64-profile-week-table-fix-css', `
     .profile-week-radio{display:none!important}
     .profile-status-radio-cell{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:0!important;min-width:0!important}
     .profile-week-table tbody tr{cursor:pointer!important}
@@ -117,8 +114,7 @@ function injectProfileWeekTableCss() {
     .profile-table-wrap{max-height:none!important;height:auto!important}
     .profile-app-shell,.profile-app-shell *{overflow-anchor:auto!important}
     @media(max-width:720px){.profile-week-picker{min-width:260px!important}.profile-week-picker div{grid-template-rows:repeat(9,auto)!important;grid-auto-columns:minmax(96px,1fr)!important}.profile-week-picker button{padding:8px 10px!important}}
-  `;
-  document.head.appendChild(style);
+  `);
 }
 
 injectProfileWeekTableCss();
