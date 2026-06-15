@@ -12,3 +12,5 @@
 @import './patches/scoreboard-final-fix.css';
 @import './patches/scoreboard-final-polish.css';
 @import './patches/scoreboard-modal-fix.css';
+
+/* CSS patches are stored under src/styles/patches. */
