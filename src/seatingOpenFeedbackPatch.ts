@@ -1,3 +1,5 @@
+import { normalizedElementText, upsertStyleTag } from './core/dom';
+
 const SEAT_OPEN_FEEDBACK_WINDOW = "#a3k64-seating-window";
 const SEAT_OPEN_FEEDBACK_STYLE_ID = "a3k64-seat-open-feedback-style";
 const SEAT_OPEN_FEEDBACK_TOAST_ID = "a3k64-seat-opening-toast";
@@ -14,10 +16,7 @@ function seatOpenFeedbackDock() {
 }
 
 function injectSeatOpenFeedbackStyle() {
-  if (document.getElementById(SEAT_OPEN_FEEDBACK_STYLE_ID)) return;
-  const style = document.createElement("style");
-  style.id = SEAT_OPEN_FEEDBACK_STYLE_ID;
-  style.textContent = `
+  upsertStyleTag(SEAT_OPEN_FEEDBACK_STYLE_ID, `
     ${SEAT_OPEN_FEEDBACK_WINDOW} .seat-ctrl-select{min-width:190px!important;z-index:260!important;}
     ${SEAT_OPEN_FEEDBACK_WINDOW} .seat-ctrl-menu{min-height:0!important;height:auto!important;max-height:260px!important;padding:6px!important;overflow:auto!important;}
     ${SEAT_OPEN_FEEDBACK_WINDOW} .seat-ctrl-option{height:38px!important;border-radius:12px!important;}
@@ -32,8 +31,7 @@ function injectSeatOpenFeedbackStyle() {
     #${SEAT_OPEN_FEEDBACK_TOAST_ID} .seat-docked-close{width:28px;height:28px;min-width:28px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#475569;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-weight:1000;line-height:1;padding:0;pointer-events:auto!important;grid-column:3;}
     #${SEAT_OPEN_FEEDBACK_TOAST_ID} .seat-docked-close:hover{border-color:#fb7185;color:#e11d48;background:#fff1f2;}
     @keyframes a3SeatOpeningSpin{to{transform:rotate(360deg)}}
-  `;
-  document.head.appendChild(style);
+  `);
 }
 
 function showSeatOpeningToast(message: string, done = false) {
@@ -68,11 +66,11 @@ function bootSeatOpenFeedbackPatch() {
     const target = event.target as HTMLElement | null;
     const option = target?.closest?.(`${SEAT_OPEN_FEEDBACK_WINDOW} .seat-ctrl-option`) as HTMLElement | null;
     if (!option) return;
-    const title = (option.textContent || "sơ đồ").trim();
+    const title = normalizedElementText(option) || "sơ đồ";
     showSeatOpeningToast(`Đang mở ${title}...`);
   }, true);
   window.addEventListener("a3k64:seating-changed", () => {
-    const active = document.querySelector<HTMLElement>(`${SEAT_OPEN_FEEDBACK_WINDOW} .seat-ctrl-trigger span`)?.textContent?.trim() || "sơ đồ";
+    const active = normalizedElementText(document.querySelector<HTMLElement>(`${SEAT_OPEN_FEEDBACK_WINDOW} .seat-ctrl-trigger span`)) || "sơ đồ";
     showSeatOpeningToast(`Đã mở ${active}.`, true);
   });
 }
