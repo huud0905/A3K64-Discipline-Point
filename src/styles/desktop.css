@@ -1,7 +1,7 @@
-@import '../desktopLightThemeHardFix.css';
-@import '../desktopDarkBackgroundSoftFix.css';
-@import '../settingsWallpaperUiPolish.css';
-@import '../settingsToggleAccentFix.css';
-@import '../desktopCleanWallpaperMode.css';
-@import '../taskFocusSwitchDarkOnFix.css';
+@import './patches/desktopLightThemeHardFix.css';
+@import './patches/desktopDarkBackgroundSoftFix.css';
+@import './patches/settingsWallpaperUiPolish.css';
+@import './patches/settingsToggleAccentFix.css';
+@import './patches/desktopCleanWallpaperMode.css';
+@import './patches/taskFocusSwitchDarkOnFix.css';
 @import './patches/profileWeekSwitcherPolish.css';
