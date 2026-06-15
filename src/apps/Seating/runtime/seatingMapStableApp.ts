@@ -1,4 +1,4 @@
-// Temporary app-runtime wrapper while the large stable seating app is migrated safely.
+// Preparing exact blob move for the large stable seating app.
 import '../../../seatingMapStableApp';
 
 export {};
