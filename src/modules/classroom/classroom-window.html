@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sơ đồ lớp A3</title>
+<link rel="stylesheet" href="classroom.css" />
+<style>
+  html, body { height:100%; margin:0; padding:0; background:#0b1220; color:#f8fafc; }
+  #classroom-root { min-height:100%; }
+</style>
+</head>
+<body>
+  <div id="classroom-root"></div>
+
+  <script>
+    // Trang này chạy TRONG iframe của desktop.html — cùng origin nên
+    // dùng chung sessionStorage/localStorage với desktop, không cần
+    // truyền dữ liệu qua query string. (Cùng quy ước với scoreboard-window.html)
+    window.__classroom_manual_init = true;
+  </script>
+  <script src="../../assets/js/config.js"></script>
+  <script src="classroom.js"></script>
+  <script>
+    /* ---- Đọc accent do desktop.html/login.html lưu ---- */
+    const ACCENT_COLORS = { blue:'#2563eb', violet:'#7c3aed', pink:'#db2777', green:'#059669', amber:'#d97706', red:'#dc2626' };
+
+    function normalizeAccent(val) {
+      if (!val) return null;
+      const raw = val.trim();
+      if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw)) return raw;
+      return ACCENT_COLORS[raw.toLowerCase()] || null;
+    }
+    function readAccent() {
+      const keys = ['login-accent','accent-color','accent','desktop-accent','a3k64-accent'];
+      for (const k of keys) {
+        const c = normalizeAccent(localStorage.getItem(k));
+        if (c) return c;
+      }
+      return ACCENT_COLORS.blue;
+    }
+
+    // Vai trò trong login.html/desktop.html hiện dùng nhãn khác với
+    // Classroom ('student'/'admin' thay vì 'hoc_sinh'/'gvcn'...).
+    // Map tạm cho tới khi 2 bên thống nhất 1 bộ nhãn vai trò chung
+    // (giống hệt cách scoreboard-window.html đang làm).
+    function normalizeRoleForClassroom(rawRole) {
+      const r = String(rawRole || '').trim().toLowerCase();
+      const map = {
+        student: 'hoc_sinh',
+        admin: 'gvcn',
+        gvcn: 'gvcn',
+        hoc_sinh: 'hoc_sinh',
+        to_truong: 'to_truong',
+        lop_truong: 'lop_truong',
+        bi_thu: 'bi_thu',
+      };
+      return map[r] || 'hoc_sinh';
+    }
+
+    function readDesktopUser() {
+      try { return JSON.parse(sessionStorage.getItem('a3k64-user') || 'null'); }
+      catch { return null; }
+    }
+
+    (function boot() {
+      const accent = readAccent();
+      document.documentElement.style.setProperty('--desktop-accent', accent);
+      document.documentElement.style.setProperty('--accent', accent);
+
+      const desktopUser = readDesktopUser();
+      const userRole  = normalizeRoleForClassroom(desktopUser?.role);
+      const userName  = desktopUser?.displayName || null;
+      const userGroup = desktopUser?.group ?? desktopUser?.to ?? null;
+      const gasUrl = (window.A3K64_CONFIG && window.A3K64_CONFIG.gasUrl) || null;
+
+      initClassroom({ userRole, userName, userGroup, gasUrl });
+    })();
+  </script>
+</body>
+</html>

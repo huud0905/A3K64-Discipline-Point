@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bảng điểm A3</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="scoreboard.css" />
+<style>
+  html, body { height:100%; margin:0; padding:0; background:#0b1220; color:#f8fafc; }
+  #scoreboard-root { min-height:100%; }
+</style>
+</head>
+<body>
+  <div id="scoreboard-root"></div>
+
+  <script>
+    window.__scoreboard_manual_init = true;
+  </script>
+  <script src="../../assets/js/config.js"></script>
+  <script src="scoreboard.js"></script>
+  <script src="scoreboard-extras.js"></script>
+  <script>
+    const ACCENT_COLORS = { blue:'#2563eb', violet:'#7c3aed', pink:'#db2777', green:'#059669', amber:'#d97706', red:'#dc2626' };
+
+    function normalizeAccent(val) {
+      if (!val) return null;
+      const raw = val.trim();
+      if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw)) return raw;
+      return ACCENT_COLORS[raw.toLowerCase()] || null;
+    }
+    function readAccent() {
+      const keys = ['login-accent','accent-color','accent','desktop-accent','a3k64-accent'];
+      for (const k of keys) {
+        const c = normalizeAccent(localStorage.getItem(k));
+        if (c) return c;
+      }
+      return ACCENT_COLORS.blue;
+    }
+
+    function normalizeRoleForScoreboard(rawRole) {
+      const r = String(rawRole || '').trim().toLowerCase();
+      const map = {
+        student: 'hoc_sinh', admin: 'gvcn', gvcn: 'gvcn',
+        hoc_sinh: 'hoc_sinh', to_truong: 'to_truong',
+        lop_truong: 'lop_truong', bi_thu: 'bi_thu',
+      };
+      return map[r] || 'hoc_sinh';
+    }
+
+    function readDesktopUser() {
+      try { return JSON.parse(sessionStorage.getItem('a3k64-user') || 'null'); }
+      catch { return null; }
+    }
+
+    (function boot() {
+      const accent = readAccent();
+      document.documentElement.style.setProperty('--desktop-accent', accent);
+      document.documentElement.style.setProperty('--accent', accent);
+
+      const desktopUser = readDesktopUser();
+      const userRole = normalizeRoleForScoreboard(desktopUser?.role);
+      const userGroup = desktopUser?.group ?? desktopUser?.to ?? null;
+
+      const gasUrl = (window.A3K64_CONFIG && window.A3K64_CONFIG.gasUrl) || null;
+      initScoreboard({ userRole, userGroup, gasUrl });
+    })();
+  </script>
+</body>
+</html>
