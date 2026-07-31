@@ -414,7 +414,7 @@ function buildWindowContent(app) {
   if (app.key === 'students') {
     return `
       <div class="win-embed">
-        <iframe class="win-embed-frame" src="../modules/classroom/classroom-window.html" title="${app.title}" loading="lazy"></iframe>
+        <iframe class="win-embed-frame" src="../modules/classroom/seating-window.html" title="${app.title}" loading="lazy"></iframe>
       </div>`;
   }
   // Generic placeholder content (replace with real app content later)
