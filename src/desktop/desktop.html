@@ -22,15 +22,11 @@
     let u;
     try { u = JSON.parse(sessionStorage.getItem('a3k64-user') || 'null'); } catch { u = null; }
 
-    // Fallback demo user (xóa dòng này khi tích hợp login thật)
-    if (!u) u = {
-      displayName : 'Demo Quản trị (gvcn)',
-      email       : 'demo@gmail.com',
-      photoURL    : null,
-      role        : 'gvcn',
-    };
-
-    try { sessionStorage.setItem('a3k64-user', JSON.stringify(u)); } catch {}
+    // Không có session → chuyển về trang đăng nhập
+    if (!u) {
+      window.location.replace('../auth/login.html');
+      return;
+    }
 
     initDesktop(u);
   })();
