@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Profile — A3K64</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent: #2563eb;
+      --bg: #07111f;
+      --panel: #0f172a;
+      --soft: #111827;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #233047;
+      --positive: #00b981;
+      --negative: #ef4444;
+    }
+    .theme-light {
+      --bg: #f8fbff;
+      --panel: #ffffff;
+      --soft: #edf3fa;
+      --text: #111827;
+      --muted: #64748b;
+      --border: #d6e2ef;
+    }
+
+    html, body {
+      height: 100%; width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+      font-size: 14px;
+      overflow: hidden;
+    }
+
+    /* ── Shell layout ── */
+    #shell {
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 256px minmax(0, 1fr);
+      overflow: hidden;
+    }
+    #shell.horizontal {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      border-right: 1px solid var(--border);
+      background: color-mix(in srgb, var(--soft) 78%, #000 8%);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px 10px;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    #shell.horizontal #sidebar {
+      flex-direction: row;
+      align-items: center;
+      border-right: 0;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 8px 10px;
+      flex-wrap: nowrap;
+    }
+    .sidebar-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+      flex-shrink: 0;
+    }
+    #shell.horizontal .sidebar-top { margin: 0; }
+    .sidebar-label {
+      font-size: 11px;
+      font-weight: 900;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    #shell.horizontal .sidebar-label { display: none; }
+
+    .tab-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+    #shell.horizontal .tab-list {
+      flex-direction: row;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .tab-btn {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 18px;
+      align-items: center;
+      gap: 6px;
+      min-height: 40px;
+      border: 0;
+      border-radius: 10px;
+      padding: 0 8px;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      font: inherit;
+      font-weight: 800;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .tab-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tab-btn:hover, .tab-btn.active {
+      background: var(--panel);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+    #shell.horizontal .tab-btn:hover,
+    #shell.horizontal .tab-btn.active {
+      box-shadow: inset 0 -3px 0 var(--accent);
+    }
+    .tab-btn .close-icon {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1;
+      display: grid;
+      place-items: center;
+      border-radius: 4px;
+      padding: 0 2px;
+    }
+    .tab-btn .close-icon:hover { background: rgba(239,68,68,.2); color: #ef4444; }
+
+    .btn-new-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 40px;
+      border: 0;
+      border-radius: 10px;
+      padding: 0 8px;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .btn-new-tab:hover { background: var(--panel); }
+    #shell.horizontal .btn-new-tab { min-width: 38px; justify-content: center; }
+    #shell.horizontal .btn-new-tab .new-tab-label,
+    #shell.horizontal .btn-new-tab .new-tab-kbd { display: none; }
+
+    .btn-mini-new {
+      width: 30px; height: 30px;
+      border: 0; border-radius: 9px;
+      display: grid; place-items: center;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 18px;
+    }
+    .btn-mini-new:hover { background: var(--panel); }
+
+    /* ── Main area ── */
+    #main {
+      overflow-y: auto;
+      overflow-x: hidden;
+      background: var(--bg);
+    }
+
+    /* ── New-tab search page ── */
+    .new-tab-page {
+      min-height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+    .browser-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    .browser-nav {
+      width: 32px; height: 32px;
+      border: 0; border-radius: 50%;
+      display: grid; place-items: center;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+    }
+    .browser-nav:hover:not(:disabled) { background: var(--soft); color: var(--text); }
+    .browser-nav:disabled { opacity: .4; cursor: default; }
+    .address-bar {
+      flex: 1;
+      height: 36px;
+      border: 2px solid var(--accent);
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      background: var(--bg);
+      color: var(--muted);
+    }
+    .address-bar input {
+      flex: 1;
+      border: 0; outline: 0;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-weight: 800;
+    }
+    .search-results-wrap {
+      padding: 10px 12px;
+      position: relative;
+    }
+    .search-results {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 8px;
+      background: var(--panel);
+      box-shadow: 0 16px 48px rgba(0,0,0,.3);
+      display: grid;
+      gap: 4px;
+    }
+    .result-btn {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border: 0;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      text-align: left;
+    }
+    .result-btn:hover { background: var(--soft); }
+    .result-btn small { color: var(--muted); font-weight: 600; }
+    .no-result { padding: 14px; color: var(--muted); text-align: center; font-weight: 700; }
+
+    /* ── Profile page ── */
+    .profile-page {
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    /* Hero */
+    .p-hero {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, transparent), var(--panel));
+    }
+    .p-avatar {
+      width: 68px; height: 68px;
+      border-radius: 22px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      color: #fff;
+      font-size: 26px;
+      font-weight: 900;
+    }
+    .p-hero-info h1 {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -.04em;
+      margin: 4px 0;
+    }
+    .p-hero-info p { color: var(--muted); font-weight: 700; margin: 0; font-size: 13px; }
+    .p-hero-meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    .p-hero-meta span { color: var(--muted); font-size: 13px; }
+    .p-rank-badge { text-align: center; }
+    .p-rank-badge strong { font-size: 28px; font-weight: 900; }
+    .p-rank-badge small { display: block; color: var(--muted); font-size: 11px; }
+
+    /* Week switcher */
+    .week-sw {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--panel) 70%, transparent);
+    }
+    .week-sw button {
+      width: 26px; height: 26px;
+      border: 0; border-radius: 50%;
+      display: grid; place-items: center;
+      background: var(--soft);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .week-sw button:disabled { opacity: .35; cursor: default; }
+    .week-sw select {
+      min-width: 96px;
+      height: 26px;
+      border: 0; outline: 0; border-radius: 999px;
+      padding: 0 8px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    /* Stat grid */
+    .p-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .stat-card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--panel);
+      padding: 12px 14px;
+    }
+    .stat-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+    .stat-card b {
+      display: block;
+      margin-top: 4px;
+      font-size: 19px;
+      font-weight: 900;
+    }
+    .stat-card.total-rank {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 0;
+      align-items: center;
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--panel)), var(--panel));
+      border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+    }
+    .stat-card.total-rank .tr-left { flex: 1; }
+    .stat-card.total-rank .tr-right {
+      text-align: right;
+      padding-left: 16px;
+      border-left: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+    }
+    .color-positive { color: var(--positive) !important; }
+    .color-negative { color: var(--negative) !important; }
+
+    /* Chart + notes grid */
+    .p-mid-grid {
+      display: grid;
+      grid-template-columns: 1.4fr .9fr;
+      gap: 12px;
+    }
+    .p-card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--panel);
+      padding: 14px;
+    }
+    .p-card h2 {
+      font-size: 15px;
+      font-weight: 900;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .p-card ul { padding-left: 18px; line-height: 1.7; }
+    .p-card p { line-height: 1.6; margin-bottom: 6px; font-size: 13px; }
+
+    /* SVG chart */
+    .profile-chart {
+      width: 100%;
+      height: 200px;
+      overflow: visible;
+    }
+    .chart-axis { stroke: var(--border); stroke-width: 1; }
+    .chart-line-me    { fill: none; stroke: #38bdf8; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    .chart-line-grp   { fill: none; stroke: #a78bfa; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+    .chart-line-cls   { fill: none; stroke: #64748b; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .chart-dot        { fill: #38bdf8; stroke: var(--panel); stroke-width: 2; }
+    .chart-label      { fill: var(--muted); font-size: 11px; font-weight: 700; }
+    .chart-value      { fill: var(--text); font-size: 12px; font-weight: 900; }
+    .chart-legend     { fill: var(--muted); font-size: 11px; font-weight: 700; }
+
+    /* Week overview table */
+    .p-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .p-table-wrap table {
+      width: 100%;
+      min-width: 680px;
+      border-collapse: collapse;
+    }
+    .p-table-wrap th {
+      padding: 9px 11px;
+      background: var(--soft);
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .p-table-wrap td {
+      padding: 9px 11px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--text);
+    }
+    .p-table-wrap tbody tr:hover { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+    .p-table-wrap tbody tr:last-child td { border-bottom: 0; }
+
+    /* History section */
+    .filter-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .filter-btn {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 5px 11px;
+      background: var(--soft);
+      color: var(--text);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .filter-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    /* Empty state */
+    .p-empty {
+      padding: 40px;
+      text-align: center;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    /* Loading */
+    .p-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      min-height: 200px;
+      color: var(--muted);
+      font-weight: 700;
+      gap: 10px;
+    }
+    .spinner {
+      width: 20px; height: 20px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Context menu */
+    .ctx-menu {
+      position: fixed;
+      z-index: 9999;
+      width: 220px;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--panel);
+      box-shadow: 0 20px 60px rgba(0,0,0,.45);
+      display: grid;
+      gap: 2px;
+    }
+    .ctx-menu button {
+      min-height: 32px;
+      border: 0; border-radius: 8px;
+      padding: 0 10px;
+      display: flex; align-items: center; gap: 8px;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      justify-content: space-between;
+    }
+    .ctx-menu button:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+    .ctx-menu button:disabled { opacity: .38; cursor: default; }
+    .ctx-menu kbd { color: var(--muted); font: inherit; font-size: 11px; }
+    .ctx-sep { height: 1px; background: var(--border); margin: 4px -6px; }
+
+    /* Responsive */
+    @media (max-width: 620px) {
+      #shell { grid-template-columns: 1fr; grid-template-rows: auto minmax(0,1fr); }
+      #sidebar { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; padding: 6px 8px; flex-wrap: nowrap; }
+      .sidebar-label { display: none; }
+      .tab-list { flex-direction: row; }
+      .tab-btn { min-width: 160px; }
+      .tab-btn:hover, .tab-btn.active { box-shadow: inset 0 -3px 0 var(--accent); }
+      .p-hero { grid-template-columns: auto minmax(0,1fr); }
+      .p-stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .p-mid-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div id="shell">
+  <div id="sidebar">
+    <div class="sidebar-top">
+      <span class="sidebar-label">Tab học sinh</span>
+      <button class="btn-mini-new" id="btn-mini-new" title="Tab mới">＋</button>
+    </div>
+    <div class="tab-list" id="tab-list"></div>
+    <button class="btn-new-tab" id="btn-new-tab">
+      <span style="font-size:16px">＋</span>
+      <span class="new-tab-label">Tab mới</span>
+      <kbd class="new-tab-kbd" style="color:var(--muted);font-size:11px">Ctrl+T</kbd>
+    </button>
+  </div>
+  <div id="main"></div>
+</div>
+<div id="ctx-menu" class="ctx-menu" style="display:none"></div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   A3K64 — Profile Window (vanilla JS)
+   ═══════════════════════════════════════════════ */
+
+/* ── Data layer ── */
+const GAS_API_URL = (() => {
+  try { return JSON.parse(localStorage.getItem('a3k64-config') || '{}').gasUrl || ''; } catch { return ''; }
+})();
+
+const LOCAL_EVENTS_KEY = 'scoreboard-local-events-v1';
+const LOCAL_WEEKS_KEY  = 'scoreboard-local-weeks-v1';
+const VTABS_KEY        = 'profile-vertical-tabs-v1';
+
+let DATA = { students: [], events: [], weeks: [], source: 'loading' };
+
+function normalize(v) {
+  return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+function formatScore(n) { return n > 0 ? `+${n}` : String(n); }
+function givenName(name) { const p = name.trim().split(/\s+/); return p[p.length - 1] || name; }
+function pad2(n) { return String(n).padStart(2, '0'); }
+function categoryLabel(cat) {
+  return cat === 'HOC_TAP' ? 'Học tập' : cat === 'NE_NEP' ? 'Nề nếp' : cat === 'PHONG_TRAO' ? 'Phong trào' : cat;
+}
+function getStatus(total) {
+  if (total >= 50) return 'Tốt';
+  if (total >= 0) return 'Khá';
+  if (total >= -50) return 'Đạt';
+  return 'Chưa đạt';
+}
+function isHiddenEvent(ev) { return String(ev.note || '').includes('__SHEET_TOTAL__'); }
+
+function summarize(students, events, week) {
+  const list = students.map(s => {
+    const wEvs = events.filter(e => e.studentId === s.id && e.week === week);
+    const visible = wEvs.filter(e => !isHiddenEvent(e));
+    const total = wEvs.reduce((sum, e) => sum + e.points, 0);
+    const positive = visible.filter(e => e.points > 0).reduce((sum, e) => sum + e.points, 0);
+    const negative = visible.filter(e => e.points < 0).reduce((sum, e) => sum + e.points, 0);
+    return { ...s, total, positive, negative, rank: 0, status: getStatus(total) };
+  });
+  const sorted = [...list].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'vi'));
+  let rank = 0; let prev = null;
+  sorted.forEach((s, i) => {
+    if (prev === null || s.total !== prev) { rank = i + 1; prev = s.total; }
+    const idx = list.findIndex(x => x.id === s.id);
+    if (idx >= 0) list[idx].rank = rank;
+  });
+  return list;
+}
+
+function catTotal(events, cat) {
+  return events.filter(e => e.category === cat).reduce((s, e) => s + e.points, 0);
+}
+
+function realWeeks() {
+  const from = DATA.weeks.filter(w => Number.isFinite(w) && w > 0);
+  const fromEvs = DATA.events.map(e => Number(e.week)).filter(w => Number.isFinite(w) && w > 0);
+  return [...new Set([...from, ...fromEvs])].sort((a, b) => a - b);
+}
+
+function latestWeek() {
+  const w = realWeeks();
+  return w[w.length - 1] || 1;
+}
+
+function alphabetStudents(arr) {
+  return [...arr].sort((a, b) => {
+    const g = givenName(a.name).localeCompare(givenName(b.name), 'vi', { sensitivity: 'base' });
+    return g || a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' });
+  });
+}
+
+function studentTitle(id) {
+  const sorted = alphabetStudents(DATA.students);
+  const s = DATA.students.find(x => x.id === id) || sorted.find(x => x.id === id);
+  const idx = Math.max(0, sorted.findIndex(x => x.id === id)) + 1;
+  return `${pad2(idx)} – ${s?.name || 'Học sinh'}`;
+}
+
+async function loadData() {
+  // Try GAS
+  if (GAS_API_URL) {
+    try {
+      const r = await fetch(`${GAS_API_URL}?action=getScoreboard`, { cache: 'no-cache' });
+      const j = await r.json();
+      if (j?.students?.length) {
+        DATA = { students: j.students, events: j.events || [], weeks: j.weeks?.length ? j.weeks : [1], source: 'gas' };
+        return;
+      }
+    } catch {}
+  }
+  // Try localStorage
+  try {
+    const evs = JSON.parse(localStorage.getItem(LOCAL_EVENTS_KEY) || 'null');
+    const wks = JSON.parse(localStorage.getItem(LOCAL_WEEKS_KEY) || 'null');
+    DATA = {
+      students: MOCK_STUDENTS,
+      events: evs?.length ? evs : [],
+      weeks: wks?.length ? wks : [1],
+      source: 'local'
+    };
+    return;
+  } catch {}
+  DATA = { students: MOCK_STUDENTS, events: [], weeks: [1], source: 'local' };
+}
+
+/* ── Mock students (fallback) ── */
+function initials(name) {
+  const p = name.trim().split(/\s+/);
+  return (p[p.length - 1]?.[0] || name[0] || '?').toUpperCase();
+}
+const MOCK_STUDENTS = [
+  { id: 's01', name: 'Nguyễn Thị Hằng', group: 1 },
+  { id: 's02', name: 'Nguyễn Minh Thiện', group: 1 },
+  { id: 's03', name: 'Nguyễn Ngọc Hiếu', group: 3 },
+  { id: 's04', name: 'Đinh Mạnh Hữu', group: 3, role: 'Lớp trưởng' },
+].map(s => ({ ...s, avatarInitial: initials(s.name) }));
+
+/* ── Tab state ── */
+let tabs = [];       // { key, kind:'student'|'new', id?, name?, title }
+let activeKey = '';
+let ctxMenu = null;  // { x, y, key }
+let verticalTabs = localStorage.getItem(VTABS_KEY) !== 'off';
+
+// Per-tab state
+let tabWeeks = {};      // key → current week
+let tabFilters = {};    // key → filter string
+
+function newTabKey() { return `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
+
+function getUser() {
+  try { return JSON.parse(sessionStorage.getItem('a3k64-user') || 'null') || {}; } catch { return {}; }
+}
+
+function currentUserStudent() {
+  const u = getUser();
+  const names = [u.displayName, u.email?.split('@')[0], u.hoten, u.name]
+    .map(normalize).filter(Boolean);
+  return DATA.students.find(s => names.some(n =>
+    normalize(s.name) === n || normalize(s.name).includes(n) || n.includes(normalize(s.name))
+  )) || alphabetStudents(DATA.students)[0];
+}
+
+function openStudent(id, week) {
+  if (DATA.source === 'loading' || !DATA.students.length) return;
+  const s = id ? DATA.students.find(x => x.id === id) : currentUserStudent();
+  if (!s) return;
+  const targetWeek = week || latestWeek();
+  // Check if already open
+  const existing = tabs.find(t => t.kind === 'student' && normalize(t.name) === normalize(s.name));
+  if (existing) {
+    activeKey = existing.key;
+    tabWeeks[existing.key] = targetWeek;
+    render();
+    return;
+  }
+  // Replace active new-tab or push new
+  const active = tabs.find(t => t.key === activeKey);
+  const tab = {
+    key: active?.kind === 'new' ? active.key : `student-${s.id}-${Date.now()}`,
+    kind: 'student',
+    id: s.id,
+    name: s.name,
+    title: studentTitle(s.id)
+  };
+  if (active?.kind === 'new') {
+    tabs = tabs.map(t => t.key === active.key ? tab : t);
+  } else {
+    tabs.push(tab);
+  }
+  activeKey = tab.key;
+  tabWeeks[tab.key] = targetWeek;
+  render();
+}
+
+function openNewTab(afterKey) {
+  const tab = { key: newTabKey(), kind: 'new', title: 'Tab mới' };
+  if (afterKey) {
+    const idx = tabs.findIndex(t => t.key === afterKey);
+    tabs.splice(idx >= 0 ? idx + 1 : tabs.length, 0, tab);
+  } else {
+    tabs.push(tab);
+  }
+  activeKey = tab.key;
+  render();
+}
+
+function closeTab(key) {
+  const idx = tabs.findIndex(t => t.key === key);
+  tabs = tabs.filter(t => t.key !== key);
+  if (activeKey === key) {
+    activeKey = tabs[Math.max(0, idx - 1)]?.key || tabs[0]?.key || '';
+  }
+  render();
+}
+
+function closeCtxMenu() { ctxMenu = null; document.getElementById('ctx-menu').style.display = 'none'; }
+
+/* ── Chart rendering ── */
+function buildChart(rows) {
+  // rows: [{week, me, group, cls}]
+  if (!rows.length) return '<p style="color:var(--muted);font-size:13px">Chưa có dữ liệu</p>';
+  const W = 860, H = 200, pl = 36, pr = 16, pt = 20, pb = 36;
+  const vals = rows.flatMap(r => [r.me, r.group, r.cls]);
+  const minV = Math.min(0, ...vals) - 8;
+  const maxV = Math.max(60, ...vals) + 8;
+  const rng = Math.max(1, maxV - minV);
+  const x = i => pl + (rows.length < 2 ? (W - pl - pr) / 2 : i * (W - pl - pr) / (rows.length - 1));
+  const y = v => H - pb - ((v - minV) * (H - pt - pb)) / rng;
+  const pts = key => rows.map((r, i) => `${x(i)},${y(r[key])}`).join(' ');
+
+  return `<svg class="profile-chart" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+    <line x1="${pl}" y1="${H - pb}" x2="${W - pr}" y2="${H - pb}" class="chart-axis"/>
+    <line x1="${pl}" y1="${pt}" x2="${pl}" y2="${H - pb}" class="chart-axis"/>
+    <polyline class="chart-line-cls" points="${pts('cls')}"/>
+    <polyline class="chart-line-grp" points="${pts('group')}"/>
+    <polyline class="chart-line-me" points="${pts('me')}"/>
+    ${rows.map((r, i) => `
+      <circle cx="${x(i)}" cy="${y(r.me)}" r="4.5" class="chart-dot"/>
+      <text x="${x(i)}" y="${y(r.me) - 9}" text-anchor="middle" class="chart-value">${r.me}</text>
+      <text x="${x(i)}" y="${H - 10}" text-anchor="middle" class="chart-label">T${r.week}</text>
+    `).join('')}
+    <text x="${pl + 6}" y="${pt + 2}" class="chart-legend" fill="#38bdf8">— Tôi</text>
+    <text x="${pl + 50}" y="${pt + 2}" class="chart-legend" fill="#a78bfa">— Tổ</text>
+    <text x="${pl + 90}" y="${pt + 2}" class="chart-legend" fill="#64748b">— Lớp</text>
+  </svg>`;
+}
+
+/* ── Profile page HTML ── */
+function buildProfilePage(tab) {
+  const weeks = realWeeks();
+  const activeWeek = tabWeeks[tab.key] || latestWeek();
+  const filter = tabFilters[tab.key] || 'all';
+
+  const summaries = summarize(DATA.students, DATA.events, activeWeek);
+  const student = summaries.find(s => s.id === tab.id);
+  if (!student) return `<div class="p-empty">Không tìm thấy học sinh này.<br>Hãy mở tab mới để tìm lại.</div>`;
+
+  const allEvents = DATA.events.filter(e => e.studentId === student.id && !isHiddenEvent(e));
+  const weekEvents = allEvents.filter(e => e.week === activeWeek);
+  const groupMembers = summaries.filter(s => s.group === student.group).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'vi'));
+  const groupRank = Math.max(1, groupMembers.findIndex(s => s.id === student.id) + 1);
+  const groupAvg = groupMembers.length ? Math.round(groupMembers.reduce((s, m) => s + m.total, 0) / groupMembers.length) : 0;
+  const above = groupMembers[groupRank - 2];
+  const below = groupMembers[groupRank];
+
+  const weekIdx = weeks.indexOf(activeWeek);
+  const prevWeek = weekIdx > 0 ? weeks[weekIdx - 1] : null;
+  const nextWeek = weekIdx >= 0 && weekIdx < weeks.length - 1 ? weeks[weekIdx + 1] : null;
+
+  // Build week rows for table (last 9 weeks)
+  const tableWeeks = weeks.slice(-9);
+  const weekRows = tableWeeks.map(w => {
+    const sums = summarize(DATA.students, DATA.events, w);
+    const cur = sums.find(s => s.id === student.id);
+    const grp = sums.filter(s => s.group === student.group);
+    const wEvs = allEvents.filter(e => e.week === w);
+    return {
+      week: w,
+      total: cur?.total ?? 0,
+      positive: cur?.positive ?? 0,
+      negative: cur?.negative ?? 0,
+      hocTap: catTotal(wEvs, 'HOC_TAP'),
+      neNep: catTotal(wEvs, 'NE_NEP'),
+      phongTrao: catTotal(wEvs, 'PHONG_TRAO'),
+      rank: cur?.rank ?? 0,
+      status: cur?.status ?? '—',
+      groupAvg: grp.length ? Math.round(grp.reduce((s, m) => s + m.total, 0) / grp.length) : 0,
+    };
+  });
+
+  // Chart data
+  const chartRows = tableWeeks.map(w => {
+    const sums = summarize(DATA.students, DATA.events, w);
+    const cur = sums.find(s => s.id === student.id);
+    const grp = sums.filter(s => s.group === student.group);
+    const cls = sums;
+    return {
+      week: w,
+      me: cur?.total ?? 0,
+      group: grp.length ? Math.round(grp.reduce((s, m) => s + m.total, 0) / grp.length) : 0,
+      cls: cls.length ? Math.round(cls.reduce((s, m) => s + m.total, 0) / cls.length) : 0,
+    };
+  });
+
+  // Filtered history
+  const history = allEvents
+    .filter(e => {
+      if (filter === 'all') return true;
+      if (filter === 'plus') return e.points > 0;
+      if (filter === 'minus') return e.points < 0;
+      return e.category === filter;
+    })
+    .sort((a, b) => b.week - a.week || (Date.parse(b.createdAt) - Date.parse(a.createdAt)));
+
+  // Notes
+  const notes = [
+    student.total >= 50 ? 'Đang ở mức Tốt, hãy duy trì phong độ.' : student.total >= 0 ? 'Kết quả ổn, có thể bứt lên nhóm Tốt.' : 'Điểm đang thấp, cần giảm lỗi trừ điểm.',
+    weekEvents.some(e => e.points < 0) ? 'Tuần này có điểm trừ — kiểm tra lịch sử.' : 'Tuần này chưa có lỗi trừ điểm.',
+    student.total >= groupAvg ? 'Điểm cao hơn hoặc bằng trung bình tổ.' : 'Điểm thấp hơn trung bình tổ.',
+  ];
+
+  const scoreClass = v => v < 0 ? 'color-negative' : 'color-positive';
+
+  return `<div class="profile-page" data-tabkey="${tab.key}">
+
+    <section class="p-hero">
+      <div class="p-avatar">${student.avatarInitial || student.name[0]}</div>
+      <div class="p-hero-info">
+        <div class="p-hero-meta">
+          <span>Hồ sơ học sinh · Tuần ${activeWeek}</span>
+          <div class="week-sw" aria-label="Chọn tuần">
+            <button ${!prevWeek ? 'disabled' : ''} data-prevweek="${tab.key}" title="Tuần trước">◀</button>
+            <select data-weekselect="${tab.key}">
+              ${weeks.map(w => `<option value="${w}" ${w === activeWeek ? 'selected' : ''}>Tuần ${w}</option>`).join('')}
+            </select>
+            <button ${!nextWeek ? 'disabled' : ''} data-nextweek="${tab.key}" title="Tuần sau">▶</button>
+          </div>
+        </div>
+        <h1>${student.name}</h1>
+        <p>Tổ ${student.group} · ${student.role || 'Học sinh'} · ${student.status}</p>
+      </div>
+      <div class="p-rank-badge">
+        <strong>#${student.rank}</strong>
+        <small>Hạng lớp</small>
+      </div>
+    </section>
+
+    <div class="p-stat-grid">
+      <article class="stat-card total-rank">
+        <div class="tr-left">
+          <span>Tổng điểm</span>
+          <b class="${scoreClass(student.total)}">${formatScore(student.total)}</b>
+        </div>
+        <div class="tr-right">
+          <span>Hạng lớp</span>
+          <b>#${student.rank}</b>
+        </div>
+      </article>
+      ${[
+        ['Điểm cộng', formatScore(student.positive), true],
+        ['Điểm trừ', String(student.negative), student.negative < 0],
+        [`Hạng tổ`, `#${groupRank}/${groupMembers.length}`, false],
+        ['Học tập', formatScore(catTotal(weekEvents, 'HOC_TAP')), catTotal(weekEvents, 'HOC_TAP') >= 0],
+        ['Nề nếp', formatScore(catTotal(weekEvents, 'NE_NEP')), catTotal(weekEvents, 'NE_NEP') >= 0],
+        ['Phong trào', formatScore(catTotal(weekEvents, 'PHONG_TRAO')), catTotal(weekEvents, 'PHONG_TRAO') >= 0],
+        ['TB tổ', String(groupAvg), groupAvg >= 0],
+      ].map(([label, val, pos]) => `<article class="stat-card"><span>${label}</span><b class="${pos ? 'color-positive' : 'color-negative'}">${val}</b></article>`).join('')}
+    </div>
+
+    <div class="p-mid-grid">
+      <article class="p-card">
+        <h2>📈 Biểu đồ so sánh tuần</h2>
+        ${buildChart(chartRows)}
+      </article>
+      <article class="p-card">
+        <h2>💬 Nhận xét</h2>
+        <ul>${notes.map(n => `<li>${n}</li>`).join('')}</ul>
+        <h2 style="margin-top:12px">So sánh trong tổ</h2>
+        <p>Cách người trên: <b>${above ? `${Math.max(0, above.total - student.total)} điểm` : 'Đang dẫn đầu'}</b></p>
+        <p>Cách người dưới: <b>${below ? `${Math.max(0, student.total - below.total)} điểm` : 'Cuối nhóm'}</b></p>
+        <p>So với TB tổ: <b class="${scoreClass(student.total - groupAvg)}">${formatScore(student.total - groupAvg)}</b></p>
+      </article>
+    </div>
+
+    <article class="p-card">
+      <h2>📊 Tổng quan các tuần so sánh</h2>
+      <div class="p-table-wrap">
+        <table>
+          <thead><tr>
+            <th>Tuần</th><th>Tổng</th><th>Cộng</th><th>Trừ</th>
+            <th>Học tập</th><th>Nề nếp</th><th>Phong trào</th>
+            <th>Hạng lớp</th><th>Xếp loại</th>
+          </tr></thead>
+          <tbody>
+            ${weekRows.map(r => `<tr data-rowweek="${r.week}" data-tabkey="${tab.key}" style="cursor:pointer">
+              <td>T${r.week}</td>
+              <td class="${scoreClass(r.total)}">${formatScore(r.total)}</td>
+              <td class="color-positive">${formatScore(r.positive)}</td>
+              <td class="${r.negative < 0 ? 'color-negative' : ''}">${r.negative}</td>
+              <td>${formatScore(r.hocTap)}</td>
+              <td>${formatScore(r.neNep)}</td>
+              <td>${formatScore(r.phongTrao)}</td>
+              <td>${r.rank ? '#' + r.rank : '—'}</td>
+              <td>${r.status}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="p-card">
+      <h2>📋 Lịch sử điểm</h2>
+      <div class="filter-row">
+        ${[['all','Tất cả'],['plus','Cộng'],['minus','Trừ'],['HOC_TAP','Học tập'],['NE_NEP','Nề nếp'],['PHONG_TRAO','Phong trào']]
+          .map(([v, l]) => `<button class="filter-btn ${filter === v ? 'active' : ''}" data-filter="${v}" data-tabkey="${tab.key}">${l}</button>`).join('')}
+      </div>
+      <div class="p-table-wrap">
+        <table>
+          <thead><tr><th>Tuần</th><th>Nội dung</th><th>Điểm</th><th>Loại</th><th>Người nhập</th><th>Thời gian</th></tr></thead>
+          <tbody>
+            ${history.length ? history.map(e => `<tr>
+              <td>T${e.week}</td>
+              <td>${e.title}</td>
+              <td class="${scoreClass(e.points)}">${formatScore(e.points)}</td>
+              <td>${categoryLabel(e.category)}</td>
+              <td>${e.createdBy || 'Google Sheets'}</td>
+              <td>${e.createdAt ? new Date(e.createdAt).toLocaleString('vi-VN') : '—'}</td>
+            </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">Chưa có dữ liệu.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </div>`;
+}
+
+/* ── New-tab search page ── */
+function buildNewTabPage(tab) {
+  return `<div class="new-tab-page" data-tabkey="${tab.key}">
+    <div class="browser-bar">
+      <button class="browser-nav" disabled title="Quay lại">◀</button>
+      <button class="browser-nav" disabled title="Tiến">▶</button>
+      <button class="browser-nav" data-refresh title="Làm mới" style="font-size:16px">↻</button>
+      <div class="address-bar">
+        <span style="font-size:14px;opacity:.6">🔍</span>
+        <input autofocus placeholder="Tìm học sinh..." id="search-input-${tab.key}" autocomplete="off"/>
+      </div>
+    </div>
+    <div class="search-results-wrap" id="results-wrap-${tab.key}"></div>
+  </div>`;
+}
+
+/* ── Render engine ── */
+function renderSidebar() {
+  const list = document.getElementById('tab-list');
+  const shell = document.getElementById('shell');
+  if (!list || !shell) return;
+  // Apply vertical/horizontal class
+  if (verticalTabs) shell.classList.remove('horizontal');
+  else shell.classList.add('horizontal');
+
+  list.innerHTML = tabs.map(t => `
+    <button class="tab-btn ${t.key === activeKey ? 'active' : ''}"
+      data-tabkey="${t.key}"
+      data-kind="${t.kind}"
+      oncontextmenu="showCtx(event,'${t.key}')">
+      <span>${t.title}</span>
+      <span class="close-icon" data-closetab="${t.key}">×</span>
+    </button>
+  `).join('');
+}
+
+function renderMain() {
+  const main = document.getElementById('main');
+  if (!main) return;
+  if (!tabs.length) {
+    main.innerHTML = `<div class="p-empty">Bấm <b>Tab mới</b> để tìm và mở hồ sơ học sinh.</div>`;
+    return;
+  }
+  const tab = tabs.find(t => t.key === activeKey) || tabs[0];
+  if (!tab) return;
+
+  if (DATA.source === 'loading') {
+    main.innerHTML = `<div class="p-loading"><div class="spinner"></div>Đang tải dữ liệu…</div>`;
+    return;
+  }
+
+  if (tab.kind === 'new') {
+    main.innerHTML = buildNewTabPage(tab);
+    const input = document.getElementById(`search-input-${tab.key}`);
+    if (input) {
+      input.focus();
+      input.addEventListener('input', () => renderSearchResults(tab.key, input.value));
+    }
+    const refreshBtn = main.querySelector('[data-refresh]');
+    if (refreshBtn) refreshBtn.addEventListener('click', () => { refreshData(); });
+  } else {
+    main.innerHTML = buildProfilePage(tab);
+    attachProfileEvents(tab.key);
+  }
+}
+
+function renderSearchResults(tabKey, query) {
+  const wrap = document.getElementById(`results-wrap-${tabKey}`);
+  if (!wrap) return;
+  if (!query.trim()) { wrap.innerHTML = ''; return; }
+  const q = normalize(query);
+  const results = alphabetStudents(DATA.students)
+    .filter(s => normalize(s.name).includes(q) || String(s.group).includes(query.trim()))
+    .slice(0, 10);
+  if (!results.length) {
+    wrap.innerHTML = `<div class="search-results"><div class="no-result">Không tìm thấy học sinh phù hợp.</div></div>`;
+    return;
+  }
+  wrap.innerHTML = `<div class="search-results">${results.map(s => `
+    <button class="result-btn" data-openid="${s.id}">
+      <span>${s.name}</span>
+      <small>Tổ ${s.group}</small>
+    </button>
+  `).join('')}</div>`;
+  wrap.querySelectorAll('[data-openid]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openStudent(btn.dataset.openid);
+    });
+  });
+}
+
+function attachProfileEvents(tabKey) {
+  const page = document.querySelector(`.profile-page[data-tabkey="${tabKey}"]`);
+  if (!page) return;
+
+  // Week switcher
+  page.querySelectorAll(`[data-weekselect="${tabKey}"]`).forEach(sel => {
+    sel.addEventListener('change', e => {
+      tabWeeks[tabKey] = Number(e.target.value);
+      renderMain();
+    });
+  });
+  page.querySelectorAll(`[data-prevweek="${tabKey}"]`).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const weeks = realWeeks();
+      const cur = tabWeeks[tabKey] || latestWeek();
+      const idx = weeks.indexOf(cur);
+      if (idx > 0) { tabWeeks[tabKey] = weeks[idx - 1]; renderMain(); }
+    });
+  });
+  page.querySelectorAll(`[data-nextweek="${tabKey}"]`).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const weeks = realWeeks();
+      const cur = tabWeeks[tabKey] || latestWeek();
+      const idx = weeks.indexOf(cur);
+      if (idx >= 0 && idx < weeks.length - 1) { tabWeeks[tabKey] = weeks[idx + 1]; renderMain(); }
+    });
+  });
+
+  // Filter buttons
+  page.querySelectorAll(`[data-filter][data-tabkey="${tabKey}"]`).forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabFilters[tabKey] = btn.dataset.filter;
+      renderMain();
+    });
+  });
+
+  // Table row week navigation
+  page.querySelectorAll(`[data-rowweek][data-tabkey="${tabKey}"]`).forEach(row => {
+    row.addEventListener('click', () => {
+      tabWeeks[tabKey] = Number(row.dataset.rowweek);
+      renderMain();
+    });
+  });
+}
+
+function render() {
+  renderSidebar();
+  renderMain();
+  attachSidebarEvents();
+}
+
+function attachSidebarEvents() {
+  document.getElementById('tab-list')?.querySelectorAll('.tab-btn').forEach(btn => {
+    const key = btn.dataset.tabkey;
+    btn.addEventListener('click', e => {
+      if (e.target.closest('[data-closetab]')) return;
+      activeKey = key;
+      render();
+    });
+    btn.querySelector('[data-closetab]')?.addEventListener('click', e => {
+      e.stopPropagation();
+      closeTab(key);
+    });
+  });
+}
+
+/* ── Context menu ── */
+function showCtx(e, key) {
+  e.preventDefault();
+  e.stopPropagation();
+  activeKey = key;
+  render();
+  ctxMenu = { x: e.clientX, y: e.clientY, key };
+  const menu = document.getElementById('ctx-menu');
+  const tab = tabs.find(t => t.key === key);
+  const idx = tabs.findIndex(t => t.key === key);
+  const hasBelow = idx >= 0 && idx < tabs.length - 1;
+  menu.innerHTML = `
+    <button data-ctx="new-tab">Tab mới <kbd>Ctrl+T</kbd></button>
+    <button data-ctx="refresh">Làm mới <kbd>Ctrl+R</kbd></button>
+    <button data-ctx="pin">Ghim tab</button>
+    <div class="ctx-sep"></div>
+    <button data-ctx="close">Đóng tab</button>
+    <button data-ctx="close-others" ${tabs.length <= 1 ? 'disabled' : ''}>Đóng các tab khác</button>
+    <button data-ctx="close-below" ${!hasBelow ? 'disabled' : ''}>Đóng tab bên dưới</button>
+    <div class="ctx-sep"></div>
+    <button data-ctx="toggle-layout">${verticalTabs ? 'Tắt tab dọc' : 'Bật tab dọc'}</button>
+  `;
+  menu.style.display = 'grid';
+  menu.style.left = Math.min(e.clientX, window.innerWidth - 230) + 'px';
+  menu.style.top = Math.min(e.clientY, window.innerHeight - 240) + 'px';
+  menu.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => handleCtx(btn.dataset.ctx, key));
+  });
+}
+
+function handleCtx(action, key) {
+  closeCtxMenu();
+  if (action === 'new-tab') { openNewTab(key); }
+  else if (action === 'refresh') { refreshData(); }
+  else if (action === 'pin') { const t = tabs.find(x => x.key === key); if (t) { tabs = [t, ...tabs.filter(x => x.key !== key)]; activeKey = key; render(); } }
+  else if (action === 'close') { closeTab(key); }
+  else if (action === 'close-others') { tabs = tabs.filter(t => t.key === key); activeKey = key; render(); }
+  else if (action === 'close-below') { const idx = tabs.findIndex(t => t.key === key); tabs = tabs.slice(0, idx + 1); if (!tabs.find(t => t.key === activeKey)) activeKey = key; render(); }
+  else if (action === 'toggle-layout') { verticalTabs = !verticalTabs; localStorage.setItem(VTABS_KEY, verticalTabs ? 'on' : 'off'); render(); }
+}
+
+/* ── Theme / accent sync ── */
+function applyTheme() {
+  try {
+    const raw = localStorage.getItem('a3k64-theme') || 'dark';
+    const isLight = raw === 'light' || raw === 'sang' || raw === 'sáng';
+    document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
+    document.body.className = isLight ? 'theme-light' : '';
+  } catch {}
+  try {
+    const keys = ['login-accent','accent-color','accent','desktop-accent','a3k64-accent'];
+    for (const k of keys) {
+      const v = localStorage.getItem(k);
+      if (v && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v.trim())) {
+        document.documentElement.style.setProperty('--accent', v.trim());
+        break;
+      }
+    }
+  } catch {}
+}
+
+/* ── Data refresh ── */
+async function refreshData() {
+  DATA = { ...DATA, source: 'loading' };
+  render();
+  await loadData();
+  // Update tab titles
+  tabs = tabs.map(t => t.kind === 'student' ? { ...t, title: studentTitle(t.id) } : t);
+  render();
+}
+
+/* ── Boot ── */
+document.getElementById('btn-new-tab').addEventListener('click', () => openNewTab(activeKey));
+document.getElementById('btn-mini-new').addEventListener('click', () => openNewTab(activeKey));
+
+document.addEventListener('click', e => {
+  if (ctxMenu && !e.target.closest('.ctx-menu')) closeCtxMenu();
+});
+
+window.addEventListener('storage', () => {
+  applyTheme();
+  refreshData();
+});
+
+window.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 't') { e.preventDefault(); openNewTab(activeKey); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r') { e.preventDefault(); refreshData(); }
+  if (e.key === 'Escape') closeCtxMenu();
+});
+
+// Listen for deeplink from parent (desktop.js can postMessage to open a student)
+window.addEventListener('message', e => {
+  if (e.data?.type === 'profile-open') openStudent(e.data.studentId, e.data.week);
+});
+
+applyTheme();
+
+(async () => {
+  // Open default tab while loading
+  openNewTab();
+  render();
+  await loadData();
+
+  // Update tab titles after data loads
+  tabs = tabs.map(t => t.kind === 'student' ? { ...t, title: studentTitle(t.id) } : t);
+
+  // Auto-open current user
+  if (tabs.length && tabs[0].kind === 'new') {
+    openStudent(null, latestWeek());
+  }
+  render();
+})();
+</script>
+<script src="../../assets/js/disable-context-menu.js"></script>
+</body>
+</html>

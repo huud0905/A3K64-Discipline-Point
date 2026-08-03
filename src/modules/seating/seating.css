@@ -1,0 +1,241 @@
+/* ============================================================
+   seating.css — inline (không cần file ngoài)
+   Hỗ trợ dark/light theo [data-theme] trên <html> — cùng pattern
+   với login.html / settings-window.html (đọc key 'a3k64-theme').
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  --seat-font: 'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+
+  /* ---- Bảng màu mặc định = TỐI (khớp mặc định data-theme="dark" của app) ---- */
+  --seat-page-bg: #0b1220;
+  --seat-app-bg-1: #0f172a;
+  --seat-app-bg-2: #0b1220;
+  --seat-text: #f8fafc;
+  --seat-text-muted: #94a3b8;
+  --seat-text-muted-2: #cbd5e1;
+  --seat-border: #263244;
+  --seat-border-soft: #1e293b;
+  --seat-card-bg: #111827;
+  --seat-input-bg: #0f172a;
+  --seat-hover-bg: #1e293b;
+  --seat-empty-bg: #0f172a;
+  --seat-dashed: #334155;
+  --seat-board-border: #38bdf8;
+  --seat-backdrop: rgba(2,6,16,.6);
+  --seat-modal-shadow: rgba(0,0,0,.5);
+  --seat-toast-bg: rgba(15,23,42,.96);
+  --seat-good-text: #34d399;
+}
+
+:root[data-theme="light"] {
+  --seat-page-bg: #edf2f7;
+  --seat-app-bg-1: #f8fafc;
+  --seat-app-bg-2: #edf2f7;
+  --seat-text: #0f172a;
+  --seat-text-muted: #64748b;
+  --seat-text-muted-2: #475569;
+  --seat-border: #cbd5e1;
+  --seat-border-soft: #e2e8f0;
+  --seat-card-bg: #fff;
+  --seat-input-bg: #fff;
+  --seat-hover-bg: #e2e8f0;
+  --seat-empty-bg: #f1f5f9;
+  --seat-dashed: #cbd5e1;
+  --seat-board-border: #0f3554;
+  --seat-backdrop: rgba(15,23,42,.42);
+  --seat-modal-shadow: rgba(15,23,42,.22);
+  --seat-toast-bg: rgba(15,23,42,.96);
+  --seat-good-text: #16a34a;
+}
+
+html, body { height:100%; margin:0; padding:0; background:var(--seat-page-bg); color:var(--seat-text); font-family:var(--seat-font); }
+/* height:100% (không phải min-height) — bắt buộc phải là "definite height" thì
+   .seat-app{height:100%} bên trong mới resolve % được, kéo theo cả .seat-main/
+   .seat-board/.seat-side-col giãn hết chiều cao cửa sổ thay vì co theo nội
+   dung rồi để trống khoảng dưới khi cửa sổ phóng to. */
+#seating-root { height:100%; }
+
+.seat-app {
+  height:100%; overflow:hidden; padding:16px;
+  background:linear-gradient(180deg,var(--seat-app-bg-1),var(--seat-app-bg-2));
+  color:var(--seat-text); font-family:var(--seat-font);
+  text-rendering:optimizeLegibility;
+  font-feature-settings:"kern" 1,"liga" 1;
+  -webkit-font-smoothing:antialiased;
+  display:flex; flex-direction:column; min-height:0;
+}
+.seat-app * { scrollbar-width:thin; scrollbar-color:color-mix(in srgb, var(--desktop-accent,#14b8a6) 60%, var(--seat-border)) var(--seat-border-soft); }
+
+/* ---- Toolbar ---- */
+.seat-toolbar { display:flex; justify-content:space-between; align-items:center; gap:16px; flex:0 0 auto; margin-bottom:14px; flex-wrap:wrap; }
+.seat-heading { display:flex; align-items:center; gap:12px; min-width:0; }
+.seat-badge { border:1px solid color-mix(in srgb, var(--desktop-accent,#14b8a6) 46%, var(--seat-border)); border-radius:999px; padding:7px 10px; background:var(--seat-card-bg); color:var(--seat-text); font-size:12px; font-weight:700; white-space:nowrap; }
+.seat-heading h1 { margin:0; font-size:21px; font-weight:800; letter-spacing:-.01em; line-height:1.35; color:var(--seat-text); }
+.seat-heading p { margin:4px 0 0; color:var(--seat-text-muted-2); font-size:13px; line-height:1.5; }
+
+.seat-tools { display:flex; align-items:center; gap:14px; flex-wrap:wrap; justify-content:flex-end; }
+.seat-group { display:flex; align-items:center; gap:8px; }
+/* Ngăn cách nhẹ giữa các cụm để phân nhóm rõ ràng theo yêu cầu (chọn sơ đồ |
+   thao tác | tiện ích phụ | hành động chính) mà không cần div bọc dày đặc. */
+.seat-group + .seat-group { padding-left:14px; border-left:1px solid var(--seat-border-soft); }
+@media (max-width:1100px) { .seat-group + .seat-group { padding-left:0; border-left:0; } }
+
+.seat-tools input { height:38px; width:190px; border:1px solid var(--seat-border); border-radius:13px; background:var(--seat-input-bg); color:var(--seat-text); padding:0 12px; outline:none; font-family:inherit; font-size:13.5px; transition:all .2s ease; }
+.seat-tools input:focus { border-color:var(--desktop-accent,#14b8a6); box-shadow:0 0 0 3px color-mix(in srgb, var(--desktop-accent,#14b8a6) 18%, transparent); }
+.seat-tools button { height:38px; display:inline-flex; align-items:center; gap:6px; border:1px solid var(--seat-border); border-radius:13px; padding:0 12px; background:var(--seat-card-bg); color:var(--seat-text); cursor:pointer; font-weight:700; font-family:inherit; font-size:13.5px; white-space:nowrap; transition:all .2s ease; }
+.seat-tools button:hover { background:var(--seat-hover-bg); border-color:color-mix(in srgb, var(--desktop-accent,#14b8a6) 30%, var(--seat-border)); }
+.seat-tools button.primary { background:var(--desktop-accent,#14b8a6); border-color:transparent; color:#fff; }
+.seat-tools button.primary:hover { filter:brightness(1.08); background:var(--desktop-accent,#14b8a6); }
+.seat-tools button:disabled { opacity:.5; cursor:not-allowed; }
+.seat-tools svg { flex:0 0 auto; }
+
+/* ---- (a) Dropdown sơ đồ ---- */
+.seat-select-trigger svg:first-child { color:var(--seat-text-muted); }
+
+/* ---- (b) Ô tìm kiếm có icon chìm ---- */
+.seat-search-wrap { position:relative; display:flex; align-items:center; }
+.seat-search-wrap svg { position:absolute; left:11px; color:var(--seat-text-muted); pointer-events:none; }
+.seat-search-wrap input { padding-left:38px; }
+
+/* Nút Bật sửa: đổi màu + icon khi bật (Unlock, highlight accent) */
+.seat-btn-edit.active { background:var(--desktop-accent,#14b8a6); border-color:transparent; color:#fff; }
+.seat-btn-edit.active:hover { filter:brightness(1.08); background:var(--desktop-accent,#14b8a6); }
+
+/* ---- (c) Cụm tiện ích phụ: icon-only, hình vuông bo tròn ---- */
+.seat-icon-group { gap:6px; }
+.seat-icon-btn { width:36px; height:36px; padding:0!important; justify-content:center; border-radius:11px; }
+.seat-icon-btn svg { margin:0; }
+
+/* ---- (d) Cụm hành động chính ---- */
+.seat-btn-ghost { background:transparent; }
+.seat-btn-badge.is-on { background:color-mix(in srgb, var(--desktop-accent,#14b8a6) 20%, var(--seat-card-bg)); border-color:color-mix(in srgb, var(--desktop-accent,#14b8a6) 55%, var(--seat-border)); color:var(--desktop-accent,#14b8a6); }
+.seat-btn-save { background:#16a34a; border-color:transparent; color:#fff; }
+.seat-btn-save:hover { filter:brightness(1.08); background:#16a34a; }
+
+/* ---- Sheet dropdown ---- */
+.seat-select { position:relative; }
+.seat-select-trigger { height:38px; border:1px solid var(--seat-border); border-radius:13px; padding:0 12px; background:var(--seat-card-bg); color:var(--seat-text); cursor:pointer; font-weight:700; font-family:inherit; font-size:13.5px; display:flex; align-items:center; gap:8px; }
+.seat-select-trigger svg:last-child { width:14px; height:14px; }
+.seat-select-menu { position:absolute; left:0; top:44px; z-index:60; min-width:170px; border:1px solid var(--seat-border); border-radius:12px; background:var(--seat-card-bg); box-shadow:0 20px 55px var(--seat-modal-shadow); padding:6px; display:none; }
+.seat-select.open .seat-select-menu { display:block; }
+.seat-select-option { width:100%; height:34px; border:0; border-radius:8px; padding:0 10px; text-align:left; color:var(--seat-text); background:transparent; font-weight:600; font-family:inherit; font-size:13.5px; cursor:pointer; }
+.seat-select-option:hover { background:var(--seat-hover-bg); }
+.seat-select-option.active { background:var(--seat-hover-bg); }
+
+/* ---- Main layout ---- */
+.seat-main { display:grid; grid-template-columns:230px minmax(0,1fr); grid-template-rows:minmax(0,1fr); gap:14px; flex:1 1 auto; min-height:0; overflow:hidden; }
+.seat-side-col { display:flex; flex-direction:column; gap:14px; min-height:0; height:100%; overflow:hidden; }
+
+/* ---- Notification ---- */
+.seat-notif { border:1px solid var(--seat-border); border-radius:22px; background:var(--seat-card-bg); padding:12px; flex:0 0 auto; max-height:38%; display:flex; flex-direction:column; min-height:0; }
+.seat-notif-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex:0 0 auto; }
+.seat-notif-head strong { font-size:14px; font-weight:700; color:var(--seat-text); }
+.seat-notif-head button { border:0; background:var(--seat-hover-bg); color:var(--seat-text-muted); width:22px; height:22px; border-radius:999px; cursor:pointer; font-size:13px; line-height:1; transition:all .2s ease; }
+.seat-notif-head button:hover { background:color-mix(in srgb, #f87171 22%, var(--seat-hover-bg)); color:#f87171; }
+.seat-notif-empty { border:1px dashed var(--seat-dashed); border-radius:13px; padding:14px; text-align:center; color:var(--seat-text-muted); font-size:12.5px; line-height:1.5; }
+/* Không có thông báo nào → thu gọn còn 1 dòng tiêu đề, nhường hết chiều
+   cao còn lại của sidebar cho "Danh sách học sinh" (flex:1 bên dưới). */
+.seat-notif.collapsed { padding:9px 12px; }
+.seat-notif.collapsed .seat-notif-head { margin-bottom:0; }
+.seat-notif.collapsed .seat-notif-head strong { color:var(--seat-text-muted); font-weight:600; font-size:12.5px; }
+.seat-notif-list { display:flex; flex-direction:column; gap:6px; overflow-y:auto; min-height:0; }
+.seat-notif-item { border:1px solid var(--seat-border-soft); border-radius:11px; padding:8px 10px; background:var(--seat-empty-bg); display:flex; flex-direction:column; gap:2px; }
+.seat-notif-item span { font-size:12.5px; line-height:1.4; color:var(--seat-text); }
+.seat-notif-item small { font-size:10.5px; color:var(--seat-text-muted); font-weight:600; }
+
+/* ---- Roster ---- */
+.seat-students { border:1px solid var(--seat-border); border-radius:22px; background:var(--seat-card-bg); padding:12px; display:flex; flex-direction:column; gap:10px; min-height:0; overflow:hidden; flex:1 1 auto; }
+.seat-students-head { display:flex; justify-content:space-between; gap:8px; }
+.seat-students-head strong { display:block; font-size:15px; font-weight:700; line-height:1.4; color:var(--seat-text); }
+.seat-students-head span { display:block; color:var(--seat-text-muted); font-size:12px; margin-top:2px; line-height:1.4; }
+.seat-student-list { display:grid; gap:7px; overflow:auto; min-height:0; flex:1 1 auto; padding-right:2px; }
+.seat-student-card { border:1px solid var(--seat-border); border-radius:13px; background:var(--seat-card-bg); color:var(--seat-text); padding:8px 10px; font-weight:700; font-family:inherit; cursor:grab; text-align:left; display:flex; align-items:center; justify-content:space-between; gap:8px; line-height:1.4; }
+.seat-student-card:hover,.seat-student-card.highlight { border-color:var(--desktop-accent,#14b8a6); background:color-mix(in srgb, var(--desktop-accent,#14b8a6) 10%, var(--seat-card-bg)); }
+.seat-student-card small { font-size:11px; color:var(--seat-text-muted); font-weight:600; }
+.seat-students-note { border:1px dashed var(--seat-dashed); border-radius:13px; padding:10px; text-align:center; color:var(--seat-good-text); font-size:12px; font-weight:700; line-height:1.5; }
+
+/* ---- Board ---- */
+.seat-board { position:relative; height:100%; box-sizing:border-box; border:2px solid var(--seat-board-border); border-radius:8px; background:var(--seat-card-bg); padding:48px 46px 52px; min-width:0; overflow:auto; display:flex; flex-direction:column; }
+.seat-room-window { position:absolute; width:22px; height:98px; background:#176a8b; border:2px solid #08384d; z-index:6; }
+.seat-room-window.left.a { left:-11px; top:15%; }
+.seat-room-window.left.b { left:-11px; top:63%; }
+.seat-room-window.right.a { right:-11px; top:10%; }
+.seat-room-window.right.b { right:-11px; top:38%; }
+.seat-room-door { position:absolute; right:-11px; bottom:18px; width:22px; height:116px; background:#050505; border:2px solid #050505; z-index:6; }
+.seat-back-label { position:absolute; left:50%; top:14px; transform:translateX(-50%); font-weight:800; letter-spacing:.01em; line-height:1.4; color:var(--seat-text); }
+.seat-layout { flex:1 1 auto; min-height:0; position:relative; z-index:3; display:grid; grid-template-columns:minmax(0,1fr) 70px minmax(0,1fr); gap:18px; align-items:stretch; }
+.seat-aisle { display:flex; align-items:center; justify-content:center; writing-mode:vertical-rl; text-orientation:mixed; color:#3b82f6; border:1px dashed var(--seat-dashed); border-radius:16px; background:var(--seat-empty-bg); font-weight:800; letter-spacing:.04em; }
+.seat-side { display:flex; flex-direction:column; gap:12px; min-height:0; }
+.seat-row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border:1px solid var(--seat-border); border-radius:14px; overflow:hidden; background:var(--seat-card-bg); min-height:42px; flex:1 1 0; }
+.seat-cell { min-height:44px; border-right:1px solid var(--seat-border); background:var(--seat-card-bg); color:var(--seat-text); display:flex; align-items:center; justify-content:center; padding:7px 5px; text-align:center; font-weight:700; font-size:13.5px; line-height:1.35; position:relative; user-select:none; }
+.seat-cell:last-child { border-right:0; }
+.seat-cell.empty { background:var(--seat-empty-bg); color:var(--seat-text-muted); font-weight:500; }
+.seat-cell.highlight { background:color-mix(in srgb, var(--desktop-accent,#14b8a6) 18%, var(--seat-card-bg)); box-shadow:inset 0 0 0 2px var(--desktop-accent,#14b8a6); }
+.seat-cell.drag-over { background:rgba(34,197,94,.18)!important; box-shadow:inset 0 0 0 2px #22c55e!important; }
+.seat-cell.self-seat { box-shadow:inset 0 0 0 2px #f59e0b; }
+.seat-cell .seat-you-badge { position:absolute; top:-9px; right:2px; font-size:9px; font-weight:800; background:#f59e0b; color:#fff; padding:1px 6px; border-radius:999px; letter-spacing:.02em; }
+.seat-front { display:grid; grid-template-columns:1fr 70px 1fr; gap:18px; margin-top:14px; position:relative; z-index:3; font-size:15px; font-weight:800; line-height:1.4; flex:0 0 auto; }
+.seat-front span { text-align:center; color:var(--seat-text); }
+.seat-front .teacher { color:#d97706; }
+.seat-front .door { color:#10b981; }
+.seat-approve { text-align:right; color:var(--seat-text-muted-2); margin:14px 10px 0 0; font-size:14px; font-weight:600; line-height:1.5; flex:0 0 auto; }
+
+/* ---- Modals ---- */
+.seat-modal-backdrop {
+  /* absolute (không phải fixed) — .seat-board là position:relative nên overlay
+     chỉ phủ + làm mờ đúng khu vực sơ đồ, KHÔNG che sidebar/topbar/taskbar. */
+  position:absolute; inset:0; z-index:500;
+  display:flex; align-items:center; justify-content:center; padding:18px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity:0;
+  transition: opacity 0.3s ease;
+}
+.seat-modal-backdrop.is-open { opacity:1; }
+.seat-modal { width:min(430px,100%); border:1px solid var(--seat-border); border-radius:24px; background:var(--seat-card-bg); color:var(--seat-text); box-shadow:0 28px 90px var(--seat-modal-shadow); padding:18px; display:grid; gap:14px; font-family:inherit; }
+.seat-modal h3 { margin:0; font-size:19px; font-weight:800; line-height:1.4; color:var(--seat-text); }
+.seat-modal p { margin:0; color:var(--seat-text-muted); font-size:13px; line-height:1.5; }
+.seat-modal label { display:grid; gap:7px; font-size:13px; font-weight:700; line-height:1.4; color:var(--seat-text); }
+.seat-modal input,.seat-modal select { height:44px; border:1px solid var(--seat-border); border-radius:15px; background:var(--seat-input-bg); color:var(--seat-text); padding:0 12px; font-weight:600; font-family:inherit; outline:none; }
+.seat-modal input:focus,.seat-modal select:focus { border-color:var(--desktop-accent,#14b8a6); box-shadow:0 0 0 3px color-mix(in srgb, var(--desktop-accent,#14b8a6) 18%, transparent); }
+.seat-modal-actions { display:flex; justify-content:flex-end; gap:10px; }
+.seat-modal-actions button { height:38px; border:1px solid var(--seat-border); border-radius:13px; background:var(--seat-card-bg); color:var(--seat-text); padding:0 14px; font-weight:800; font-family:inherit; cursor:pointer; }
+.seat-modal-actions .primary { background:var(--desktop-accent,#14b8a6); border-color:transparent; color:#fff; }
+.seat-status-row { display:flex; align-items:center; justify-content:space-between; gap:14px; border:1px solid var(--seat-border-soft); border-radius:14px; padding:10px 12px; }
+.seat-status-row strong { display:block; font-size:13px; font-weight:700; line-height:1.4; color:var(--seat-text); }
+.seat-status-row span { display:block; color:var(--seat-text-muted); font-size:12px; margin-top:2px; line-height:1.4; }
+.seat-status-pill { border-radius:999px; padding:4px 10px; font-size:11px; font-weight:800; white-space:nowrap; }
+.seat-status-pill.private { background:var(--seat-hover-bg); color:var(--seat-text-muted-2); }
+.seat-status-pill.published { background:color-mix(in srgb, #22c55e 24%, transparent); color:var(--seat-good-text); }
+.seat-modal-manage-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.seat-mini-btn { height:34px; border:1px solid var(--seat-border); border-radius:11px; background:var(--seat-card-bg); color:var(--seat-text); padding:0 12px; font-weight:700; font-family:inherit; cursor:pointer; font-size:12.5px; }
+.seat-mini-btn.primary { background:var(--desktop-accent,#14b8a6); border-color:transparent; color:#fff; }
+
+@media (max-width:900px) {
+  .seat-main { grid-template-columns:1fr; }
+  .seat-student-list { grid-template-columns:repeat(2,minmax(0,1fr)); max-height:220px; }
+  .seat-layout { grid-template-columns:1fr; }
+  .seat-aisle { writing-mode:horizontal-tb; height:34px; }
+  .seat-row { min-width:520px; }
+  .seat-side { overflow-x:auto; }
+  .seat-front { grid-template-columns:1fr; }
+  .seat-toolbar { display:grid; }
+  .seat-tools { justify-content:flex-start; }
+  .seat-tools input { width:100%; }
+}
+/* ---- Blocked view (private + no permission) ---- */
+.seat-blocked {
+  height: 100%; min-height: 60vh; display:flex; align-items:center; justify-content:center; padding:24px;
+}
+.seat-blocked-card {
+  max-width: 420px; text-align:center; border:1px solid var(--seat-border); border-radius:22px;
+  background:var(--seat-card-bg); padding:32px 26px; box-shadow:0 20px 55px var(--seat-modal-shadow);
+}
+.seat-blocked-icon { font-size:34px; margin-bottom:10px; }
+.seat-blocked-card h2 { margin:0 0 8px; font-size:18px; font-weight:800; color:var(--seat-text); line-height:1.4; }
+.seat-blocked-card p { margin:0; color:var(--seat-text-muted-2); font-size:13.5px; line-height:1.6; }
+.seat-blocked-countdown { margin-top:14px !important; font-size:12px !important; color:var(--seat-text-muted) !important; }
+.seat-blocked-countdown b { color:var(--desktop-accent,#14b8a6); font-weight:800; }

@@ -1,0 +1,593 @@
+/* ============================================================
+   A3K64 — Scoreboard EXTRAS (vanilla JS port)
+   Port của scoreboardExcelExport.ts + scoreboardScreenshotCapture.ts
+   Khác bản gốc: KHÔNG gọi Google Apps Script — mọi thứ tạo ra
+   ngay trên trình duyệt (client-side) từ state cục bộ trong
+   scoreboard.js (biến `state`, hàm `summarizeStudents`, `formatScore`).
+   Nút "Tự tính điểm" (Sparkles) giữ nguyên như bản gốc: bản React
+   gốc cũng chưa gắn logic cho nút này, nên ở đây cũng không tự
+   bịa thêm hành vi — chỉ để lại làm nút trang trí như thiết kế cũ.
+   ============================================================ */
+
+/* ============================================================
+   HELPERS DÙNG CHUNG
+   ============================================================ */
+function extraEsc(v) {
+  return String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c] || c));
+}
+function extraSanitizeFileName(v) {
+  return String(v || 'BaoCao').replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_').slice(0, 120);
+}
+function extraLoadScriptOnce(cacheKey, url, getter) {
+  const existing = getter();
+  if (existing) return Promise.resolve(existing);
+  if (window[cacheKey]) return window[cacheKey];
+  window[cacheKey] = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = url;
+    s.async = true;
+    s.onload = () => { const loaded = getter(); loaded ? resolve(loaded) : reject(new Error(`Không tải được thư viện ${url}`)); };
+    s.onerror = () => reject(new Error(`Không tải được thư viện ${url}`));
+    document.head.appendChild(s);
+  });
+  return window[cacheKey];
+}
+function ensureHtml2Canvas() { return extraLoadScriptOnce('__a3Html2CanvasPromise', 'https://html2canvas.hertzen.com/dist/html2canvas.min.js', () => window.html2canvas); }
+function ensureJSZip()      { return extraLoadScriptOnce('__a3JsZipPromise', 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', () => window.JSZip); }
+function ensureXLSX()       { return extraLoadScriptOnce('__a3XlsxPromise', 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js', () => window.XLSX); }
+
+function extraDownloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename || 'BaoCao';
+  document.body.appendChild(a); a.click(); a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+async function extraCanvasToBlob(canvas) {
+  return new Promise((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('Không tạo được ảnh PNG.')), 'image/png'));
+}
+async function extraCopyBlobToClipboard(blob) {
+  if (!navigator.clipboard || !window.ClipboardItem) throw new Error('Trình duyệt không hỗ trợ copy ảnh.');
+  await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+}
+function extraToast(title, message, kind='info') {
+  document.querySelector('.a3-shot-toast')?.remove();
+  const t = document.createElement('div');
+  t.className = `a3-shot-toast ${kind}`;
+  t.innerHTML = `<strong>${extraEsc(title)}</strong><span>${extraEsc(message)}</span>`;
+  document.body.appendChild(t);
+  window.setTimeout(() => t.remove(), 3600);
+}
+function extraSetLoading(visible, message='Đang tạo ảnh...') {
+  const current = document.getElementById('a3-shot-loading');
+  if (!visible) { current?.remove(); return; }
+  if (current) { const span = current.querySelector('span'); if (span) span.textContent = message; return; }
+  const node = document.createElement('div');
+  node.id = 'a3-shot-loading'; node.className = 'a3-shot-loading';
+  node.innerHTML = `<div><i></i><strong>Đang xử lý...</strong><span>${extraEsc(message)}</span></div>`;
+  document.body.appendChild(node);
+}
+
+/* Lấy dữ liệu bảng điểm cục bộ (thay cho fetch GAS trong bản gốc) */
+function extraGetScoreboardPayload() {
+  return {
+    students: state.students,
+    events: state.events,
+    weeks: state.weeks && state.weeks.length ? state.weeks : [1],
+  };
+}
+function extraGetCurrentWeek(weeks) {
+  return weeks.includes(state.week) ? state.week : (weeks[weeks.length - 1] || 1);
+}
+function extraEventTitles(events, positive) {
+  return events.filter(e => positive ? e.points > 0 : e.points < 0).map(e => (e.title || '').trim()).filter(Boolean).join(' • ');
+}
+function extraGetMembersForCurrentWeek() {
+  const payload = extraGetScoreboardPayload();
+  const week = extraGetCurrentWeek(payload.weeks);
+  const summaries = summarizeStudents(payload.students, payload.events, week);
+  const members = summaries.map(s => ({ ...s, plusText: extraEventTitles(s.events, true), minusText: extraEventTitles(s.events, false) }));
+  return { week, members };
+}
+
+/* ============================================================
+   1) XUẤT EXCEL — gọi GAS exportWeeksToExcel
+      GAS copy đúng sheet TUẦN N từ Google Sheets gốc (giữ
+      nguyên format, công thức, màu sắc), xuất XLSX, trả về
+      base64 → frontend decode và tải file về máy.
+      Fallback client-side (SheetJS) khi gasUrl chưa cấu hình.
+   ============================================================ */
+(function excelExportModule() {
+  let root = null;
+  let weeks = [];
+  let picked = new Set();
+  let busy = false;
+  let driveInfo = null; // thông tin file Drive sau khi xuất thành công
+
+  /* ── CSS ── */
+  function css() {
+    if (document.getElementById('a3-export-css')) return;
+    const st = document.createElement('style');
+    st.id = 'a3-export-css';
+    st.textContent = `
+.a3-export-backdrop{position:fixed;inset:0;z-index:2147483647;background:rgba(2,6,23,.55);display:grid;place-items:center;padding:20px;backdrop-filter:blur(4px)}
+.a3-export-card{width:min(580px,calc(100vw - 28px));border:1px solid var(--border-modal,rgba(148,163,184,.28));border-radius:24px;background:var(--bg-modal,#0f172a);color:var(--text,#f8fafc);box-shadow:0 30px 100px rgba(0,0,0,.35);overflow:hidden}
+.a3-export-head{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 22px;border-bottom:1px solid var(--border-subtle,rgba(148,163,184,.16));background:var(--bg-modal-header,rgba(15,23,42,.98))}
+.a3-export-head h2{margin:0;font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px;color:var(--text,#f8fafc)}
+.a3-export-head-sub{font-size:11px;font-weight:600;color:var(--text-muted,#64748b);margin-top:2px}
+.a3-export-close{width:36px;height:36px;border:0;border-radius:12px;background:var(--border-subtle,rgba(148,163,184,.13));color:var(--text-muted,#94a3b8);cursor:pointer;font-size:22px;font-weight:800;line-height:1;flex-shrink:0}
+.a3-export-close:hover{background:rgba(239,68,68,.15);color:#f87171}
+.a3-export-body{padding:18px 22px 20px;background:var(--bg-modal,#0f172a)}
+.a3-export-source-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;margin-bottom:14px}
+.a3-export-source-badge.gas{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#10b981}
+.a3-export-source-badge.client{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.28);color:#d97706}
+.a3-export-tools{display:flex;justify-content:space-between;gap:10px;margin-bottom:12px;color:var(--text-sub,#cbd5e1);font-size:13px;font-weight:800;align-items:center}
+.a3-export-tools div{display:flex;gap:8px;flex-wrap:wrap}
+.a3-export-tools button{border:1px solid var(--border-modal,rgba(148,163,184,.24));background:var(--bg-mid,#172033);color:var(--text,#dbeafe);border-radius:999px;padding:6px 11px;font-weight:800;cursor:pointer;font-size:12px}
+.a3-export-tools button:hover{border-color:var(--accent,#2563eb);color:var(--accent,#2563eb)}
+.a3-export-weeks{display:grid;grid-template-rows:repeat(9,auto);grid-auto-flow:column;grid-auto-columns:minmax(84px,1fr);gap:8px;overflow-x:auto;padding:4px 2px 10px;max-height:340px}
+.a3-export-week{height:36px;border:1px solid var(--border-modal,rgba(148,163,184,.24));border-radius:12px;background:var(--bg-mid,#172033);color:var(--text,#f8fafc);font-weight:800;cursor:pointer;display:grid;place-items:center;white-space:nowrap;font-size:13px;transition:background .14s,border-color .14s}
+.a3-export-week:hover{border-color:var(--accent,#2563eb)}
+.a3-export-week.selected{background:var(--accent,#2563eb);border-color:var(--accent,#2563eb);color:#fff;box-shadow:0 8px 20px rgba(37,99,235,.24)}
+.a3-export-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px}
+.a3-export-actions button{border:0;border-radius:14px;padding:11px 18px;font-weight:800;cursor:pointer;font-size:13.5px}
+.a3-export-cancel{background:var(--bg-deep,#1e293b);color:var(--text-sub,#cbd5e1);border:1px solid var(--border-modal,rgba(148,163,184,.2))}
+.a3-export-cancel:hover{border-color:var(--border,#334155)}
+.a3-export-submit{background:linear-gradient(135deg,#16a34a,#059669);color:#fff;display:flex;align-items:center;gap:7px;box-shadow:0 4px 18px rgba(16,185,129,.28)}
+.a3-export-submit:disabled{background:var(--bg-mid,#1e293b);color:var(--text-dim,#3d5470);box-shadow:none;cursor:not-allowed;border:1px solid var(--border-modal)}
+.a3-export-msg{margin-top:12px;font-size:13px;font-weight:700;min-height:18px;line-height:1.5}
+.a3-export-msg.error{color:#ef4444}
+.a3-export-msg.success{color:#10b981}
+.a3-export-msg.info{color:var(--accent,#3b82f6)}
+.a3-export-drive-link{display:inline-flex;align-items:center;gap:5px;color:var(--accent,#60a5fa);text-decoration:none;font-size:12px;font-weight:700;margin-top:6px}
+.a3-export-drive-link:hover{text-decoration:underline}
+.a3-export-spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:999px;animation:a3ExSpin .7s linear infinite;display:inline-block}
+@keyframes a3ExSpin{to{transform:rotate(360deg)}}`;
+    document.head.appendChild(st);
+  }
+
+  /* ── gasUrl helper — đọc từ biến module-level của scoreboard.js ── */
+  function _gasUrl() {
+    try { return (typeof gasUrl !== 'undefined' && gasUrl) ? gasUrl : null; }
+    catch { return null; }
+  }
+
+  /* ── Render modal ── */
+  function draw(message = '', msgKind = 'error') {
+    if (!root) return;
+    const hasGas = !!_gasUrl();
+    const sourceBadge = hasGas
+      ? `<div class="a3-export-source-badge gas">✓ Xuất từ Google Sheets (dữ liệu gốc đầy đủ)</div>`
+      : `<div class="a3-export-source-badge client">⚠ Chưa kết nối GAS — xuất từ dữ liệu cục bộ</div>`;
+    const weekButtons = weeks.map(w =>
+      `<button type="button" class="a3-export-week ${picked.has(w) ? 'selected' : ''}" data-week="${w}">Tuần ${w}</button>`
+    ).join('');
+    const driveHtml = driveInfo?.fileUrl
+      ? `<div style="margin-top:8px"><a class="a3-export-drive-link" href="${extraEsc(driveInfo.fileUrl)}" target="_blank" rel="noopener">
+           📁 Mở file trên Drive (${extraEsc(driveInfo.folderName || 'export')})
+         </a></div>`
+      : '';
+    root.innerHTML = `
+<div class="a3-export-card">
+  <div class="a3-export-head">
+    <div>
+      <h2>📊 Xuất Excel bảng chấm</h2>
+      <div class="a3-export-head-sub">Chọn tuần cần xuất, sau đó bấm Xuất Excel</div>
+    </div>
+    <button type="button" class="a3-export-close" title="Đóng">×</button>
+  </div>
+  <div class="a3-export-body">
+    ${sourceBadge}
+    <div class="a3-export-tools">
+      <span>${picked.size}/${weeks.length} tuần đã chọn</span>
+      <div>
+        <button type="button" data-export-action="all">Chọn tất cả</button>
+        <button type="button" data-export-action="none">Bỏ chọn</button>
+      </div>
+    </div>
+    <div class="a3-export-weeks">${weekButtons}</div>
+    ${message ? `<div class="a3-export-msg ${msgKind}">${extraEsc(message)}${driveHtml}</div>` : driveHtml ? `<div class="a3-export-msg success">${driveHtml}</div>` : ''}
+    <div class="a3-export-actions">
+      <button type="button" class="a3-export-cancel">Huỷ</button>
+      <button type="button" class="a3-export-submit" ${busy || !picked.size ? 'disabled' : ''}>
+        ${busy ? `<span class="a3-export-spinner"></span> Đang xuất…` : '⬇ Xuất Excel'}
+      </button>
+    </div>
+  </div>
+</div>`;
+  }
+
+  function open() {
+    css();
+    const payload = extraGetScoreboardPayload();
+    weeks = payload.weeks.map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+    picked = new Set(weeks.length ? [weeks[weeks.length - 1]] : []);
+    busy = false;
+    driveInfo = null;
+    root?.remove();
+    root = document.createElement('div');
+    root.className = 'a3-export-backdrop';
+    document.body.appendChild(root);
+    draw();
+  }
+
+  function close() { root?.remove(); root = null; busy = false; driveInfo = null; }
+
+  /* ── Tải file từ base64 (kết quả GAS trả về) ── */
+  function downloadBase64Xlsx(base64, fileName) {
+    const byteChars = atob(base64);
+    const bytes = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    extraDownloadBlob(blob, fileName);
+  }
+
+  /* ── Xuất qua GAS ── */
+  async function submitViaGas() {
+    const url = _gasUrl();
+    const pickedWeeks = Array.from(picked).sort((a, b) => a - b);
+    const params = new URLSearchParams({
+      action: 'exportWeeksToExcel',
+      payload: JSON.stringify({ weeks: pickedWeeks }),
+    });
+    const res = await fetch(`${url}?${params}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    // GAS trả về { ok, data: { base64, fileName, fileUrl, folderName, savedToDrive, message, ... } }
+    if (!json.ok && !json.data) throw new Error(json.error || 'GAS trả về lỗi không xác định.');
+    const data = json.data || json;
+    if (!data.base64) throw new Error('GAS không trả về dữ liệu file. Kiểm tra quyền Drive.');
+    downloadBase64Xlsx(data.base64, data.fileName || `A3K64_Export.xlsx`);
+    return data;
+  }
+
+  /* ── Fallback: xuất client-side bằng SheetJS ── */
+  async function submitClientSide() {
+    const XLSX = await ensureXLSX();
+    const wb = XLSX.utils.book_new();
+    const pickedWeeks = Array.from(picked).sort((a, b) => a - b);
+    pickedWeeks.forEach(week => {
+      const payload = extraGetScoreboardPayload();
+      const summaries = summarizeStudents(payload.students, payload.events, week)
+        .slice()
+        .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'vi'));
+      const rows = [
+        ['STT', 'Họ và tên', 'Tổ', 'Vai trò', 'Tổng điểm', 'Cộng', 'Trừ', 'Xếp loại', 'Chi tiết cộng', 'Chi tiết trừ'],
+        ...summaries.map((s, i) => [
+          i + 1, s.name, s.group, s.role || '', s.total,
+          s.positive, s.negative, s.status,
+          extraEventTitles(s.events, true),
+          extraEventTitles(s.events, false),
+        ]),
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws['!cols'] = [{ wch: 5 }, { wch: 24 }, { wch: 6 }, { wch: 14 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 36 }, { wch: 36 }];
+      XLSX.utils.book_append_sheet(wb, ws, `Tuan ${week}`.slice(0, 31));
+    });
+    const fileName = `A3K64_Export_${extraSanitizeFileName(`Tuan_${pickedWeeks.join('_')}`)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    return { fileName, savedToDrive: false };
+  }
+
+  /* ── Entry point khi bấm Xuất Excel ── */
+  async function submit() {
+    if (busy || !picked.size) return;
+    busy = true;
+    driveInfo = null;
+    draw('Đang xuất — vui lòng chờ…', 'info');
+
+    try {
+      const hasGas = !!_gasUrl();
+      let result;
+
+      if (hasGas) {
+        // Ưu tiên GAS: sheet gốc Google Sheets → XLSX đầy đủ
+        try {
+          result = await submitViaGas();
+          driveInfo = result;
+          busy = false;
+          const msg = result.savedToDrive
+            ? `✅ Đã tải về: ${result.fileName} — đã lưu Drive.`
+            : `✅ Đã tải về: ${result.fileName}`;
+          draw(msg, 'success');
+          return;
+        } catch (gasErr) {
+          console.warn('[ExcelExport] GAS thất bại, fallback client-side:', gasErr);
+          // fallthrough → client-side
+        }
+      }
+
+      // Client-side fallback (hoặc khi GAS lỗi)
+      result = await submitClientSide();
+      busy = false;
+      draw(`✅ Đã tải về: ${result.fileName} (dữ liệu cục bộ${hasGas ? ' — GAS không phản hồi' : ''})`, 'success');
+
+    } catch (err) {
+      busy = false;
+      draw(err instanceof Error ? err.message : 'Không xuất được Excel.', 'error');
+    }
+  }
+
+  /* ── Event delegation ── */
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!target) return;
+    const exportButton = target.closest?.('.toolbar-button.export');
+    if (exportButton) { event.preventDefault(); event.stopPropagation(); open(); return; }
+    if (!root) return;
+    if (target.classList?.contains('a3-export-backdrop') || target.closest('.a3-export-close') || target.closest('.a3-export-cancel')) { close(); return; }
+    const weekButton = target.closest?.('.a3-export-week');
+    if (weekButton) {
+      if (busy) return;
+      const week = Number(weekButton.dataset.week);
+      if (picked.has(week)) picked.delete(week); else picked.add(week);
+      draw();
+      return;
+    }
+    const action = target.closest?.('[data-export-action]')?.dataset.exportAction;
+    if (action === 'all') { if (!busy) { picked = new Set(weeks); draw(); } return; }
+    if (action === 'none') { if (!busy) { picked = new Set(); draw(); } return; }
+    if (target.closest('.a3-export-submit')) submit();
+  }, true);
+
+  window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && root && !busy) close(); });
+})();
+
+/* ============================================================
+   2) CHỤP ẢNH — port gần như nguyên vẹn từ scoreboardScreenshotCapture.ts
+      (module này vốn đã chạy 100% phía trình duyệt, chỉ thay
+       nguồn dữ liệu GAS bằng state cục bộ)
+   ============================================================ */
+(function screenshotCaptureModule() {
+  // Fallback local nếu SCORE_STATUS chưa tải (tránh crash khi load order thay đổi)
+  const _SS = (typeof SCORE_STATUS !== 'undefined')
+    ? SCORE_STATUS
+    : { GOOD: 'Tốt', FAIR: 'Khá', PASS: 'Đạt', FAIL: 'Chưa đạt' };
+  const RANK_COLOR_BY_STATUS = {
+    [_SS.GOOD]: '#059669',
+    [_SS.FAIR]: '#d97706',
+    [_SS.PASS]: '#ea580c',
+    [_SS.FAIL]: '#e11d48',
+  };
+  function rankColorOf(status) {
+    return RANK_COLOR_BY_STATUS[status] || '#111827';
+  }
+  function statusBadge(status) {
+    const color = rankColorOf(status);
+    return `<span style="display:inline-block;color:${color};font-weight:800;border:1px solid ${color};padding:2px 7px;border-radius:7px;font-size:12px;white-space:nowrap;">${extraEsc(status)}</span>`;
+  }
+  function th(text, extra='') { return `<th style="border:1px solid #d1d5db;padding:8px 6px;background:#f3f4f6;font-weight:800;${extra}">${extraEsc(text)}</th>`; }
+  function td(html, extra='') { return `<td style="border:1px solid #d1d5db;padding:7px 6px;vertical-align:top;${extra}">${html}</td>`; }
+  function screenshotHeader(title) {
+    return `<div style="text-align:center;margin-bottom:18px;"><div style="font-size:22px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;line-height:1.2;">${extraEsc(title)}</div><div style="margin-top:6px;font-size:14px;color:#374151;">Lớp A3K64</div></div>`;
+  }
+  function pageWrap(content) {
+    const now = new Date().toLocaleString('vi-VN');
+    return `<div class="a3-shot-page" style="width:794px;min-height:1123px;box-sizing:border-box;padding:28px;background:#fff;color:#000;font-family:'Inter',system-ui,sans-serif;border:1px solid #e5e7eb;">${content}<div style="margin-top:14px;text-align:right;font-style:italic;color:#6b7280;font-size:12px;">Xuất từ hệ thống quản lý A3K64 - ${extraEsc(now)}</div></div>`;
+  }
+
+  function renderAllClass(members, week) {
+    const data = [...members].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'vi'));
+    const mid = Math.ceil(data.length / 2);
+    const leftData = data.slice(0, mid);
+    const rightData = data.slice(mid);
+    const renderRow = (member, index, startIndex) => `<tr>${td(String(startIndex + index + 1), 'text-align:center;font-weight:700;')}${td(`<span style="font-weight:800;">${extraEsc(member.name)}</span>`, 'text-align:left;')}${td(`<span style="font-weight:800;font-size:16px;">${extraEsc(formatScore(member.total))}</span>`, `text-align:center;color:${member.total >= 0 ? '#059669' : '#e11d48'};`)}${td(`#${extraEsc(member.rank || '-')}`, 'text-align:center;')}${td(statusBadge(member.status), 'text-align:center;')}</tr>`;
+    const renderTable = (items, startIndex) => `<table style="width:100%;border-collapse:collapse;font-size:15px;table-layout:fixed;"><thead><tr>${th('STT','width:34px;text-align:center;')}${th('Họ tên','text-align:left;')}${th('Điểm','width:60px;text-align:center;')}${th('Thứ','width:48px;text-align:center;')}${th('XL','width:76px;text-align:center;')}</tr></thead><tbody>${items.map((m,i)=>renderRow(m,i,startIndex)).join('')}</tbody></table>`;
+    return pageWrap(`${screenshotHeader(`BẢNG ĐIỂM THI ĐUA - TUẦN ${week} - CẢ LỚP`)}<div style="display:flex;gap:12px;align-items:flex-start;"><div style="flex:1;min-width:0;">${renderTable(leftData,0)}</div><div style="flex:1;min-width:0;">${renderTable(rightData,mid)}</div></div>`);
+  }
+
+  function renderGroup(members, week, group) {
+    const data = members.filter(m => Number(m.group) === group).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'vi'));
+    const clamp = 'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.25;';
+    const rowHtml = (member, index) => {
+      const plusShort = member.plusText ? `<div style="margin-top:3px;font-size:12px;color:#059669;${clamp}">+ ${extraEsc(member.plusText)}</div>` : '';
+      const minusShort = member.minusText ? `<div style="margin-top:2px;font-size:12px;color:#e11d48;${clamp}">- ${extraEsc(member.minusText)}</div>` : '';
+      const nameCell = `<div style="font-weight:800;font-size:15px;">${extraEsc(member.name)}</div>${plusShort}${minusShort}`;
+      return `<tr>${td(String(index+1),'text-align:center;font-weight:700;')}${td(nameCell,'text-align:left;')}${td(`<span style="font-weight:800;">${member.positive>0?extraEsc(formatScore(member.positive)):''}</span>`,'text-align:center;color:#059669;')}${td(`<span style="font-weight:800;">${member.negative<0?extraEsc(member.negative):''}</span>`,'text-align:center;color:#e11d48;')}${td(`<span style="font-weight:800;font-size:16px;">${extraEsc(formatScore(member.total))}</span>`,`text-align:center;color:${member.total>=0?'#059669':'#e11d48'};`)}${td(`#${extraEsc(member.rank||'-')}`,'text-align:center;')}${td(statusBadge(member.status),'text-align:center;')}</tr>`;
+    };
+    return pageWrap(`${screenshotHeader(`BẢNG ĐIỂM THI ĐUA - TUẦN ${week} - TỔ ${group}`)}<table style="width:100%;border-collapse:collapse;font-size:15px;table-layout:fixed;"><thead><tr>${th('STT','width:34px;text-align:center;')}${th('Họ tên','text-align:left;')}${th('Cộng','width:58px;text-align:center;')}${th('Trừ','width:58px;text-align:center;')}${th('Tổng','width:58px;text-align:center;')}${th('Thứ','width:46px;text-align:center;')}${th('XL','width:76px;text-align:center;')}</tr></thead><tbody>${data.map(rowHtml).join('') || `<tr>${td('Không có dữ liệu tổ này.','text-align:center;color:#6b7280;')}</tr>`}</tbody></table>`);
+  }
+
+  function renderScreenshotHtml(type, members, week) { return type === 'ALL' ? renderAllClass(members, week) : renderGroup(members, week, type); }
+
+  function ensureHiddenArea() {
+    let area = document.getElementById('a3-shot-hidden-area');
+    if (!area) { area = document.createElement('div'); area.id = 'a3-shot-hidden-area'; document.body.appendChild(area); }
+    return area;
+  }
+
+  async function captureBlob(type, members, week, scale=2) {
+    const html2canvas = await ensureHtml2Canvas();
+    const area = ensureHiddenArea();
+    area.innerHTML = renderScreenshotHtml(type, members, week);
+    const target = area.firstElementChild;
+    if (!target) throw new Error('Không dựng được ảnh báo cáo.');
+    await new Promise(resolve => window.setTimeout(resolve, 120));
+    const canvas = await html2canvas(target, { scale, useCORS: true, logging: false, backgroundColor: '#ffffff' });
+    const blob = await extraCanvasToBlob(canvas);
+    area.innerHTML = '';
+    return blob;
+  }
+
+  function previewState() {
+    if (!window.__a3ShotPreview) window.__a3ShotPreview = { blob: null, url: null, filename: 'BaoCao.png' };
+    return window.__a3ShotPreview;
+  }
+  function closePreview() {
+    document.getElementById('a3-shot-preview')?.remove();
+    const s = previewState();
+    if (s.url) {
+      try { URL.revokeObjectURL(s.url); }
+      catch (err) { console.warn('[closePreview] Không giải phóng được URL ảnh xem trước:', err); }
+      s.url = null;
+    }
+  }
+  function openPreview(blob, filename, copiedOk) {
+    closePreview();
+    const s = previewState();
+    const url = URL.createObjectURL(blob);
+    s.blob = blob; s.url = url; s.filename = filename;
+    const modal = document.createElement('div');
+    modal.id = 'a3-shot-preview';
+    modal.className = 'a3-shot-preview-backdrop';
+    modal.innerHTML = `<div class="a3-shot-preview-card"><header class="a3-shot-preview-header"><div><span>ẢNH BÁO CÁO</span><strong>${extraEsc(filename)}</strong><small>${copiedOk ? '✅ Đã copy vào clipboard — có thể dán ngay vào tin nhắn.' : '⚠️ Không copy được — có thể tải PNG bằng nút bên dưới.'}</small></div><button type="button" class="a3-shot-close" aria-label="Đóng">×</button></header><div class="a3-shot-preview-body"><img src="${url}" alt="Ảnh báo cáo" /></div><footer class="a3-shot-preview-footer"><button type="button" class="a3-shot-copy">Copy lại</button><button type="button" class="a3-shot-download">Tải PNG</button></footer></div>`;
+    document.body.appendChild(modal);
+  }
+
+  async function captureSingle(type) {
+    extraSetLoading(true, 'Đang tạo ảnh...');
+    try {
+      const { week, members } = extraGetMembersForCurrentWeek();
+      const blob = await captureBlob(type, members, week, 2);
+      const filename = `BaoCao_${type}_${extraSanitizeFileName(`Tuan_${week}`)}.png`;
+      let copiedOk = false;
+      try { await extraCopyBlobToClipboard(blob); copiedOk = true; extraToast('Đã copy ảnh', 'Bạn có thể dán Ctrl+V vào tin nhắn.', 'success'); }
+      catch { extraToast('Không copy được', 'Trình duyệt chặn copy ảnh. Dùng nút tải PNG trong preview.', 'warning'); }
+      openPreview(blob, filename, copiedOk);
+    } catch (error) {
+      extraToast('Lỗi', error instanceof Error ? error.message : 'Không thể tạo ảnh.', 'error');
+    } finally {
+      extraSetLoading(false);
+      hideScreenshotMenu();
+    }
+  }
+
+  async function captureZip() {
+    extraSetLoading(true, 'Đang tạo ZIP 5 ảnh...');
+    try {
+      const { week, members } = extraGetMembersForCurrentWeek();
+      const JSZip = await ensureJSZip();
+      const zip = new JSZip();
+      const types = ['ALL', 1, 2, 3, 4];
+      for (let i = 0; i < types.length; i++) {
+        extraSetLoading(true, `Đang tạo ảnh ${i+1}/${types.length}...`);
+        const blob = await captureBlob(types[i], members, week, 1.9);
+        zip.file(`BaoCao_${types[i]}_${extraSanitizeFileName(`Tuan_${week}`)}.png`, blob);
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      extraDownloadBlob(zipBlob, `BaoCao_${extraSanitizeFileName(`Tuan_${week}`)}_5_anh.zip`);
+      extraToast('Thành công', 'Đã tải ZIP gồm 5 ảnh.', 'success');
+    } catch (error) {
+      extraToast('Lỗi', error instanceof Error ? error.message : 'Không thể tạo ZIP ảnh.', 'error');
+    } finally {
+      extraSetLoading(false);
+      hideScreenshotMenu();
+    }
+  }
+
+  async function shareAllMobile() {
+    extraSetLoading(true, 'Đang chuẩn bị 5 ảnh để chia sẻ...');
+    try {
+      const { week, members } = extraGetMembersForCurrentWeek();
+      const files = [];
+      const types = ['ALL', 1, 2, 3, 4];
+      for (let i = 0; i < types.length; i++) {
+        extraSetLoading(true, `Đang tạo ảnh ${i+1}/${types.length}...`);
+        const blob = await captureBlob(types[i], members, week, 1.6);
+        files.push(new File([blob], `BaoCao_${types[i]}_${extraSanitizeFileName(`Tuan_${week}`)}.png`, { type: 'image/png' }));
+      }
+      if (!navigator.share || (navigator.canShare && !navigator.canShare({ files }))) {
+        extraToast('Thiết bị chưa hỗ trợ', 'Sẽ tải ZIP thay thế.', 'warning');
+        await captureZip();
+        return;
+      }
+      await navigator.share({ files, title: 'Bộ ảnh báo cáo thi đua', text: 'Bộ 5 ảnh báo cáo thi đua A3K64' });
+      extraToast('Đã mở chia sẻ', 'Chọn ứng dụng để gửi ảnh.', 'success');
+    } catch (error) {
+      extraToast('Lỗi chia sẻ', error instanceof Error ? error.message : 'Không thể chia sẻ ảnh.', 'error');
+    } finally {
+      extraSetLoading(false);
+      hideScreenshotMenu();
+    }
+  }
+
+  function hideScreenshotMenu() { document.getElementById('a3-screenshot-menu')?.remove(); }
+  function showScreenshotMenu(anchor) {
+    hideScreenshotMenu();
+    const rect = anchor.getBoundingClientRect();
+    const menu = document.createElement('div');
+    menu.id = 'a3-screenshot-menu';
+    menu.className = 'a3-screenshot-menu';
+    menu.innerHTML = `<div class="a3-shot-dropdown-header">Chụp ảnh báo cáo</div><button type="button" data-shot="ALL">📋 Cả lớp</button><button type="button" data-shot="1">👥 Tổ 1</button><button type="button" data-shot="2">👥 Tổ 2</button><button type="button" data-shot="3">👥 Tổ 3</button><button type="button" data-shot="4">👥 Tổ 4</button><button type="button" data-shot="zip">📦 Tải ZIP 5 ảnh</button><button type="button" data-shot="share" class="a3-share-mobile">📤 Chia sẻ 5 ảnh</button>`;
+    menu.style.left = `${Math.min(rect.left, window.innerWidth - 230)}px`;
+    menu.style.top = `${rect.bottom + 8}px`;
+    document.body.appendChild(menu);
+  }
+
+  function injectStyle() {
+    if (document.getElementById('a3-shot-style')) return;
+    const style = document.createElement('style');
+    style.id = 'a3-shot-style';
+    style.textContent = `#a3-shot-hidden-area{position:fixed!important;left:-20000px!important;top:0!important;z-index:-1!important;pointer-events:none!important;opacity:1!important;background:#fff!important;width:820px!important;min-width:820px!important;overflow:visible!important}
+.a3-screenshot-menu{position:fixed;width:210px;background:var(--bg-modal,rgba(15,23,42,.97));border:1px solid var(--border-modal,rgba(148,163,184,.28));border-radius:14px;padding:6px;z-index:2147483647;box-shadow:0 18px 50px rgba(0,0,0,.3);backdrop-filter:blur(20px);animation:a3ShotIn .16s ease}
+.a3-shot-dropdown-header{padding:9px 12px 8px;font-size:10px;font-weight:800;text-transform:uppercase;color:var(--text-muted,#94a3b8);letter-spacing:1px;border-bottom:1px solid var(--border-subtle,rgba(148,163,184,.18));margin-bottom:5px}
+.a3-screenshot-menu button{width:100%;border:0;background:transparent;color:var(--text,#e5e7eb);text-align:left;padding:10px 12px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer}
+.a3-screenshot-menu button:hover{background:color-mix(in srgb,var(--accent,#3b82f6) 14%,var(--bg-input,transparent));color:var(--accent,#93c5fd)}
+.a3-share-mobile{display:none!important}@media(max-width:760px){.a3-share-mobile{display:block!important}}
+.a3-shot-loading{position:fixed;inset:0;z-index:2147483647;background:rgba(2,6,23,.46);backdrop-filter:blur(3px);display:grid;place-items:center}
+.a3-shot-loading>div{min-width:245px;border:1px solid var(--border-subtle,rgba(148,163,184,.24));border-radius:22px;display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:center;padding:18px 20px;background:var(--bg-modal,#111827);color:var(--text,#f8fafc);box-shadow:0 24px 80px rgba(0,0,0,.42)}
+.a3-shot-loading i{width:24px;height:24px;border:3px solid rgba(59,130,246,.22);border-top-color:#3b82f6;border-radius:999px;animation:a3Spin .75s linear infinite}
+.a3-shot-loading strong{display:block;font-size:15px}
+.a3-shot-loading span{display:block;margin-top:3px;color:var(--text-muted,#94a3b8);font-size:13px}
+.a3-shot-preview-backdrop{position:fixed;inset:0;z-index:2147483647;background:rgba(2,6,23,.62);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:22px}
+.a3-shot-preview-card{width:min(1180px,96vw);height:min(900px,92vh);border:1px solid var(--border-modal,rgba(148,163,184,.28));border-radius:28px;background:var(--bg-modal,#0f172a);color:var(--text,#f8fafc);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 100px rgba(0,0,0,.4)}
+.a3-shot-preview-header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:18px 22px;background:var(--bg-modal-header,rgba(15,23,42,.98));border-bottom:1px solid var(--border-subtle,rgba(148,163,184,.18))}
+.a3-shot-preview-header span{display:block;font-size:11px;font-weight:800;letter-spacing:3px;color:var(--text-muted,#94a3b8)}
+.a3-shot-preview-header strong{display:block;margin-top:4px;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:760px;color:var(--text,#f8fafc)}
+.a3-shot-preview-header small{display:block;margin-top:5px;color:var(--text-sub,#cbd5e1)}
+.a3-shot-close{width:38px;height:38px;border:0;border-radius:13px;background:var(--border-subtle,rgba(148,163,184,.13));color:var(--text,#f8fafc);cursor:pointer;font-size:24px;font-weight:800}
+.a3-shot-close:hover{background:rgba(239,68,68,.15);color:#f87171}
+.a3-shot-preview-body{flex:1;overflow:auto;padding:18px;background:var(--bg-deep,#111827);display:grid;place-items:start center}
+.a3-shot-preview-body img{max-width:100%;height:auto;border-radius:12px;background:#fff;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+.a3-shot-preview-footer{display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;border-top:1px solid var(--border-subtle,rgba(148,163,184,.18))}
+.a3-shot-preview-footer button{border:0;border-radius:14px;padding:11px 16px;font-weight:800;cursor:pointer}
+.a3-shot-copy{background:var(--bg-mid,#1e293b);color:var(--text,#dbeafe);border:1px solid var(--border-modal)}
+.a3-shot-copy:hover{border-color:var(--accent)}
+.a3-shot-download{background:var(--accent,#2563eb);color:#fff}
+.a3-shot-toast{position:fixed;right:18px;bottom:22px;z-index:2147483647;min-width:250px;max-width:min(380px,calc(100vw - 28px));border-radius:18px;padding:14px 16px;background:var(--bg-modal,#111827);color:var(--text,#f8fafc);border:1px solid var(--border-subtle,rgba(148,163,184,.24));box-shadow:0 18px 50px rgba(0,0,0,.3);display:grid;gap:4px}
+.a3-shot-toast strong{font-size:14px}
+.a3-shot-toast span{font-size:13px;color:var(--text-sub,#cbd5e1)}
+.a3-shot-toast.success{border-color:rgba(34,197,94,.45)}
+.a3-shot-toast.warning{border-color:rgba(245,158,11,.45)}
+.a3-shot-toast.error{border-color:rgba(239,68,68,.5)}
+@keyframes a3Spin{to{transform:rotate(360deg)}}
+@keyframes a3ShotIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}`;
+    document.head.appendChild(style);
+  }
+
+  function install() {
+    injectStyle();
+    document.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!target) return;
+      if (target.closest('.a3-shot-close')) { closePreview(); return; }
+      if (target.classList?.contains('a3-shot-preview-backdrop')) { closePreview(); return; }
+      if (target.closest('.a3-shot-copy')) {
+        const s = previewState();
+        if (s.blob) extraCopyBlobToClipboard(s.blob).then(() => extraToast('Đã copy ảnh', 'Bạn có thể dán Ctrl+V vào tin nhắn.', 'success')).catch(() => extraToast('Không copy được', 'Trình duyệt chặn copy ảnh.', 'warning'));
+        return;
+      }
+      if (target.closest('.a3-shot-download')) { const s = previewState(); if (s.blob) extraDownloadBlob(s.blob, s.filename); return; }
+      const menuItem = target.closest?.('#a3-screenshot-menu [data-shot]');
+      if (menuItem) {
+        event.preventDefault(); event.stopPropagation();
+        const value = menuItem.dataset.shot || '';
+        if (value === 'zip') captureZip();
+        else if (value === 'share') shareAllMobile();
+        else captureSingle(value === 'ALL' ? 'ALL' : Number(value));
+        return;
+      }
+      const cameraButton = target.closest?.('.toolbar-button.camera');
+      if (cameraButton) {
+        event.preventDefault(); event.stopPropagation();
+        const isOpen = Boolean(document.getElementById('a3-screenshot-menu'));
+        if (isOpen) hideScreenshotMenu(); else showScreenshotMenu(cameraButton);
+        return;
+      }
+      if (!target.closest?.('#a3-screenshot-menu')) hideScreenshotMenu();
+    }, true);
+    window.addEventListener('keydown', (event) => { if (event.key === 'Escape') { hideScreenshotMenu(); closePreview(); } });
+  }
+
+  install();
+})();
