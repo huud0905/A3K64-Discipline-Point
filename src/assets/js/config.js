@@ -4,5 +4,5 @@
    scoreboard-window.html, classroom-window.html, ...).
    ============================================================ */
 window.A3K64_CONFIG = {
-  gasUrl: 'https://script.google.com/macros/s/AKfycbxhlZ9LfDEVyzGqAq6S52GAAqCg80a1w37vzn7RtMxpReZj9eCvJlUK0pxntIZmsrnryA/exec',
+  gasUrl: 'https://script.google.com/macros/s/AKfycbwFoey58T0W3sNgP2xS1b8TR7bFNB08VUidcLaAFZ-UnYKmnVIraFKmn8QdLbVya2KbfQ/exec',
 };
