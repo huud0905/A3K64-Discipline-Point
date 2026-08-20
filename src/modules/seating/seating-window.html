@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sơ đồ lớp 12A3</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="seating.css" />
+<style>
+  html, body { height:100%; margin:0; padding:0; }
+  #seating-root { height:100%; }
+</style>
+</head>
+<body>
+  <div id="seating-root"></div>
+
+  <script>
+    // ── Theme: đọc & áp dụng NGAY trước khi seating.js render, để tránh
+    // nháy sáng rồi mới tối. Cùng key/thứ tự ưu tiên với settings-window.html
+    // (readTheme()) — 'a3k64-theme' là nguồn sự thật chính.
+    (function () {
+      function readMode() {
+        try {
+          const raw = (localStorage.getItem('a3k64-theme') || localStorage.getItem('desktop-theme') ||
+            localStorage.getItem('login-theme') || localStorage.getItem('theme-mode') || 'dark').toLowerCase();
+          return ['dark', 'light', 'auto'].includes(raw) ? raw : 'dark';
+        } catch (e) { return 'dark'; }
+      }
+      function apply() {
+        const mode = readMode();
+        const resolved = mode === 'auto'
+          ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : mode;
+        document.documentElement.setAttribute('data-theme', resolved);
+      }
+      apply();
+      // Đồng bộ khi người dùng đổi theme ở cửa sổ Cài đặt trong lúc sơ đồ
+      // vẫn đang mở (storage bắn khi đổi từ tab/cửa sổ khác; các event
+      // custom bắn khi đổi từ cùng cửa sổ cha).
+      window.addEventListener('storage', apply);
+      window.addEventListener('desktop-theme-change', apply);
+      window.addEventListener('appearance-change', apply);
+    })();
+
+    window.__seating_manual_init = true;
+  </script>
+  <script src="../../assets/js/config.js"></script>
+  <script src="../../assets/js/notify.js"></script>
+  <script src="seating.js"></script>
+  <script>
+    function readDesktopUser() {
+      try { return JSON.parse(sessionStorage.getItem('a3k64-user') || 'null'); }
+      catch { return null; }
+    }
+
+    (function boot() {
+      const desktopUser = readDesktopUser();
+      const gasUrl = (window.A3K64_CONFIG && window.A3K64_CONFIG.gasUrl) || null;
+      initSeating({
+        gasUrl,
+        userRole: desktopUser?.role || null,
+        userGroup: desktopUser?.group ?? desktopUser?.to ?? null,
+      });
+    })();
+  </script>
+<script src="../../assets/js/disable-context-menu.js"></script>
+</body>
+</html>

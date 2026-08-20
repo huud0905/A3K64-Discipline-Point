@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>A3K64 — Đăng nhập</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="dns-prefetch" href="https://script.googleusercontent.com">
+<link rel="icon" type="image/x-icon" href="../assets/img/favicon.ico" />
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --acc:#2f6fed;--acc-s:#1d4ed8;--acc-f:rgba(47,111,237,.16);
+  --bg-0:#040810;--bg-1:#0a1424;
+  --panel:rgba(13,20,36,.72);--panel-s:rgba(10,16,30,.92);
+  --text:#f4f7fc;--muted:#8b98af;--muted-d:#5b697e;
+  --line:rgba(255,255,255,.09);--line-s:rgba(255,255,255,.16);--inp:rgba(3,7,16,.55);
+  --card-shadow:0 24px 60px -14px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.04);
+  --card-edge-1:rgba(255,255,255,.14);--card-edge-2:rgba(255,255,255,.06);
+  --glow-2:rgba(120,170,255,.10);--glow-3:rgba(80,120,255,.06);
+  --scheme:dark;
+}
+:root[data-theme="light"]{
+  --acc:#2f6fed;--acc-s:#1d4ed8;--acc-f:rgba(47,111,237,.10);
+  --bg-0:#eef2f9;--bg-1:#ffffff;
+  --panel:rgba(255,255,255,.72);--panel-s:rgba(255,255,255,.94);
+  --text:#101828;--muted:#5c6b81;--muted-d:#94a1b5;
+  --line:rgba(15,23,42,.10);--line-s:rgba(15,23,42,.18);--inp:rgba(241,245,251,.75);
+  --card-shadow:0 24px 50px -18px rgba(30,41,59,.18),inset 0 1px 0 rgba(255,255,255,.6);
+  --card-edge-1:rgba(255,255,255,.9);--card-edge-2:rgba(15,23,42,.04);
+  --glow-2:rgba(120,170,255,.16);--glow-3:rgba(80,120,255,.08);
+  --scheme:light;
+}
+html{color-scheme:var(--scheme)}
+
+/* Full screen */
+html,body{
+  height:100%;width:100%;
+}
+body{
+  display:grid;place-items:center;
+  padding:20px;
+  color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:14px;
+  background:
+    radial-gradient(560px 420px at 12% 8%,var(--acc-f),transparent 60%),
+    radial-gradient(480px 380px at 92% 4%,var(--glow-2),transparent 55%),
+    radial-gradient(900px 700px at 50% 110%,var(--glow-3),transparent 60%),
+    linear-gradient(160deg,var(--bg-1),var(--bg-0) 65%);
+  transition:background .35s ease,color .35s ease;
+}
+::selection{background:var(--acc);color:#fff}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:8px}
+
+/* ── Shell: 2 columns, full screen height ── */
+.shell{
+  width:min(1280px,100%);
+  height:calc(100vh - 40px);
+  max-height:860px;
+  display:grid;
+  grid-template-columns:1.8fr 1.2fr;
+  gap:10px;
+  opacity:0;transform:translateY(10px);
+  animation:rise .6s cubic-bezier(.19,1,.22,1) .05s forwards;
+}
+@keyframes rise{to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.shell{animation:none;opacity:1;transform:none}}
+
+/* ── Card base ── */
+.card{
+  position:relative;border:1px solid var(--line);border-radius:22px;background:var(--panel);
+  box-shadow:var(--card-shadow);
+  backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);overflow:hidden;
+  transition:background .35s ease,border-color .35s ease,box-shadow .35s ease;
+}
+.card::before{
+  content:'';position:absolute;inset:0;padding:1px;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(155deg,var(--card-edge-1),transparent 30%,transparent 70%,var(--card-edge-2));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  transition:background .35s ease;
+}
+
+/* ══════════════════════════════════════
+   PANEL 1 — Điểm thi đua 4 tổ
+══════════════════════════════════════ */
+.panel-intro{
+  padding:22px 22px 18px;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-shrink:0;
+}
+.brand{display:flex;align-items:center;gap:11px}
+.logo{
+  width:42px;height:42px;border-radius:13px;display:grid;place-items:center;
+  color:#fff;flex-shrink:0;font-size:20px;
+  background:linear-gradient(135deg,var(--acc),var(--acc-s));
+  box-shadow:0 10px 26px color-mix(in srgb,var(--acc) 40%,transparent),inset 0 1px 0 rgba(255,255,255,.25);
+}
+.brand-name h1{font-family:'Be Vietnam Pro',sans-serif;font-size:17px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
+.brand-name p{font-size:11px;color:var(--muted);margin-top:2px}
+
+.controls{display:flex;align-items:center;gap:5px}
+.ctrl-grp{display:flex;gap:3px;padding:3px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.03)}
+.ctrl{
+  width:27px;height:27px;border:none;border-radius:999px;display:grid;place-items:center;
+  cursor:pointer;color:var(--muted);background:transparent;font-size:12px;
+  transition:color .15s,background .15s;
+}
+.ctrl:hover{color:var(--text)}
+.ctrl.on{color:#fff;background:var(--acc)}
+.dot{
+  width:21px;height:21px;border-radius:999px;cursor:pointer;
+  border:2px solid transparent;transition:transform .15s,border-color .15s;
+}
+.dot:hover{transform:scale(1.1)}
+.dot.on{border-color:var(--text);transform:scale(1.14)}
+
+/* Live score section header */
+.live-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:12px;flex-shrink:0;
+}
+.live-title{
+  font-family:'Be Vietnam Pro',sans-serif;font-size:13px;font-weight:800;
+  letter-spacing:-.01em;display:flex;align-items:center;gap:7px;
+}
+.live-dot{
+  width:7px;height:7px;border-radius:50%;background:#34d399;
+  box-shadow:0 0 8px #34d399;
+  animation:pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+.live-week{font-size:11px;color:var(--muted)}
+.live-week span{color:var(--acc);font-weight:700}
+
+/* 4 group cards — main area */
+.groups-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  flex:1;
+  min-height:0;
+}
+.group-card{
+  border:1px solid var(--line);border-radius:18px;
+  background:rgba(255,255,255,.025);
+  padding:18px 18px 14px;
+  display:flex;flex-direction:column;
+  transition:border-color .2s,background .2s;
+  position:relative;overflow:hidden;
+  cursor:default;
+}
+.group-card:hover{
+  border-color:color-mix(in srgb,var(--acc) 35%,transparent);
+  background:rgba(47,111,237,.04);
+}
+.group-card.rank-1{border-color:rgba(234,179,8,.35);background:rgba(234,179,8,.04)}
+.group-card.rank-1:hover{border-color:rgba(234,179,8,.55);background:rgba(234,179,8,.07)}
+
+/* Rank badge */
+.rank-badge{
+  position:absolute;top:10px;right:10px;
+  width:22px;height:22px;border-radius:50%;
+  display:grid;place-items:center;
+  font-size:11px;font-weight:800;
+  background:rgba(255,255,255,.06);
+  color:var(--muted-d);
+}
+.group-card.rank-1 .rank-badge{background:rgba(234,179,8,.18);color:#f59e0b;font-size:13px}
+
+.group-num{
+  font-size:10px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;
+}
+.group-score-big{
+  font-family:'Be Vietnam Pro',sans-serif;
+  font-size:48px;font-weight:800;letter-spacing:-.04em;
+  line-height:1;color:var(--acc);
+  transition:color .3s;
+}
+.group-card.rank-1 .group-score-big{color:#f59e0b}
+.group-score-big.neg{color:#f87171}
+
+.group-avg-row{
+  margin-top:5px;display:flex;align-items:center;gap:6px;
+}
+.group-avg-lbl{font-size:10.5px;color:var(--muted)}
+.group-avg-val{
+  font-size:12px;font-weight:700;
+  padding:2px 7px;border-radius:999px;
+  background:rgba(255,255,255,.06);
+}
+.group-avg-val.pos{color:#34d399;background:rgba(52,211,153,.12)}
+.group-avg-val.neg{color:#f87171;background:rgba(248,113,113,.12)}
+
+/* Mini bar chart inside each card */
+.group-mini-bar{
+  margin-top:auto;padding-top:12px;
+  height:52px;display:flex;align-items:flex-end;gap:3px;
+}
+.mini-bar-seg{
+  flex:1;border-radius:4px 4px 0 0;min-height:3px;
+  background:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 30%,transparent));
+  transition:height .6s cubic-bezier(.2,.9,.2,1);
+  opacity:.65;
+}
+.group-card.rank-1 .mini-bar-seg{
+  background:linear-gradient(180deg,#f59e0b,color-mix(in srgb,#f59e0b 30%,transparent));
+}
+.mini-bar-seg.neg{
+  background:linear-gradient(180deg,#f87171,color-mix(in srgb,#f87171 30%,transparent));
+}
+
+/* Status row */
+.group-status-row{
+  display:flex;align-items:center;gap:5px;margin-top:6px;flex-wrap:wrap;
+}
+.st-chip{
+  font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;
+  display:flex;align-items:center;gap:3px;
+}
+.st-chip.good{color:#34d399;background:rgba(52,211,153,.12)}
+.st-chip.warn{color:#f87171;background:rgba(248,113,113,.12)}
+.st-chip.cnt{color:var(--muted);background:rgba(255,255,255,.06)}
+
+/* Loading skeleton */
+.skel{
+  border-radius:8px;background:rgba(255,255,255,.05);
+  animation:skel-pulse 1.6s ease-in-out infinite;
+}
+@keyframes skel-pulse{0%,100%{opacity:.4}50%{opacity:.9}}
+
+/* Bottom stats strip */
+.stats-strip{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:8px;margin-top:10px;flex-shrink:0;
+}
+.stat-box{
+  border:1px solid var(--line);border-radius:12px;
+  background:rgba(255,255,255,.025);
+  padding:10px 8px;text-align:center;
+}
+.stat-num{
+  font-family:'Be Vietnam Pro',sans-serif;font-size:20px;font-weight:800;
+  color:var(--acc);letter-spacing:-.03em;line-height:1;
+}
+.stat-lbl{font-size:9.5px;color:var(--muted);margin-top:3px;line-height:1.3}
+
+/* Data note */
+.data-note{
+  margin-top:8px;text-align:center;font-size:10px;color:var(--muted-d);flex-shrink:0;
+}
+.data-note a{color:var(--muted);text-decoration:none}
+
+
+/* ══════════════════════════════════════
+   PANEL 3 — Form đăng nhập
+══════════════════════════════════════ */
+.panel-login{
+  padding:22px 22px 18px;display:flex;flex-direction:column;
+  overflow:hidden;
+}
+.login-header{margin-bottom:18px;flex-shrink:0}
+.login-header h2{
+  font-family:'Be Vietnam Pro',sans-serif;font-size:21px;font-weight:800;letter-spacing:-.02em;
+  line-height:1.2;margin-bottom:3px;
+}
+.login-header p{font-size:11.5px;color:var(--muted);line-height:1.5}
+
+.field{display:grid;gap:5px;margin-bottom:11px;flex-shrink:0}
+.label{font-weight:700;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.inp-wrap{
+  height:44px;border:1px solid var(--line);border-radius:12px;
+  display:grid;grid-template-columns:36px 1fr 36px;align-items:center;background:var(--inp);
+  transition:border-color .15s,box-shadow .15s;
+}
+.inp-wrap.focused{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-f)}
+.icon-cell{display:grid;place-items:center;color:var(--muted-d);font-size:14px}
+.inp-wrap.focused .icon-cell{color:var(--acc)}
+.inp-wrap input{
+  height:100%;border:none;outline:none;background:transparent;
+  color:var(--text);font:inherit;font-weight:600;min-width:0;font-size:13px;
+}
+.inp-wrap input::placeholder{color:var(--muted-d);font-weight:500}
+.eye{display:grid;place-items:center;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;transition:color .15s}
+.eye:hover{color:var(--text)}
+
+.error-msg{
+  color:#ef4444;font-size:11.5px;margin-top:6px;text-align:center;display:none;flex-shrink:0;
+  padding:7px;border-radius:9px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);
+}
+
+.btn-primary{
+  width:100%;height:44px;margin-top:4px;border:none;border-radius:12px;
+  font-weight:700;font-size:13px;font-family:inherit;cursor:pointer;color:#fff;
+  background:linear-gradient(135deg,var(--acc),var(--acc-s));
+  box-shadow:0 14px 28px -6px color-mix(in srgb,var(--acc) 45%,transparent),inset 0 1px 0 rgba(255,255,255,.2);
+  transition:transform .15s,box-shadow .15s;flex-shrink:0;
+}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 18px 32px -6px color-mix(in srgb,var(--acc) 55%,transparent)}
+.btn-primary:active{transform:translateY(0)}
+.btn-primary:disabled{opacity:.6;transform:none;cursor:not-allowed}
+
+.divider{display:flex;align-items:center;gap:10px;margin:11px 0 2px;color:var(--muted-d);font-size:11px;flex-shrink:0}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--line)}
+
+.btn-google{
+  width:100%;height:44px;margin-top:8px;border:1px solid var(--line);border-radius:12px;
+  font-weight:600;font-size:12.5px;font-family:inherit;cursor:pointer;color:var(--text);background:var(--panel-s);
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  transition:border-color .15s,transform .15s;flex-shrink:0;
+}
+.btn-google:hover{border-color:var(--line-s);transform:translateY(-1px)}
+.g-icon{width:16px;height:16px;flex-shrink:0}
+
+.login-footer{
+  margin-top:auto;padding-top:14px;flex-shrink:0;
+  display:flex;flex-direction:column;gap:7px;
+}
+.forgot-link{
+  display:block;text-align:center;font-size:12px;color:var(--acc);
+  text-decoration:none;font-weight:600;transition:opacity .15s;
+}
+.forgot-link:hover{opacity:.75}
+.note{font-size:10px;color:var(--muted-d);text-align:center}
+
+/* ══════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════ */
+@media (max-width:1024px) and (min-width:768px){
+  body{overflow:auto;padding:16px}
+  .shell{
+    height:auto;
+    grid-template-columns:1.6fr 1fr;
+    grid-template-rows:auto;
+  }
+  .panel-intro{grid-column:1;grid-row:1}
+  .panel-login{grid-column:2;grid-row:1}
+}
+@media (max-width:767px){
+  body{overflow:auto;padding:0;display:flex;flex-direction:column;min-height:100dvh}
+  .shell{
+    grid-template-columns:1fr;height:auto;gap:0;width:100%;
+    min-height:100dvh;animation:none;opacity:1;transform:none;
+  }
+  .panel-intro{display:none}
+  .panel-login{
+    flex:1;padding:32px 20px 28px;
+    border-radius:0;border:0;min-height:100dvh;box-shadow:none;overflow:visible;
+  }
+  .mob-header{
+    display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;
+  }
+  .mob-brand{display:flex;align-items:center;gap:10px}
+  .mob-brand .logo{width:38px;height:38px;border-radius:12px;font-size:18px}
+  .mob-brand h1{font-family:'Be Vietnam Pro',sans-serif;font-size:17px;font-weight:800}
+}
+@media (min-width:768px){.mob-header{display:none}}
+
+/* Accent swatches */
+#acc-blue{background:#2f6fed}#acc-violet{background:#7c3aed}#acc-pink{background:#db2777}
+#acc-green{background:#059669}#acc-amber{background:#d97706}#acc-red{background:#dc2626}
+</style>
+<script src="../assets/js/config.js"></script>
+<script>
+/* ═══ STEP 1: Đăng ký Service Worker — chạy ngay khi <head> parse ═══
+   SW sẽ intercept fetch getScoreboard và trả cache ngay (0ms) nếu có */
+(function earlyFetch() {
+  var gasUrl = window.A3K64_CONFIG && window.A3K64_CONFIG.gasUrl;
+  if (gasUrl) {
+    try {
+      var url = new URL(gasUrl);
+      url.searchParams.set('action', 'getScoreboard');
+      window.__gasPromise = fetch(url.toString(), { method: 'GET', redirect: 'follow' })
+        .then(function(r) { return r.json(); })
+        .catch(function() { return null; });
+    } catch(e) {}
+  }
+})();
+</script>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ══ PANEL 1: Điểm thi đua 4 tổ ══ -->
+  <div class="card panel-intro">
+
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">🛡</div>
+        <div class="brand-name">
+          <h1>Bảng điểm A3K64</h1>
+          <p>Quản lý thi đua lớp 12A3</p>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="ctrl-grp" role="group" aria-label="Giao diện">
+          <button class="ctrl" id="ctrl-light" title="Sáng" onclick="applyTheme('light')">☀</button>
+          <button class="ctrl" id="ctrl-dark"  title="Tối"  onclick="applyTheme('dark')">🌙</button>
+          <button class="ctrl" id="ctrl-auto"  title="Tự động" onclick="applyTheme('auto')">🖥</button>
+        </div>
+        <div class="ctrl-grp" role="group" aria-label="Màu chủ đạo">
+          <button class="dot on" id="acc-blue"   title="Xanh"></button>
+          <button class="dot"    id="acc-violet" title="Tím"></button>
+          <button class="dot"    id="acc-pink"   title="Hồng"></button>
+          <button class="dot"    id="acc-green"  title="Xanh lá"></button>
+          <button class="dot"    id="acc-amber"  title="Cam"></button>
+          <button class="dot"    id="acc-red"    title="Đỏ"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live score header -->
+    <div class="live-header">
+      <div class="live-title">
+        <span class="live-dot" id="live-dot"></span>
+        Điểm thi đua — 4 tổ
+      </div>
+      <div class="live-week">Tuần <span id="live-week-num">…</span></div>
+    </div>
+
+    <!-- 4 group cards -->
+    <div class="groups-grid" id="groups-grid">
+      <!-- Skeleton loading -->
+      <div class="group-card"><div class="skel" style="height:22px;width:60%;margin-bottom:10px"></div><div class="skel" style="height:40px;width:80%"></div></div>
+      <div class="group-card"><div class="skel" style="height:22px;width:60%;margin-bottom:10px"></div><div class="skel" style="height:40px;width:80%"></div></div>
+      <div class="group-card"><div class="skel" style="height:22px;width:60%;margin-bottom:10px"></div><div class="skel" style="height:40px;width:80%"></div></div>
+      <div class="group-card"><div class="skel" style="height:22px;width:60%;margin-bottom:10px"></div><div class="skel" style="height:40px;width:80%"></div></div>
+    </div>
+
+    <!-- Stats strip -->
+    <div class="stats-strip">
+      <div class="stat-box">
+        <div class="stat-num" id="stat-students">45</div>
+        <div class="stat-lbl">Học sinh</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="stat-events">—</div>
+        <div class="stat-lbl">Sự kiện</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="stat-good">—</div>
+        <div class="stat-lbl">Xếp tốt/khá</div>
+      </div>
+    </div>
+
+    <div class="data-note" id="data-note">Đang tải dữ liệu…</div>
+  </div>
+
+  <!-- ══ PANEL 2: Form đăng nhập ══ -->
+  <div class="card panel-login">
+
+    <!-- Mobile header -->
+    <div class="mob-header">
+      <div class="mob-brand">
+        <div class="logo" aria-hidden="true">🛡</div>
+        <h1>A3K64</h1>
+      </div>
+      <div class="ctrl-grp" role="group">
+        <button class="ctrl" id="ctrl-light-m" onclick="applyTheme('light')">☀</button>
+        <button class="ctrl" id="ctrl-dark-m"  onclick="applyTheme('dark')">🌙</button>
+        <button class="ctrl" id="ctrl-auto-m"  onclick="applyTheme('auto')">🖥</button>
+      </div>
+    </div>
+
+    <div class="login-header">
+      <h2>Chào mừng trở lại 👋</h2>
+      <p>Đăng nhập để xem bảng điểm và thi đua lớp 12A3</p>
+    </div>
+
+    <div class="field">
+      <div class="label">Tên đăng nhập</div>
+      <div class="inp-wrap">
+        <div class="icon-cell">👤</div>
+        <input id="login-username" placeholder="username / email" autocomplete="username"/>
+        <span></span>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="label">Mật khẩu</div>
+      <div class="inp-wrap">
+        <div class="icon-cell">🔒</div>
+        <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password"/>
+        <button class="eye" type="button" title="Hiện mật khẩu">👁</button>
+      </div>
+    </div>
+
+    <div id="login-error" class="error-msg"></div>
+
+    <button class="btn-primary" id="btn-submit-login">Đăng nhập</button>
+
+    <div class="divider">HOẶC</div>
+
+    <button class="btn-google" id="btn-login-google" type="button">
+      <svg class="g-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      Đăng nhập bằng Google
+    </button>
+
+    <div class="login-footer">
+      <a href="forgot-password.html" class="forgot-link">Quên mật khẩu?</a>
+      <p class="note">Phiên đăng nhập tự lưu tối đa 7 ngày.</p>
+    </div>
+  </div>
+
+</div><!-- /.shell -->
+
+<script>
+/* ════════════════════════════════════════
+   1. Accent colors
+════════════════════════════════════════ */
+const ACCENTS = {
+  blue:  {main:'#2f6fed',s:'#1d4ed8',f:'rgba(47,111,237,.16)'},
+  violet:{main:'#7c3aed',s:'#6d28d9',f:'rgba(124,58,237,.16)'},
+  pink:  {main:'#db2777',s:'#be185d',f:'rgba(219,39,119,.16)'},
+  green: {main:'#059669',s:'#047857',f:'rgba(5,150,105,.16)'},
+  amber: {main:'#d97706',s:'#b45309',f:'rgba(217,119,6,.16)'},
+  red:   {main:'#dc2626',s:'#b91c1c',f:'rgba(220,38,38,.16)'},
+};
+document.querySelectorAll('.dot').forEach(btn=>{
+  const k = btn.id.replace('acc-','');
+  btn.onclick = ()=>{
+    document.querySelectorAll('.dot').forEach(d=>d.classList.remove('on'));
+    btn.classList.add('on');
+    const a = ACCENTS[k];
+    const r = document.documentElement;
+    r.style.setProperty('--acc', a.main);
+    r.style.setProperty('--acc-s', a.s);
+    r.style.setProperty('--acc-f', a.f);
+  };
+});
+
+/* ════════════════════════════════════════
+   2. Input focus + password toggle
+════════════════════════════════════════ */
+document.querySelectorAll('.inp-wrap').forEach(w=>{
+  const inp = w.querySelector('input');
+  if(!inp) return;
+  inp.onfocus = ()=>w.classList.add('focused');
+  inp.onblur  = ()=>w.classList.remove('focused');
+});
+document.querySelectorAll('.eye').forEach(btn=>{
+  btn.onclick = ()=>{
+    const inp = btn.closest('.inp-wrap').querySelector('input');
+    inp.type = inp.type==='password'?'text':'password';
+  };
+});
+
+/* ════════════════════════════════════════
+   3. Theme
+════════════════════════════════════════ */
+const THEME_KEY = 'a3k64-theme';
+const mql = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+function systemPrefersDark(){ return mql ? mql.matches : true; }
+function applyTheme(mode){
+  const effective = mode==='auto'?(systemPrefersDark()?'dark':'light'):mode;
+  document.documentElement.setAttribute('data-theme', effective);
+  document.querySelectorAll('.ctrl').forEach(c=>c.classList.remove('on'));
+  ['ctrl-'+mode,'ctrl-'+mode+'-m'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.classList.add('on');
+  });
+  try{ localStorage.setItem(THEME_KEY, mode); }catch(e){}
+}
+if(mql) mql.addEventListener('change',()=>{
+  const s=(()=>{try{return localStorage.getItem(THEME_KEY);}catch(e){return null;}})();
+  if((s||'dark')==='auto') applyTheme('auto');
+});
+let initialMode='dark';
+try{ initialMode=localStorage.getItem(THEME_KEY)||'dark'; }catch(e){}
+applyTheme(initialMode);
+
+/* ════════════════════════════════════════
+   4. Scoreboard data — hiển thị điểm 4 tổ
+════════════════════════════════════════ */
+
+// Ngưỡng xếp loại (khớp với scoreboard.js)
+const THRESHOLDS = [
+  {min:50,  status:'Tốt'},
+  {min:0,   status:'Khá'},
+  {min:-50, status:'Đạt'},
+  {min:-Infinity, status:'CĐ'},
+];
+function getStatus(total){
+  return (THRESHOLDS.find(t=>total>=t.min)||THRESHOLDS[THRESHOLDS.length-1]).status;
+}
+
+/**
+ * Tính điểm 4 tổ từ mảng students + events + week hiện tại.
+ * Logic khớp với getGroupStats() trong scoreboard.js.
+ */
+function computeGroupStats(students, events, week) {
+  // Khớp với summarizeStudents() trong scoreboard.js:
+  // e.week so sánh loose (GAS trả về có thể number hoặc string)
+  // e.points là số âm/dương tổng hợp (KHÔNG dùng e.value + e.type)
+  // s.group so sánh loose với group number
+  const weekEvents = events.filter(e => e.week == week); // loose ==
+
+  const summaries = students.map(s => {
+    const sEvts = weekEvents.filter(e => e.studentId === s.id);
+    const total  = sEvts.reduce((a, e) => a + (Number(e.points) || 0), 0);
+    return { ...s, total, status: getStatus(total) };
+  });
+
+  return [1,2,3,4].map(group => {
+    const members = summaries.filter(s => s.group == group); // loose ==
+    const total   = members.reduce((a,m) => a+m.total, 0);
+    const average = members.length ? Math.round(total / members.length) : 0;
+    const good    = members.filter(m => m.status==='Tốt'||m.status==='Khá').length;
+    const warn    = members.filter(m => m.status==='CĐ').length;
+    const scores  = members.map(m => m.total);
+    return { group, total, average, good, warn, count: members.length, scores };
+  });
+}
+
+/**
+ * Render 4 group cards vào #groups-grid.
+ */
+function renderGroupCards(groupStats, week) {
+  // Xếp hạng
+  const ranked = [...groupStats].sort((a,b) => b.average-a.average || b.total-a.total);
+  const rankMap = {};
+  ranked.forEach((g,i) => rankMap[g.group] = i+1);
+
+  const grid = document.getElementById('groups-grid');
+  if (!grid) return;
+
+  // Tìm max |score| để scale mini-bar
+  const allScores = groupStats.flatMap(g => g.scores);
+  const maxAbs = Math.max(1, ...allScores.map(Math.abs));
+
+  const rankEmoji = ['🥇','🥈','🥉','4️⃣'];
+
+  grid.innerHTML = groupStats.map(g => {
+    const rank = rankMap[g.group];
+    const isTop = rank === 1;
+    const avgPos = g.average >= 0;
+    const scorePos = g.total >= 0;
+
+    // Mini bars từ điểm các thành viên
+    const barH = 52;
+    const bars = g.scores.length
+      ? g.scores.map(sc => {
+          const h = Math.max(3, Math.round(Math.abs(sc) / maxAbs * barH));
+          const neg = sc < 0;
+          return `<div class="mini-bar-seg${neg?' neg':''}" style="height:${h}px"></div>`;
+        }).join('')
+      : '<div class="mini-bar-seg" style="height:4px;opacity:.3"></div>'.repeat(4);
+
+    return `
+      <div class="group-card${isTop?' rank-1':''}">
+        <div class="rank-badge">${rankEmoji[rank-1]}</div>
+        <div class="group-num">Tổ ${g.group} · ${g.count} thành viên</div>
+        <div class="group-score-big${!scorePos?' neg':''}">
+          ${g.total > 0 ? '+' : ''}${g.total}
+        </div>
+        <div class="group-avg-row">
+          <span class="group-avg-lbl">TB mỗi người</span>
+          <span class="group-avg-val${avgPos?' pos':' neg'}">
+            ${g.average > 0 ? '+' : ''}${g.average}đ
+          </span>
+        </div>
+        <div class="group-status-row">
+          <span class="st-chip cnt">📋 ${g.count}</span>
+          ${g.good ? `<span class="st-chip good">✓ ${g.good} tốt/khá</span>` : ''}
+          ${g.warn ? `<span class="st-chip warn">⚠ ${g.warn} CĐ</span>` : ''}
+        </div>
+        <div class="group-mini-bar">${bars}</div>
+      </div>`;
+  }).join('');
+
+  // Cập nhật tuần
+  const weekEl = document.getElementById('live-week-num');
+  if (weekEl) weekEl.textContent = week || '—';
+}
+
+/**
+ * Đọc cache → render ngay, rồi fetch GAS để cập nhật.
+ */
+/* ── Helpers: tuần mới nhất từ remote object ── */
+function resolveLatestWeek(r) {
+  const w1 = Array.isArray(r.weeks)       ? r.weeks.map(w=>Number(w.week??w))   : [];
+  const w2 = (r.weekSettings||[]).map(w=>Number(w.week||w));
+  const w3 = (r.events||[]).map(e=>Number(e.week));
+  const all = [...new Set([...w1,...w2,...w3])].filter(n=>n>0);
+  return all.length ? Math.max(...all) : 1;
+}
+
+/* ── Cache helpers: localStorage (persist) + sessionStorage (fast) ── */
+const CACHE_KEY = 'a3k64-scoreboard-cache-v2';
+function readCache() {
+  // sessionStorage trước (cùng tab, nhanh nhất)
+  for (const store of [sessionStorage, localStorage]) {
+    try {
+      const raw = store.getItem(CACHE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch(e) {}
+  }
+  return null;
+}
+function writeCache(remote) {
+  const payload = JSON.stringify({ savedAt: Date.now(), remote });
+  try { sessionStorage.setItem(CACHE_KEY, payload); } catch(e) {}
+  try { localStorage.setItem(CACHE_KEY, payload); } catch(e) {}
+}
+
+/* ── Render từ data ── */
+function applyRemote(remote, note, statEvents, statGood, source) {
+  if (!remote?.students?.length) return false;
+  const week  = resolveLatestWeek(remote);
+  const stats = computeGroupStats(remote.students, remote.events||[], week);
+  renderGroupCards(stats, week);
+  const wCount = (remote.events||[]).filter(e=>e.week==week).length;
+  if (statEvents) statEvents.textContent = wCount;
+  if (statGood)   statGood.textContent   = stats.reduce((a,g)=>a+g.good,0);
+  if (note) {
+    if (source === 'live') {
+      note.textContent = 'Dữ liệu mới nhất · ' + new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
+    } else {
+      const age = Math.round((Date.now()-source)/60000);
+      note.textContent = age < 1 ? 'Vừa cập nhật' : `Cập nhật ${age} phút trước`;
+    }
+  }
+  return true;
+}
+
+async function loadGroupData() {
+  const note       = document.getElementById('data-note');
+  const statEvents = document.getElementById('stat-events');
+  const statGood   = document.getElementById('stat-good');
+
+  // ── Bước 1: Render cache ngay lập tức (0ms) ──
+  const cached = readCache();
+  const hasCache = cached?.remote?.students?.length;
+  if (hasCache) {
+    applyRemote(cached.remote, note, statEvents, statGood, cached.savedAt || 0);
+  }
+
+  // ── Bước 2: Await __gasPromise (fetch đã kick từ <head>) ──
+  const gasUrl = window.A3K64_CONFIG?.gasUrl;
+  if (!gasUrl) {
+    if (!hasCache) {
+      const grid = document.getElementById('groups-grid');
+      if (grid) grid.innerHTML = '<div style="grid-column:1/-1;display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:12px;text-align:center;gap:8px"><span style="font-size:24px">📋</span><span>Chưa cấu hình kết nối.<br>Điểm sẽ hiển thị sau khi đăng nhập.</span></div>';
+      if (note) note.textContent = 'Cần đăng nhập để xem điểm';
+    }
+    return;
+  }
+
+  try {
+    // __gasPromise đã chạy từ <head> → chỉ await, không fetch lại
+    const json   = await (window.__gasPromise || (async ()=>{
+      // Fetch không có ?t= timestamp → SW có thể intercept và trả cache
+      const u = new URL(gasUrl);
+      u.searchParams.set('action','getScoreboard');
+      return fetch(u.toString(),{method:'GET',redirect:'follow'}).then(r=>r.json()).catch(()=>null);
+    })());
+    window.__gasPromise = null; // dùng 1 lần
+
+
+
+    if (!json) throw new Error('null response');
+    const remote = json?.data?.students ? json.data : (json?.data ?? json);
+    if (!remote?.students?.length) throw new Error('no students');
+
+    applyRemote(remote, note, statEvents, statGood, 'live');
+    writeCache(remote);
+
+  } catch(err) {
+    if (!hasCache && note) note.textContent = 'Không tải được dữ liệu · đăng nhập để xem';
+    else if (note && !note.textContent.includes('phút')) note.textContent = 'Dữ liệu từ cache';
+  }
+}
+
+// Kick off
+loadGroupData();
+
+/* ════════════════════════════════════════
+   6. Prefetch desktop
+════════════════════════════════════════ */
+(function prefetchDesktop() {
+  const link = document.createElement('link');
+  link.rel = 'prefetch';
+  link.href = '../desktop/desktop.html';
+  link.as = 'document';
+  document.head.appendChild(link);
+})();
+
+/* ════════════════════════════════════════
+   7. Prefetch scoreboard data (sau login)
+════════════════════════════════════════ */
+async function prefetchScoreboardData(gasUrl) {
+  try {
+    const url = new URL(gasUrl);
+    url.searchParams.set('action', 'getScoreboard');
+    const res = await fetch(url.toString(), { method:'GET', redirect:'follow' });
+    if (!res.ok) return;
+    const json = await res.json();
+    const remote = json?.data?.students ? json.data : (json?.data ?? json);
+    if (!remote?.students?.length) return;
+    writeCache(remote); // ghi cả sessionStorage + localStorage để lần sau load ngay
+  } catch(e) {}
+}
+
+/* ════════════════════════════════════════
+   8. Đăng nhập
+════════════════════════════════════════ */
+document.getElementById('btn-submit-login').addEventListener('click', function(e) {
+  e.preventDefault();
+  const usernameInput = document.getElementById('login-username').value.trim();
+  const passwordInput = document.getElementById('login-password').value.trim();
+  const errorMsg  = document.getElementById('login-error');
+  const submitBtn = document.getElementById('btn-submit-login');
+  errorMsg.style.display = 'none';
+  if(!usernameInput || !passwordInput) {
+    errorMsg.textContent = 'Vui lòng điền đầy đủ thông tin!';
+    errorMsg.style.display = 'block';
+    return;
+  }
+  const gasUrl = (window.A3K64_CONFIG && window.A3K64_CONFIG.gasUrl) || null;
+  if (!gasUrl) {
+    errorMsg.textContent = 'Chưa cấu hình gasUrl (config.js). Không thể đăng nhập.';
+    errorMsg.style.display = 'block';
+    return;
+  }
+  const originalLabel = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Đang đăng nhập…';
+  fetch(gasUrl, {
+    method:'POST',
+    body: JSON.stringify({ action:'login', payload:{ username:usernameInput, password:passwordInput } }),
+  })
+    .then(res=>res.json())
+    .then(async json=>{
+      if (!json||!json.ok||!json.data||!json.data.ok) {
+        const err=(json&&json.data&&json.data.error)||(json&&json.error)||'Tên đăng nhập hoặc mật khẩu không chính xác!';
+        errorMsg.textContent = err;
+        errorMsg.style.display = 'block';
+        return;
+      }
+      const user = json.data.user || {};
+      const userObject = {
+        username: user.username||usernameInput,
+        email: user.email||usernameInput,
+        displayName: user.displayName||usernameInput,
+        role: user.role||'hoc_sinh',
+        group: user.group||null,
+        photoURL: user.photoURL||null,
+        loginAt: new Date().toISOString(),
+      };
+      sessionStorage.setItem('a3k64-user', JSON.stringify(userObject));
+      // Prefetch toàn bộ hệ thống song song — chạy nền, không block chuyển trang
+      if (typeof A3K64Preload !== 'undefined') {
+        A3K64Preload.run(gasUrl, userObject);
+      } else {
+        prefetchScoreboardData(gasUrl); // fallback nếu preload.js chưa load
+      }
+      await new Promise(r=>setTimeout(r,80));
+      window.location.href = '../desktop/desktop.html';
+    })
+    .catch(()=>{
+      errorMsg.textContent = 'Không kết nối được máy chủ. Vui lòng thử lại.';
+      errorMsg.style.display = 'block';
+    })
+    .finally(()=>{
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalLabel;
+    });
+});
+</script>
+<script src="../assets/js/preload.js"></script>
+<script src="../assets/js/disable-context-menu.js"></script>
+</body>
+</html>
