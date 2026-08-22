@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>Profile — A3K64</title>
+
+  <!-- Theme áp dụng NGAY trước khi CSS render, tránh nháy sáng/tối -->
+  <script>
+    (function () {
+      function readMode() {
+        try {
+          const raw = (
+            localStorage.getItem('desktop-theme') ||
+            localStorage.getItem('login-theme')   ||
+            localStorage.getItem('theme-mode')    ||
+            localStorage.getItem('a3k64-theme')   ||
+            'dark'
+          ).toLowerCase();
+          if (raw === 'auto') return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          return raw === 'light' || raw === 'sang' || raw === 'sáng' ? 'light' : 'dark';
+        } catch { return 'dark'; }
+      }
+      const mode = readMode();
+      document.documentElement.setAttribute('data-theme', mode);
+      if (mode === 'light') document.documentElement.classList.add('theme-light');
+    })();
+  </script>
+
+  <link rel="stylesheet" href="profile.css"/>
+</head>
+<body>
+
+<div id="shell">
+  <div id="sidebar">
+    <div class="sidebar-top">
+      <span class="sidebar-label">Tab học sinh</span>
+      <button class="btn-mini-new" id="btn-mini-new" title="Tab mới">＋</button>
+    </div>
+    <div class="tab-list" id="tab-list"></div>
+    <button class="btn-new-tab" id="btn-new-tab">
+      <span style="font-size:16px">＋</span>
+      <span class="new-tab-label">Tab mới</span>
+      <kbd class="new-tab-kbd" style="color:var(--muted);font-size:11px">Ctrl+T</kbd>
+    </button>
+  </div>
+  <div id="main"></div>
+</div>
+
+<div id="ctx-menu" class="ctx-menu" style="display:none"></div>
+
+<!-- defer: 3 script trước đây tải/parse chặn render (blocking), giờ
+     tải song song ở background và chạy đúng thứ tự sau khi HTML dựng xong -->
+<script src="../../assets/js/config.js" defer></script>
+<script src="profile.js" defer></script>
+<script src="../../assets/js/disable-context-menu.js" defer></script>
+<script src="../../assets/js/touch-scroll-fix.js" defer></script>
+
+</body>
+</html>
