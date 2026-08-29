@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cài đặt A3K64</title>
+<link rel="stylesheet" href="settings.css"/>
+</head>
+<body>
+
+<div id="app">
+  <!-- ── Sidebar ── -->
+  <aside id="sidebar">
+    <div class="sidebar-top">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      Cài đặt
+    </div>
+
+    <div class="profile-card" id="sb-profile">
+      <div class="profile-avatar" id="sb-avatar">A3</div>
+      <div>
+        <div class="profile-name"  id="sb-name">Người dùng 12A3</div>
+        <div class="profile-email" id="sb-email">Đang đăng nhập</div>
+      </div>
+    </div>
+
+    <!-- Sync status bar — được cập nhật bởi settings-sync.js -->
+    <div id="sync-status-bar" class="sync-status" style="display:none;margin:0 4px 10px"></div>
+
+    <nav class="nav-section" id="sidebar-nav"><!-- injected by JS --></nav>
+  </aside>
+
+  <!-- ── Main content ── -->
+  <main id="content">
+    <!-- Page: Home (mobile) / Personalization root -->
+    <div class="page active" id="page-home">
+      <div class="mobile-header">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        Cài đặt
+      </div>
+      <div class="page-title">Cá nhân hóa</div>
+      <div class="nav-grid" id="home-nav-grid"><!-- injected --></div>
+    </div>
+
+    <!-- Page: Color -->
+    <div class="page" id="page-color"></div>
+
+    <!-- Page: Background -->
+    <div class="page" id="page-background"></div>
+
+    <!-- Page: Taskbar -->
+    <div class="page" id="page-taskbar"></div>
+
+    <!-- Page: Display -->
+    <div class="page" id="page-display"></div>
+
+    <!-- Page: About -->
+    <div class="page" id="page-about"></div>
+
+    <!-- Page: System -->
+    <div class="page" id="page-system"></div>
+  </main>
+</div>
+
+<!--
+  THỨ TỰ LOAD QUAN TRỌNG:
+  1. config.js      — cung cấp window.A3K64_CONFIG.gasUrl
+  2. settings-core.js  — hằng số, ls helper, readAccent/Theme/TB
+  3. settings-sync.js  — Sync object, saveAccent/saveTB wrappers
+  4. settings-ui.js    — renderers, navigate, applyAccentUI, v.v.
+-->
+<script src="../../assets/js/config.js"></script>
+<script src="settings-core.js"></script>
+<script src="settings-sync.js"></script>
+<script src="settings-ui.js"></script>
+
+<script>
+/* ── Boot ── */
+(function boot() {
+  // Áp accent & theme ngay từ localStorage (không chờ backend)
+  accent = readAccent();
+  theme  = readTheme();
+  document.documentElement.style.setProperty('--accent', accent);
+  applyTheme(theme);
+
+  buildSidebar();
+  renderHome();
+  renderSystem();
+
+  // Mobile: thêm mục Hệ thống vào home
+  const mobileExtra = document.createElement('div');
+  mobileExtra.style.cssText = 'margin-top:20px';
+  mobileExtra.innerHTML = `<div class="color-label" style="margin:16px 0 8px">Hệ thống</div>
+    <div class="nav-grid">
+      ${[
+        { id: 'display', icon: 'monitor', label: 'Màn hình',   sub: 'Tỷ lệ và bố cục' },
+        { id: 'about',   icon: 'info',    label: 'Giới thiệu', sub: 'Thông tin ứng dụng' },
+      ].map(p => `<button class="nav-card" onclick="navigate('${p.id}')">${svg(ICONS[p.icon],22)}<div><strong>${p.label}</strong><span>${p.sub}</span></div><span class="chevron">${svg(ICONS.chevronRight,18)}</span></button>`).join('')}
+    </div>`;
+  $('#home-nav-grid').after(mobileExtra);
+
+  // Đồng bộ cài đặt từ backend (bất đồng bộ, không chặn UI)
+  Sync.load();
+})();
+</script>
+
+<script src="../../assets/js/disable-context-menu.js"></script>
+</body>
+</html>
