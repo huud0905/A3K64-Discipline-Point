@@ -739,6 +739,10 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
         newTitle,
         points: suggestedPoints,
         category: suggestedCategory,
+        // Giữ nguyên note gốc (vd. dấu nghỉ tập trung __TT_ABSENCE__...) —
+        // nếu không mang theo, dòng "đã sửa" sẽ mất dấu hiệu đặc biệt này
+        // dù nội dung điểm vẫn đúng, làm mất tích trong tab Nghỉ tập trung.
+        note: ev.note,
         // Giữ lại loại/môn/ĐIỂM GỐC (trước khi sửa) — cần để có thể Hoàn tác
         // đúng như cũ nếu sau này phát hiện AI sửa sai.
         originalCategory: p.category,
@@ -788,6 +792,10 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
           points: s.points, type: s.points >= 0 ? 'CONG' : 'TRU',
           category: s.category, createdBy: 'AI Hậu kiểm',
           createdAt: new Date().toISOString(),
+          // Mang theo note gốc (vd. dấu nghỉ tập trung) sang dòng mới —
+          // nếu không, dòng sửa xong sẽ mất dấu dù điểm/tiêu đề đúng, và
+          // vì đây là dữ liệu gửi thẳng lên GAS nên mất luôn cả sau reload.
+          note: s.note,
         }],
         // Dòng CŨ đang bị xoá có điểm CŨ (có thể sai, ví dụ +100) — phải
         // dùng originalPoints ở đây, KHÔNG dùng s.points (điểm mới, đã sửa),
@@ -860,6 +868,9 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
         oldTitle:         s.oldTitle,
         newTitle:         s.newTitle,
         points:           s.points,
+        // Note gốc (vd. dấu nghỉ tập trung) — cần để Hoàn tác khôi phục
+        // đúng dòng ban đầu, không chỉ đúng điểm/tiêu đề.
+        note:             s.note,
         originalCategory: s.originalCategory,
         originalSubject:  s.originalSubject,
         originalPoints:   origPoints,
@@ -921,6 +932,9 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
           points: restorePoints, type: restorePoints >= 0 ? 'CONG' : 'TRU',
           category: h.originalCategory || 'HOC_TAP', createdBy: 'Hoàn tác AI Hậu kiểm',
           createdAt: new Date().toISOString(),
+          // Khôi phục lại đúng note gốc (vd. dấu nghỉ tập trung) — nếu
+          // không, Hoàn tác sẽ trả đúng điểm/tiêu đề nhưng vẫn thiếu dấu.
+          note: h.note,
         }],
         deletions: h.newId ? [{ id: h.newId, studentId: h.studentId, week: h.week, title: h.newTitle, points: h.points }] : [],
       });

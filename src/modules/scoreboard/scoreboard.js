@@ -173,6 +173,8 @@ let state = {
   isCreatingWeek: false,
   groupOrder: readGroupOrder(),
   mobileFilterOpen: false,
+  ttExpanded: {},               // { [studentId]: true } — hàng nào đang mở chi tiết nghỉ tập trung
+  ttSort: { key: 'name', dir: 'asc' }, // sắp xếp riêng cho bảng "Nghỉ tập trung"
 };
 
 /** Cấu hình do initScoreboard() truyền vào (vai trò, tổ, URL Apps Script). */
@@ -277,6 +279,129 @@ function statusTone(s) {
   return 'danger';
 }
 function isSheetTotalEvent(ev) { return String(ev.note||'').includes('__SHEET_TOTAL__'); }
+
+/* ============================================================
+   NGHỈ TẬP TRUNG (lũy kế cả năm học, không tính theo tuần)
+   ============================================================ */
+const TT_ABSENCE_MARKER = '__TT_ABSENCE__';
+const TT_FREE_QUOTA = 2;          // 2 buổi đầu miễn phí, không trừ điểm
+const TT_PENALTY_EXCUSED = -200;  // buổi thứ 3 trở đi, có phép
+const TT_PENALTY_UNEXCUSED = -400; // buổi thứ 3 trở đi, không phép
+
+function isTTAbsenceEvent(ev) { return String(ev.note||'').includes(TT_ABSENCE_MARKER); }
+function ttAbsenceIsExcused(ev) { return String(ev.note||'').includes(TT_ABSENCE_MARKER+':excused'); }
+// Ngày nghỉ (do người dùng chọn) được nhúng trong note dạng "...:YYYY-MM-DD" ở cuối,
+// tách riêng khỏi createdAt (thời điểm ghi nhận) vì 2 mốc này có thể khác nhau
+// (ví dụ ghi nhận trễ cho 1 buổi nghỉ đã xảy ra trước đó).
+function ttAbsenceDate(ev) {
+  const m = String(ev.note||'').match(/(\d{4}-\d{2}-\d{2})$/);
+  return m ? m[1] : (ev.createdAt||'').slice(0,10);
+}
+function formatTTDate(iso) {
+  if(!iso) return '?';
+  const [y,m,d] = iso.split('-');
+  return d && m ? `${d}/${m}` : iso;
+}
+
+// Lịch sử nghỉ tập trung của 1 học sinh, xuyên suốt TẤT CẢ các tuần, sắp theo NGÀY NGHỈ.
+function getStudentAbsenceHistory(studentId) {
+  return state.events
+    .filter(e => e.studentId === studentId && isTTAbsenceEvent(e))
+    .sort((a,b) => ttAbsenceDate(a).localeCompare(ttAbsenceDate(b)));
+}
+
+// Điểm trừ cho lần nghỉ thứ `occurrenceIndex` (0-based: 0 = lần 1, 1 = lần 2, 2 = lần 3...)
+function computeTTAbsencePoints(occurrenceIndex, excused) {
+  if (occurrenceIndex < TT_FREE_QUOTA) return 0;
+  return excused ? TT_PENALTY_EXCUSED : TT_PENALTY_UNEXCUSED;
+}
+
+// Tổng hợp nghỉ tập trung lũy kế cho toàn bộ học sinh — dùng cho tab "Nghỉ tập trung".
+function summarizeTTAbsences(students) {
+  return students.map(student => {
+    const history = getStudentAbsenceHistory(student.id);
+    const excusedCount = history.filter(e => ttAbsenceIsExcused(e)).length;
+    const unexcusedCount = history.length - excusedCount;
+    const deducted = history.reduce((s,e) => s + (e.points||0), 0);
+    return { ...student, ttHistory: history, ttExcusedCount: excusedCount, ttUnexcusedCount: unexcusedCount, ttTotalCount: history.length, ttDeducted: deducted };
+  });
+}
+
+// Tạo + lưu 1 lần ghi nhận nghỉ tập trung mới cho học sinh `studentId` vào ngày `dateStr` (YYYY-MM-DD).
+// `excused` = true (có phép) / false (không phép).
+async function addTTAbsence(studentId, excused, dateStr) {
+  const student = state.students.find(s => s.id === studentId);
+  if (!student) return;
+  const dateInput = document.getElementById(`tt-date-${studentId}`);
+  const chosenDate = dateStr || dateInput?.value || new Date().toISOString().slice(0,10);
+  const history = getStudentAbsenceHistory(studentId);
+  const occurrenceIndex = history.length; // 0-based: lần ghi nhận tiếp theo
+  const points = computeTTAbsencePoints(occurrenceIndex, excused);
+  const label = excused ? 'có phép' : 'không phép';
+  const title = `Nghỉ tập trung (${label}) ngày ${formatTTDate(chosenDate)} - lần ${occurrenceIndex+1}`;
+  const note = `${TT_ABSENCE_MARKER}:${excused?'excused':'unexcused'}:${chosenDate}`;
+  const ev = makeDraftEvent({
+    studentId, week: state.week, title, points, note,
+    type: points >= 0 ? 'CONG' : 'TRU',
+    category: CATEGORY.DISCIPLINE,
+    createdBy: 'Nghỉ tập trung',
+    createdAt: new Date().toISOString(),
+  });
+  await saveScoreChanges({ additions: [ev], deletions: [] });
+}
+
+// Xoá 1 lần ghi nhận nghỉ tập trung (ví dụ bấm nhầm).
+async function removeTTAbsence(eventId) {
+  await saveScoreChanges({ additions: [], deletions: [eventId] });
+}
+
+// Bấm tên học sinh để xem/xoá chi tiết từng lần nghỉ.
+// CỐ Ý KHÔNG gọi setState()/render() ở đây — hàng chi tiết đã có sẵn trong DOM
+// (xem buildDetailRow), nên chỉ cần toggle class CSS trực tiếp trên đúng nút
+// và đúng hàng đó. Làm vậy tránh render() lại toàn trang mỗi lần bấm (mất vị
+// trí cuộn, giật/nháy, đóng luôn các hàng khác đang mở...).
+function toggleTTExpand(studentId) {
+  const next = !state.ttExpanded[studentId];
+  state.ttExpanded[studentId] = next; // vẫn cập nhật state để lần render() sau (đổi tuần, đổi bộ lọc, sắp xếp...) giữ đúng trạng thái đóng/mở
+
+  const btn = document.getElementById(`tt-expand-btn-${studentId}`);
+  const detailRow = document.getElementById(`tt-detail-${studentId}`);
+  if (!btn || !detailRow) {
+    // Phòng hờ: nếu vì lý do gì đó DOM chưa có 2 phần tử này (VD vừa lọc/sắp
+    // xếp lại chưa kịp render), rơi về cách cũ để không bị kẹt UI.
+    render();
+    return;
+  }
+  btn.classList.toggle('open', next);
+  detailRow.classList.toggle('tt-detail-open', next);
+}
+
+// Bấm tiêu đề cột để sắp xếp bảng "Nghỉ tập trung". Bấm lại cùng cột thì đảo chiều.
+function setTTSort(key) {
+  const cur = state.ttSort || { key:'name', dir:'asc' };
+  const dir = (cur.key === key && cur.dir === 'asc') ? 'desc' : 'asc';
+  setState({ ttSort: { key, dir } }, 'setTTSort');
+}
+
+function sortTTAbsences(list) {
+  const { key, dir } = state.ttSort || { key:'name', dir:'asc' };
+  const mul = dir === 'asc' ? 1 : -1;
+  const getVal = (s) => {
+    if (key === 'name')      return null; // dùng compareByGivenName riêng bên dưới
+    if (key === 'group')     return Number(s.group)||0;
+    if (key === 'excused')   return s.ttExcusedCount;
+    if (key === 'unexcused') return s.ttUnexcusedCount;
+    if (key === 'total')     return s.ttTotalCount;
+    if (key === 'deducted')  return s.ttDeducted;
+    return 0;
+  };
+  return [...list].sort((a,b) => {
+    if (key === 'name') return mul * compareByGivenName(a,b);
+    const diff = getVal(a) - getVal(b);
+    return diff !== 0 ? mul * diff : compareByGivenName(a,b);
+  });
+}
+
 function parseDay(title) {
   const t=title.toLowerCase();
   const m=t.match(/thứ\s*([2-7])/i);
@@ -396,11 +521,15 @@ function getDerived() {
     return false;
   };
 
+  const ttAbsenceSummaries = sortTTAbsences(
+    summarizeTTAbsences(state.students).filter(s => matchesGroups(s.group, state.groupFilter))
+  );
+
   return {
     role, hasFullAccess, isGroupLeader, isStudentOnly, canUseScoringTab, canCreateWeek,
     ugn, lockedForLeader, permNote, highlightName, nextWeek,
     rawSummaries, groupFiltered, sorted, scoringSummaries, groupStats,
-    totalScore, goodCount, warnCount, topGroup, canEditStudent,
+    totalScore, goodCount, warnCount, topGroup, canEditStudent, ttAbsenceSummaries,
   };
 }
 
@@ -1236,6 +1365,92 @@ function buildScoringPage(d) {
 }
 
 /* ============================================================
+   BUILD ABSENCE PAGE (Nghỉ tập trung — lũy kế cả năm)
+   ============================================================ */
+function buildAbsencePage(d) {
+  const canEdit = d.hasFullAccess || d.isGroupLeader;
+  const todayStr = new Date().toISOString().slice(0,10);
+  const sortInfo = state.ttSort || { key:'name', dir:'asc' };
+
+  function sortArrow(key) {
+    if (sortInfo.key !== key) return '';
+    return sortInfo.dir === 'asc' ? ' ▲' : ' ▼';
+  }
+  function sortTh(key, label) {
+    return `<th class="tt-sortable-th ${sortInfo.key===key?'tt-th-active':''}" onclick="setTTSort('${key}')">${label}${sortArrow(key)}</th>`;
+  }
+
+  function checkGroup(count, kind) {
+    // kind: 'excused' | 'unexcused' — dấu tích xanh lặp lại theo số lần, thay vì hiện số
+    if (!count) return '<span class="tt-empty-dash">—</span>';
+    const cls = kind === 'excused' ? 'tt-check-excused' : 'tt-check-unexcused';
+    return `<span class="tt-check-group">${Array.from({length:count}).map(()=>`<span class="tt-check-icon ${cls}">${Icons.check}</span>`).join('')}</span>`;
+  }
+
+  // Hàng chi tiết LUÔN được render trong DOM (kể cả khi đang đóng) — trạng thái
+  // đóng/mở chỉ là CSS (.tt-detail-open), để toggleTTExpand() có thể bật/tắt
+  // bằng cách toggle class trực tiếp trên đúng dòng, không cần render() lại
+  // toàn trang mỗi lần bấm tên.
+  function buildDetailRow(s, isOpen) {
+    const chips = s.ttHistory.length
+      ? s.ttHistory.map(ev => `
+        <span class="tt-chip ${ttAbsenceIsExcused(ev)?'tt-chip-excused':'tt-chip-unexcused'}">
+          <span class="tt-chip-date">${formatTTDate(ttAbsenceDate(ev))}</span>
+          <span class="tt-chip-label">${ttAbsenceIsExcused(ev)?'Có phép':'Không phép'}</span>
+          ${canEdit?`<button type="button" class="tt-chip-del" onclick="removeTTAbsence('${ev.id}')" title="Xoá lần ghi nhận này (bấm nhầm)">${Icons.x||'&times;'}</button>`:''}
+        </span>`).join('')
+      : `<span class="tt-empty-dash">Chưa có lần nghỉ nào</span>`;
+    return `<tr class="tt-detail-row${isOpen?' tt-detail-open':''}" id="tt-detail-${s.id}"><td colspan="${canEdit?7:6}"><div class="tt-chip-list">${chips}</div></td></tr>`;
+  }
+
+  const rows = d.ttAbsenceSummaries.map(s => {
+    const over = s.ttTotalCount > TT_FREE_QUOTA;
+    const isOpen = !!state.ttExpanded[s.id];
+    return `
+    <tr class="${over?'tt-row-over':''}">
+      <td>
+        <button type="button" id="tt-expand-btn-${s.id}" class="tt-name-expand-btn ${isOpen?'open':''}" onclick="toggleTTExpand('${s.id}')" title="Bấm để xem/xoá chi tiết từng lần nghỉ">
+          <span class="tt-expand-chevron">${Icons.chevdown}</span>
+          <span class="tt-expand-name">${s.name}</span>
+        </button>
+      </td>
+      <td>Tổ ${s.group}</td>
+      <td class="tt-count-cell">${checkGroup(s.ttExcusedCount,'excused')}</td>
+      <td class="tt-count-cell">${checkGroup(s.ttUnexcusedCount,'unexcused')}</td>
+      <td class="tt-count-cell tt-total-cell">${s.ttTotalCount} / ${TT_FREE_QUOTA} miễn</td>
+      <td class="${s.ttDeducted<0?'score-negative':''}">${s.ttDeducted<0?formatScore(s.ttDeducted):'—'}</td>
+      ${canEdit?`<td class="tt-actions-cell">
+        <input type="date" class="tt-date-input" id="tt-date-${s.id}" value="${todayStr}" max="${todayStr}" title="Ngày nghỉ">
+        <button type="button" class="tt-add-btn tt-add-excused" onclick="addTTAbsence('${s.id}',true)" title="Ghi nhận 1 buổi nghỉ tập trung có phép">+ Có phép</button>
+        <button type="button" class="tt-add-btn tt-add-unexcused" onclick="addTTAbsence('${s.id}',false)" title="Ghi nhận 1 buổi nghỉ tập trung không phép">+ Không phép</button>
+      </td>`:''}
+    </tr>${buildDetailRow(s, isOpen)}`;
+  }).join('');
+
+  return `<div class="score-page">
+    <section class="score-panel">
+      <div class="table-toolbar">
+        <div class="section-heading-inner">
+          <strong>Nghỉ tập trung (lũy kế cả năm học)</strong>
+          <span class="score-permission-note">2 buổi đầu miễn phí. Từ buổi thứ 3: có phép trừ 200, không phép trừ 400. Bấm tên học sinh để xem/xoá từng lần. Bấm tiêu đề cột để sắp xếp.</span>
+        </div>
+      </div>
+      <div class="score-table-wrap">
+        <table class="score-table tt-absence-table">
+          <thead>
+            <tr>
+              ${sortTh('name','Học sinh')}${sortTh('group','Tổ')}${sortTh('excused','Có phép')}${sortTh('unexcused','Không phép')}
+              ${sortTh('total','Tổng / Miễn')}${sortTh('deducted','Điểm đã trừ')}${canEdit?'<th>Ghi nhận (chọn ngày nghỉ)</th>':''}
+            </tr>
+          </thead>
+          <tbody>${rows || `<tr><td colspan="${canEdit?7:6}" style="text-align:center;color:var(--score-muted)">Không có học sinh phù hợp bộ lọc</td></tr>`}</tbody>
+        </table>
+      </div>
+    </section>
+  </div>`;
+}
+
+/* ============================================================
    BUILD LEFT SIDEBAR
    ============================================================ */
 function buildFilterSelect(id,value,options,disabled,title='') {
@@ -1400,6 +1615,8 @@ function render() {
   const createWeekJustOpened = createWeekOpenNow && !__a3PrevCreateWeekOpen;
 
   const focusInfo = __a3CaptureFocus(root);
+  const prevScrollEl = root.querySelector('.scoreboard-content');
+  const prevScrollTop = prevScrollEl ? prevScrollEl.scrollTop : 0;
 
   root.innerHTML = `
     <div class="scoreboard-app ${shellFirstPaint?'a3-enter':''} role-${d.role} ${d.isStudentOnly?'student-readonly-mode':''}">
@@ -1416,11 +1633,12 @@ function render() {
               <p>Quản lý điểm thi đua, xếp hạng học tập và nề nếp theo tuần.</p>
             </div>
           </div>
-          <nav class="scoreboard-tabs two-tabs">
+          <nav class="scoreboard-tabs three-tabs">
             <button type="button" class="${state.activeTab==='overview'?'active':''}" onclick="setTab('overview')">Tổng quan</button>
             <button type="button" class="${state.activeTab==='scoring'?'active':''}"
               onclick="${d.canUseScoringTab?`setTab('scoring')`:'null'}"
               ${!d.canUseScoringTab?'disabled':''}>Bảng chấm</button>
+            <button type="button" class="${state.activeTab==='absence'?'active':''}" onclick="setTab('absence')">Nghỉ tập trung</button>
           </nav>
         </header>
         <!-- Toolbar -->
@@ -1437,6 +1655,7 @@ function render() {
         <main class="scoreboard-content">
           ${state.dataSource===DATA_SOURCE.LOADING?`<div style="padding:40px;text-align:center;color:var(--score-muted)">Đang tải dữ liệu, lần đầu có thể hơi chậm...</div>`:
             state.activeTab==='overview'?buildOverviewPage(d):
+            state.activeTab==='absence'?buildAbsencePage(d):
             d.canUseScoringTab?buildScoringPage(d):''}
         </main>
       </section>
@@ -1463,6 +1682,8 @@ function render() {
   __a3AppMounted = true;
   __a3PrevCreateWeekOpen = createWeekOpenNow;
   __a3RestoreFocus(root, focusInfo);
+  const newScrollEl = root.querySelector('.scoreboard-content');
+  if (newScrollEl && prevScrollTop) newScrollEl.scrollTop = prevScrollTop;
 }
 
 /* ============================================================
@@ -1471,6 +1692,7 @@ function render() {
 function setTab(tab) {
   const d=getDerived();
   if(tab==='scoring'&&!d.canUseScoringTab) return;
+  if(tab!=='overview'&&tab!=='scoring'&&tab!=='absence') return;
   setState({activeTab:tab}, 'setTab');
 }
 
