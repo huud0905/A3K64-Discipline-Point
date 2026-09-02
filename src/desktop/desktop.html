@@ -32,13 +32,20 @@
 <script src="desktop.js"></script>
 <script>
   (function boot() {
-    let u;
-    try { u = JSON.parse(sessionStorage.getItem('a3k64-user') || 'null'); } catch { u = null; }
+    // Đọc user từ sessionStorage trước (phiên hiện tại đang mở);
+    // nếu không có -> thử localStorage (chỉ tồn tại khi học sinh đã
+    // tick "Ghi nhớ đăng nhập" ở trang login) và kiểm tra hạn 7 ngày.
+    let u = readSessionUser();
+    if (!u) u = readRememberedUser();
 
     if (!u) {
       window.location.replace('../auth/login.html');
       return;
     }
+
+    // Hồi phục lại sessionStorage cho phiên làm việc hiện tại,
+    // để phần còn lại của app (vốn chỉ đọc sessionStorage) hoạt động bình thường.
+    sessionStorage.setItem('a3k64-user', JSON.stringify(u));
 
     // Nếu user vào desktop bằng thiết bị mobile → chuyển sang mobile shell
     if (window.innerWidth < 768) {
@@ -49,8 +56,27 @@
     initDesktop(u);
   })();
 
+  function readSessionUser() {
+    try { return JSON.parse(sessionStorage.getItem('a3k64-user') || 'null'); }
+    catch { return null; }
+  }
+
+  function readRememberedUser() {
+    let u;
+    try { u = JSON.parse(localStorage.getItem('a3k64-user') || 'null'); }
+    catch { return null; }
+    if (!u) return null;
+    if (u.expiresAt && Date.now() > u.expiresAt) {
+      // Hết hạn 7 ngày -> xoá và bắt đăng nhập lại
+      localStorage.removeItem('a3k64-user');
+      return null;
+    }
+    return u;
+  }
+
   window.addEventListener('a3k64-logout', () => {
     sessionStorage.removeItem('a3k64-user');
+    localStorage.removeItem('a3k64-user');
     window.location.href = '../auth/login.html';
   });
 </script>

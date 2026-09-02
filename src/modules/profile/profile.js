@@ -34,6 +34,14 @@ function getStatus(total) {
   return 'Chưa đạt';
 }
 function isHiddenEvent(ev) { return String(ev.note || '').includes('__SHEET_TOTAL__'); }
+/* Escape để chèn an toàn vào innerHTML — dữ liệu tên/tiêu đề sự kiện/
+   người nhập đều tới từ GAS/Sheet, không phải literal của app, nên
+   cần escape trước khi nội suy vào template (đồng bộ với dutyEscape()
+   bên module Trực nhật). */
+function pEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
 
 /* ── Date parsing (BUG: "Thời gian" hiển thị sai) ──
    GAS/Sheet trả createdAt dạng chuỗi Việt hoá "HH:MM:SS DD/MM/YYYY"
@@ -112,7 +120,7 @@ function studentTitle(id) {
   const sorted = alphabetStudents(DATA.students);
   const s = DATA.students.find(x => x.id === id) || sorted.find(x => x.id === id);
   const idx = Math.max(0, sorted.findIndex(x => x.id === id)) + 1;
-  return `${pad2(idx)} – ${s?.name || 'Học sinh'}`;
+  return `${pad2(idx)} – ${pEsc(s?.name) || 'Học sinh'}`;
 }
 
 /* ── Perf: cache dữ liệu GAS ngắn hạn ──
@@ -400,7 +408,7 @@ function buildProfilePage(tab) {
   return `<div class="profile-page" data-tabkey="${tab.key}">
 
     <section class="p-hero">
-      <div class="p-avatar">${student.avatarInitial || student.name[0]}</div>
+      <div class="p-avatar">${pEsc(student.avatarInitial) || pEsc(student.name[0])}</div>
       <div class="p-hero-info">
         <div class="p-hero-meta">
           <span>Hồ sơ học sinh · Tuần ${activeWeek}</span>
@@ -412,8 +420,8 @@ function buildProfilePage(tab) {
             <button ${!nextWeek ? 'disabled' : ''} data-nextweek="${tab.key}" title="Tuần sau">▶</button>
           </div>
         </div>
-        <h1>${student.name}</h1>
-        <p>Tổ ${student.group} · ${student.role || 'Học sinh'} · ${student.status}</p>
+        <h1>${pEsc(student.name)}</h1>
+        <p>Tổ ${student.group} · ${pEsc(student.role) || 'Học sinh'} · ${student.status}</p>
       </div>
       <div class="p-rank-badge">
         <strong>#${student.rank}</strong>
@@ -499,10 +507,10 @@ function buildProfilePage(tab) {
           <tbody>
             ${history.length ? history.map(e => `<tr>
               <td>T${e.week}</td>
-              <td>${e.title}</td>
+              <td>${pEsc(e.title)}</td>
               <td class="${scoreClass(e.points)}">${formatScore(e.points)}</td>
               <td>${categoryLabel(e.category)}</td>
-              <td>${e.createdBy || 'Chưa rõ'}</td>
+              <td>${pEsc(e.createdBy) || 'Chưa rõ'}</td>
               <td>${formatDateTime(e.createdAt)}</td>
             </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">Chưa có dữ liệu.</td></tr>`}
           </tbody>
@@ -515,8 +523,8 @@ function buildProfilePage(tab) {
           <div class="p-event-card">
             <div class="p-event-dot ${e.points > 0 ? 'positive' : e.points < 0 ? 'negative' : ''}"></div>
             <div>
-              <div class="ev-title">${e.title}</div>
-              <div class="ev-meta">T${e.week} · ${categoryLabel(e.category)} · ${e.createdBy || 'Chưa rõ'}</div>
+              <div class="ev-title">${pEsc(e.title)}</div>
+              <div class="ev-meta">T${e.week} · ${categoryLabel(e.category)} · ${pEsc(e.createdBy) || 'Chưa rõ'}</div>
             </div>
             <div class="ev-score ${scoreClass(e.points)}">${formatScore(e.points)}</div>
           </div>
@@ -555,7 +563,7 @@ function renderSidebar() {
       data-tabkey="${t.key}"
       data-kind="${t.kind}"
       oncontextmenu="showCtx(event,'${t.key}')">
-      <span>${t.title}</span>
+      <span>${pEsc(t.title)}</span>
       <span class="close-icon" data-closetab="${t.key}">×</span>
     </button>
   `).join('');
@@ -605,7 +613,7 @@ function renderSearchResults(tabKey, query) {
   }
   wrap.innerHTML = `<div class="search-results">${results.map(s => `
     <button class="result-btn" data-openid="${s.id}">
-      <span>${s.name}</span>
+      <span>${pEsc(s.name)}</span>
       <small>Tổ ${s.group}</small>
     </button>
   `).join('')}</div>`;

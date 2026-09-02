@@ -63,7 +63,7 @@ body{
   height:calc(100vh - 40px);
   max-height:860px;
   display:grid;
-  grid-template-columns:1.8fr 1.2fr;
+  grid-template-columns:1fr 1.15fr;
   gap:10px;
   opacity:0;transform:translateY(10px);
   animation:rise .6s cubic-bezier(.19,1,.22,1) .05s forwards;
@@ -85,6 +85,15 @@ body{
   mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
   -webkit-mask-composite:xor;mask-composite:exclude;
   transition:background .35s ease;
+}
+
+/* Panel login là trọng tâm của trang -> viền + shadow nổi bật hơn panel điểm */
+.card.panel-login{
+  border-color:color-mix(in srgb,var(--acc) 22%,var(--line));
+  box-shadow:var(--card-shadow),0 0 0 1px color-mix(in srgb,var(--acc) 10%,transparent),0 30px 70px -20px color-mix(in srgb,var(--acc) 22%,transparent);
+}
+.card.panel-intro{
+  background:color-mix(in srgb,var(--panel) 92%,transparent);
 }
 
 /* ══════════════════════════════════════
@@ -109,7 +118,7 @@ body{
 .brand-name h1{font-family:'Be Vietnam Pro',sans-serif;font-size:17px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
 .brand-name p{font-size:11px;color:var(--muted);margin-top:2px}
 
-.controls{display:flex;align-items:center;gap:5px}
+.controls{display:flex;align-items:center;gap:5px;position:relative}
 .ctrl-grp{display:flex;gap:3px;padding:3px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.03)}
 .ctrl{
   width:27px;height:27px;border:none;border-radius:999px;display:grid;place-items:center;
@@ -124,6 +133,31 @@ body{
 }
 .dot:hover{transform:scale(1.1)}
 .dot.on{border-color:var(--text);transform:scale(1.14)}
+
+/* Gộp 9 nút theme+accent -> 1 nút gear mở popover, đỡ rối trang login */
+.settings-trigger{
+  width:32px;height:32px;border:1px solid var(--line);border-radius:10px;
+  display:grid;place-items:center;cursor:pointer;color:var(--muted);
+  background:rgba(255,255,255,.03);font-size:14px;transition:color .15s,border-color .15s,transform .15s;
+  flex-shrink:0;
+}
+.settings-trigger:hover{color:var(--text);border-color:var(--line-s)}
+.settings-trigger.open{color:var(--acc);border-color:color-mix(in srgb,var(--acc) 40%,var(--line))}
+.settings-popover{
+  position:absolute;top:calc(100% + 8px);right:0;z-index:20;
+  min-width:200px;padding:12px;border-radius:14px;
+  border:1px solid var(--line-s);background:var(--panel-s);
+  box-shadow:0 20px 44px -12px rgba(0,0,0,.45);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  opacity:0;transform:translateY(-6px) scale(.97);pointer-events:none;
+  transition:opacity .15s,transform .15s;
+}
+.settings-popover.open{opacity:1;transform:none;pointer-events:auto}
+.settings-row{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.settings-row:last-child{margin-bottom:0}
+.settings-label{font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.settings-row .ctrl-grp,.settings-row .dot-row{width:100%;justify-content:space-between}
+.dot-row{display:flex;gap:6px;padding:2px}
 
 /* Live score section header */
 .live-header{
@@ -292,8 +326,30 @@ body{
   color:var(--text);font:inherit;font-weight:600;min-width:0;font-size:13px;
 }
 .inp-wrap input::placeholder{color:var(--muted-d);font-weight:500}
-.eye{display:grid;place-items:center;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;transition:color .15s}
-.eye:hover{color:var(--text)}
+.eye{
+  display:grid;place-items:center;border:none;background:transparent;color:var(--muted);
+  cursor:pointer;font-size:15px;transition:color .15s,background .15s;
+  width:30px;height:30px;border-radius:8px;margin-right:3px;
+}
+.eye:hover{color:var(--text);background:rgba(255,255,255,.06)}
+
+/* Remember-me */
+.remember-row{
+  display:flex;align-items:center;gap:8px;margin:2px 0 12px;user-select:none;flex-shrink:0;
+}
+.remember-row input[type="checkbox"]{
+  appearance:none;-webkit-appearance:none;width:17px;height:17px;flex-shrink:0;
+  border:1.5px solid var(--line-s);border-radius:5px;background:var(--inp);cursor:pointer;
+  display:grid;place-items:center;transition:background .15s,border-color .15s;
+}
+.remember-row input[type="checkbox"]::before{
+  content:'';width:9px;height:9px;border-radius:2px;background:transparent;transition:background .15s;
+}
+.remember-row input[type="checkbox"]:checked{background:var(--acc);border-color:var(--acc)}
+.remember-row input[type="checkbox"]:checked::before{
+  content:'✓';color:#fff;font-size:12px;font-weight:800;line-height:1;
+}
+.remember-row label{font-size:12px;color:var(--muted);cursor:pointer}
 
 .error-msg{
   color:#ef4444;font-size:11.5px;margin-top:6px;text-align:center;display:none;flex-shrink:0;
@@ -364,8 +420,22 @@ body{
   .mob-brand{display:flex;align-items:center;gap:10px}
   .mob-brand .logo{width:38px;height:38px;border-radius:12px;font-size:18px}
   .mob-brand h1{font-family:'Be Vietnam Pro',sans-serif;font-size:17px;font-weight:800}
+  .mob-score-strip{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:22px;
+  }
+  .mob-score-item{
+    border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.025);
+    padding:8px 4px;text-align:center;
+  }
+  .mob-score-item .n{
+    font-family:'Be Vietnam Pro',sans-serif;font-size:16px;font-weight:800;
+    color:var(--acc);letter-spacing:-.03em;line-height:1.1;
+  }
+  .mob-score-item .n.neg{color:#f87171}
+  .mob-score-item .n.top{color:#f59e0b}
+  .mob-score-item .lbl{font-size:9px;color:var(--muted);margin-top:2px}
 }
-@media (min-width:768px){.mob-header{display:none}}
+@media (min-width:768px){.mob-header{display:none}.mob-score-strip{display:none}}
 
 /* Accent swatches */
 #acc-blue{background:#2f6fed}#acc-violet{background:#7c3aed}#acc-pink{background:#db2777}
@@ -381,9 +451,11 @@ body{
     try {
       var url = new URL(gasUrl);
       url.searchParams.set('action', 'getScoreboard');
-      window.__gasPromise = fetch(url.toString(), { method: 'GET', redirect: 'follow' })
+      var fetchP = fetch(url.toString(), { method: 'GET', redirect: 'follow' })
         .then(function(r) { return r.json(); })
         .catch(function() { return null; });
+      var timeoutP = new Promise(function(res) { setTimeout(function() { res(null); }, 5000); });
+      window.__gasPromise = Promise.race([fetchP, timeoutP]);
     } catch(e) {}
   }
 })();
@@ -405,18 +477,27 @@ body{
         </div>
       </div>
       <div class="controls">
-        <div class="ctrl-grp" role="group" aria-label="Giao diện">
-          <button class="ctrl" id="ctrl-light" title="Sáng" onclick="applyTheme('light')">☀</button>
-          <button class="ctrl" id="ctrl-dark"  title="Tối"  onclick="applyTheme('dark')">🌙</button>
-          <button class="ctrl" id="ctrl-auto"  title="Tự động" onclick="applyTheme('auto')">🖥</button>
-        </div>
-        <div class="ctrl-grp" role="group" aria-label="Màu chủ đạo">
-          <button class="dot on" id="acc-blue"   title="Xanh"></button>
-          <button class="dot"    id="acc-violet" title="Tím"></button>
-          <button class="dot"    id="acc-pink"   title="Hồng"></button>
-          <button class="dot"    id="acc-green"  title="Xanh lá"></button>
-          <button class="dot"    id="acc-amber"  title="Cam"></button>
-          <button class="dot"    id="acc-red"    title="Đỏ"></button>
+        <button class="settings-trigger" id="settings-trigger" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Cài đặt giao diện" title="Cài đặt giao diện">⚙</button>
+        <div class="settings-popover" id="settings-popover" role="menu">
+          <div class="settings-row">
+            <div class="settings-label">Giao diện</div>
+            <div class="ctrl-grp" role="group" aria-label="Giao diện">
+              <button class="ctrl" id="ctrl-light" title="Sáng" onclick="applyTheme('light')">☀</button>
+              <button class="ctrl" id="ctrl-dark"  title="Tối"  onclick="applyTheme('dark')">🌙</button>
+              <button class="ctrl" id="ctrl-auto"  title="Tự động" onclick="applyTheme('auto')">🖥</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">Màu chủ đạo</div>
+            <div class="dot-row" role="group" aria-label="Màu chủ đạo">
+              <button class="dot on" id="acc-blue"   title="Xanh"></button>
+              <button class="dot"    id="acc-violet" title="Tím"></button>
+              <button class="dot"    id="acc-pink"   title="Hồng"></button>
+              <button class="dot"    id="acc-green"  title="Xanh lá"></button>
+              <button class="dot"    id="acc-amber"  title="Cam"></button>
+              <button class="dot"    id="acc-red"    title="Đỏ"></button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -467,11 +548,38 @@ body{
         <div class="logo" aria-hidden="true">🛡</div>
         <h1>A3K64</h1>
       </div>
-      <div class="ctrl-grp" role="group">
-        <button class="ctrl" id="ctrl-light-m" onclick="applyTheme('light')">☀</button>
-        <button class="ctrl" id="ctrl-dark-m"  onclick="applyTheme('dark')">🌙</button>
-        <button class="ctrl" id="ctrl-auto-m"  onclick="applyTheme('auto')">🖥</button>
+      <div class="controls">
+        <button class="settings-trigger" id="settings-trigger-m" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Cài đặt giao diện" title="Cài đặt giao diện">⚙</button>
+        <div class="settings-popover" id="settings-popover-m" role="menu">
+          <div class="settings-row">
+            <div class="settings-label">Giao diện</div>
+            <div class="ctrl-grp" role="group">
+              <button class="ctrl" id="ctrl-light-m" onclick="applyTheme('light')">☀</button>
+              <button class="ctrl" id="ctrl-dark-m"  onclick="applyTheme('dark')">🌙</button>
+              <button class="ctrl" id="ctrl-auto-m"  onclick="applyTheme('auto')">🖥</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">Màu chủ đạo</div>
+            <div class="dot-row" role="group">
+              <button class="dot on" id="acc-blue-m"   title="Xanh"></button>
+              <button class="dot"    id="acc-violet-m" title="Tím"></button>
+              <button class="dot"    id="acc-pink-m"   title="Hồng"></button>
+              <button class="dot"    id="acc-green-m"  title="Xanh lá"></button>
+              <button class="dot"    id="acc-amber-m"  title="Cam"></button>
+              <button class="dot"    id="acc-red-m"    title="Đỏ"></button>
+            </div>
+          </div>
+        </div>
       </div>
+    </div>
+
+    <!-- Dải điểm rút gọn cho mobile — thay vì ẩn hẳn panel điểm như trước -->
+    <div class="mob-score-strip" id="mob-score-strip">
+      <div class="mob-score-item skel" style="height:46px"></div>
+      <div class="mob-score-item skel" style="height:46px"></div>
+      <div class="mob-score-item skel" style="height:46px"></div>
+      <div class="mob-score-item skel" style="height:46px"></div>
     </div>
 
     <div class="login-header">
@@ -497,6 +605,11 @@ body{
       </div>
     </div>
 
+    <div class="remember-row">
+      <input type="checkbox" id="login-remember"/>
+      <label for="login-remember">Ghi nhớ đăng nhập trên máy này (7 ngày)</label>
+    </div>
+
     <div id="login-error" class="error-msg"></div>
 
     <button class="btn-primary" id="btn-submit-login">Đăng nhập</button>
@@ -515,7 +628,7 @@ body{
 
     <div class="login-footer">
       <a href="forgot-password.html" class="forgot-link">Quên mật khẩu?</a>
-      <p class="note">Phiên đăng nhập tự lưu tối đa 7 ngày.</p>
+      <p class="note">Không dùng máy chung? Bỏ tick "Ghi nhớ" để tự đăng xuất khi đóng trình duyệt.</p>
     </div>
   </div>
 
@@ -533,18 +646,67 @@ const ACCENTS = {
   amber: {main:'#d97706',s:'#b45309',f:'rgba(217,119,6,.16)'},
   red:   {main:'#dc2626',s:'#b91c1c',f:'rgba(220,38,38,.16)'},
 };
+const ACCENT_KEY = 'a3k64-accent';
+function applyAccent(key) {
+  const a = ACCENTS[key];
+  if (!a) return;
+  const r = document.documentElement;
+  r.style.setProperty('--acc', a.main);
+  r.style.setProperty('--acc-s', a.s);
+  r.style.setProperty('--acc-f', a.f);
+  document.querySelectorAll('.dot').forEach(d => d.classList.remove('on'));
+  // Có 2 bộ dot (desktop + mobile, id hậu tố "-m") -> bật cả 2
+  [document.getElementById('acc-' + key), document.getElementById('acc-' + key + '-m')]
+    .forEach(el => { if (el) el.classList.add('on'); });
+  try { localStorage.setItem(ACCENT_KEY, key); } catch(e) {}
+}
 document.querySelectorAll('.dot').forEach(btn=>{
-  const k = btn.id.replace('acc-','');
-  btn.onclick = ()=>{
-    document.querySelectorAll('.dot').forEach(d=>d.classList.remove('on'));
-    btn.classList.add('on');
-    const a = ACCENTS[k];
-    const r = document.documentElement;
-    r.style.setProperty('--acc', a.main);
-    r.style.setProperty('--acc-s', a.s);
-    r.style.setProperty('--acc-f', a.f);
-  };
+  const k = btn.id.replace(/^acc-/,'').replace(/-m$/,'');
+  btn.onclick = () => applyAccent(k);
 });
+
+/* ════════════════════════════════════════
+   1b. Settings popover (gộp theme + accent
+   khỏi giao diện chính, tránh rối trang login)
+════════════════════════════════════════ */
+(function setupSettingsPopover() {
+  const pairs = [
+    ['settings-trigger', 'settings-popover'],
+    ['settings-trigger-m', 'settings-popover-m'],
+  ];
+  const allPopovers = pairs.map(p => document.getElementById(p[1])).filter(Boolean);
+  function closeAll() {
+    allPopovers.forEach(p => p.classList.remove('open'));
+    pairs.forEach(([tId]) => {
+      const t = document.getElementById(tId);
+      if (t) { t.classList.remove('open'); t.setAttribute('aria-expanded','false'); }
+    });
+  }
+  pairs.forEach(([tId, pId]) => {
+    const trigger = document.getElementById(tId);
+    const pop = document.getElementById(pId);
+    if (!trigger || !pop) return;
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const willOpen = !pop.classList.contains('open');
+      closeAll();
+      if (willOpen) {
+        pop.classList.add('open');
+        trigger.classList.add('open');
+        trigger.setAttribute('aria-expanded','true');
+      }
+    });
+  });
+  document.addEventListener('click', closeAll);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
+})();
+// Khôi phục accent đã lưu
+(function(){
+  try {
+    const saved = localStorage.getItem(ACCENT_KEY);
+    if (saved && ACCENTS[saved]) applyAccent(saved);
+  } catch(e) {}
+})();
 
 /* ════════════════════════════════════════
    2. Input focus + password toggle
@@ -646,6 +808,8 @@ function renderGroupCards(groupStats, week) {
 
   const rankEmoji = ['🥇','🥈','🥉','4️⃣'];
 
+  renderMobileScoreStrip(groupStats, rankMap);
+
   grid.innerHTML = groupStats.map(g => {
     const rank = rankMap[g.group];
     const isTop = rank === 1;
@@ -687,6 +851,23 @@ function renderGroupCards(groupStats, week) {
   // Cập nhật tuần
   const weekEl = document.getElementById('live-week-num');
   if (weekEl) weekEl.textContent = week || '—';
+}
+
+/**
+ * Dải điểm rút gọn cho mobile (thay vì ẩn hẳn panel điểm như bản cũ).
+ */
+function renderMobileScoreStrip(groupStats, rankMap) {
+  const strip = document.getElementById('mob-score-strip');
+  if (!strip) return;
+  strip.innerHTML = groupStats.map(g => {
+    const isTop = rankMap[g.group] === 1;
+    const neg = g.total < 0;
+    return `
+      <div class="mob-score-item">
+        <div class="n${isTop?' top':neg?' neg':''}">${g.total>0?'+':''}${g.total}</div>
+        <div class="lbl">Tổ ${g.group}</div>
+      </div>`;
+  }).join('');
 }
 
 /**
@@ -807,7 +988,7 @@ loadGroupData();
 document.getElementById('btn-submit-login').addEventListener('click', function(e) {
   e.preventDefault();
   const usernameInput = document.getElementById('login-username').value.trim();
-  const passwordInput = document.getElementById('login-password').value.trim();
+  const passwordInput = document.getElementById('login-password').value; // KHÔNG trim — giữ nguyên mật khẩu
   const errorMsg  = document.getElementById('login-error');
   const submitBtn = document.getElementById('btn-submit-login');
   errorMsg.style.display = 'none';
@@ -826,7 +1007,8 @@ document.getElementById('btn-submit-login').addEventListener('click', function(e
   submitBtn.disabled = true;
   submitBtn.textContent = 'Đang đăng nhập…';
   fetch(gasUrl, {
-    method:'POST',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action:'login', payload:{ username:usernameInput, password:passwordInput } }),
   })
     .then(res=>res.json())
@@ -838,6 +1020,7 @@ document.getElementById('btn-submit-login').addEventListener('click', function(e
         return;
       }
       const user = json.data.user || {};
+      const remember = document.getElementById('login-remember')?.checked || false;
       const userObject = {
         username: user.username||usernameInput,
         email: user.email||usernameInput,
@@ -846,8 +1029,20 @@ document.getElementById('btn-submit-login').addEventListener('click', function(e
         group: user.group||null,
         photoURL: user.photoURL||null,
         loginAt: new Date().toISOString(),
+        rememberMe: remember,
       };
+      // Mặc định: chỉ lưu sessionStorage -> tự đăng xuất khi đóng tab/trình duyệt
+      // (an toàn cho máy dùng chung ở lớp). Chỉ khi tick "Ghi nhớ" mới ghi thêm
+      // vào localStorage kèm hạn 7 ngày để các trang khác (đọc localStorage) duy trì phiên.
       sessionStorage.setItem('a3k64-user', JSON.stringify(userObject));
+      try {
+        if (remember) {
+          const withExpiry = { ...userObject, expiresAt: Date.now() + 7*24*60*60*1000 };
+          localStorage.setItem('a3k64-user', JSON.stringify(withExpiry));
+        } else {
+          localStorage.removeItem('a3k64-user');
+        }
+      } catch(e) {}
       // Kick off prefetch song song ngay (không await — không block chuyển trang).
       // A3K64Preload ghi thẳng vào các cache key mà desktop.js/scoreboard.js/
       // seating.js/profile.js đọc, nên khi desktop.html render xong sẽ có sẵn data.

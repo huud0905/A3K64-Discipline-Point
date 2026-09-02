@@ -152,6 +152,7 @@ function _notifPatchPanel() {
 
 /* Notification bridge: nhận postMessage từ iframe (scoreboard, seating...) */
 window.addEventListener('message', function(e) {
+  if (e.origin !== window.location.origin) return; // chỉ nhận từ iframe cùng-origin
   if (!e.data || e.data.type !== 'a3k64-notif') return;
   notifAdd(e.data.title || 'Thông báo', e.data.body || '');
 });
@@ -656,15 +657,15 @@ function buildWindowContent(app) {
 
 function buildSidebar(activeKey) {
   const avatarContent = user.photoURL
-    ? `<img src="${user.photoURL}" alt="Avatar">`
+    ? `<img src="${_escH(user.photoURL)}" alt="Avatar">`
     : getInitials(user.displayName);
   return `
     <aside class="win-sidebar">
       <div class="user-card">
         <div class="avatar">${avatarContent}</div>
         <div style="min-width:0">
-          <strong>${user.displayName || 'Người dùng 12A3'}</strong>
-          <span class="user-email">${user.email || user.role || 'Đang đăng nhập'}</span>
+          <strong>${_escH(user.displayName) || 'Người dùng 12A3'}</strong>
+          <span class="user-email">${_escH(user.email) || _escH(user.role) || 'Đang đăng nhập'}</span>
         </div>
       </div>
       <nav class="side-nav">
@@ -801,7 +802,7 @@ function buildStartMenu() {
   if (!startOpen) return '';
   const alignment = taskbarSettings.alignment;
   const avatarContent = user.photoURL
-    ? `<img src="${user.photoURL}" alt="Avatar">`
+    ? `<img src="${_escH(user.photoURL)}" alt="Avatar">`
     : getInitials(user.displayName);
   return `
     <section class="start-menu align-${alignment}">
@@ -816,7 +817,7 @@ function buildStartMenu() {
       <div class="start-footer">
         <div class="user-card" style="padding:0;background:transparent">
           <div class="avatar" style="width:34px;height:34px;border-radius:12px">${avatarContent}</div>
-          <strong>${user.displayName || '12A3'}</strong>
+          <strong>${_escH(user.displayName) || '12A3'}</strong>
         </div>
         <button class="logout-button" style="width:118px" onclick="handleLogout()">${icon('logout')} Thoát</button>
       </div>

@@ -160,4 +160,4 @@ let currentPage = 'home';
 let accent = readAccent();
 let theme  = readTheme();
 let tb     = readTB();
-let recentAccents = (() => { try { return JSON.parse(ls.get('recent-accents') || '[]'); } catch { return []; } })();
+let recentAccents = (() => { try { return (JSON.parse(ls.get('recent-accents') || '[]')).filter(c => normalizeHex(c)); } catch { return []; } })(); // filter: chỉ giữ hex hợp lệ, phòng localStorage bị chỉnh tay inject vào onclick

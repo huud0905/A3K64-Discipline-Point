@@ -270,6 +270,9 @@
 /* ============================================================
    GLOBAL TOOLTIP (dùng chung cho bar chart hover)
    ============================================================ */
+/** Escape HTML cho tooltip — phòng XSS khi label/detail từ backend có ký tự đặc biệt. */
+function a3AnimEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
 const a3AnimTooltip = (() => {
   let el = null;
   function ensure() {
@@ -457,9 +460,9 @@ function a3AnimApplyBarChart() {
         }
       });
       const html = `
-        <strong>${label}</strong>
-        <span class="tt-score" style="color:${score.startsWith('-') ? 'var(--color-minus,#f87171)' : 'var(--color-plus,#34d399)'}">${score}</span>
-        <span>${detail}</span>`;
+        <strong>${a3AnimEsc(label)}</strong>
+        <span class="tt-score" style="color:${score.startsWith('-') ? 'var(--color-minus,#f87171)' : 'var(--color-plus,#34d399)'}">${a3AnimEsc(score)}</span>
+        <span>${a3AnimEsc(detail)}</span>`;
       a3AnimTooltip.show(html, e.clientX, e.clientY);
     });
 

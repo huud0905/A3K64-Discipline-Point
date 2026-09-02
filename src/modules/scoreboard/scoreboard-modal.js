@@ -59,7 +59,7 @@
   function _sub() { return _subject || subjects[0]; }
   function _cat() { return _category || CATEGORY.STUDY; }
   function _ruleKey(r) { return `${r.title}::${r.points}::${r.category}`; }
-  function _esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function _esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
   function _isDraft(id) { return String(id).startsWith('draft-'); }
   function _getRoot() { return document.getElementById(MODAL_ROOT_ID); }
 

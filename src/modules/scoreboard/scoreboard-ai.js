@@ -95,7 +95,7 @@
      HELPERS
   ──────────────────────────────────────────────────────── */
   function _esc(s) {
-    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
   function _root() { return document.getElementById(AI_ROOT_ID); }
 

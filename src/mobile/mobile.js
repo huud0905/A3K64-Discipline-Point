@@ -60,7 +60,7 @@ let _mobRendered   = false;    // true sau lần render đầu tiên
 /* ── Build helpers ── */
 function mobAvatarContent() {
   return user?.photoURL
-    ? `<img src="${user.photoURL}" alt="Avatar">`
+    ? `<img src="${_escH(user.photoURL)}" alt="Avatar">`
     : getInitials(user?.displayName);
 }
 
@@ -204,8 +204,8 @@ function mobBuildDrawer() {
       <div class="mob-drawer-user">
         <div class="mob-drawer-avatar">${avatarContent}</div>
         <div>
-          <div class="mob-drawer-name">${user?.displayName || 'Học sinh'}</div>
-          <div class="mob-drawer-email">${user?.email || ''}</div>
+          <div class="mob-drawer-name">${_escH(user?.displayName) || 'Học sinh'}</div>
+          <div class="mob-drawer-email">${_escH(user?.email) || ''}</div>
         </div>
       </div>
       <nav class="mob-drawer-nav">

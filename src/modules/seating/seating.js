@@ -682,7 +682,7 @@ function render() {
   scheduleFitBoard();
 }
 
-function escH(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escH(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 /* ---------- Icon set (SVG inline, quy chuẩn kiểu Lucide) ---------- */
 const SEAT_ICON_PATHS = {
