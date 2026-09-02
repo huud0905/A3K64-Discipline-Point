@@ -39,6 +39,7 @@ function mobIframeSrc(appKey) {
     settings:  '../modules/settings/settings-window.html',
     students:  '../modules/seating/seating-window.html',
     profile:   '../modules/profile/profile-window.html',
+    duty:      '../modules/duty/duty-window.html',
   };
   return map[appKey] || null;
 }
