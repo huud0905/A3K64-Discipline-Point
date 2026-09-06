@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bảng điểm A3K64</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="scoreboard.css" />
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0; padding: 0;
+      background: #07111f; color: #f8fafc;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+    #scoreboard-root {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+  </style>
+  <script>
+    (function () {
+      function setAppVH() {
+        document.documentElement.style.setProperty('--app-vh', (window.innerHeight * 0.01) + 'px');
+      }
+      setAppVH();
+      window.addEventListener('resize', setAppVH);
+      window.addEventListener('orientationchange', function () { setTimeout(setAppVH, 60); });
+    })();
+  </script>
+</head>
+<body>
+  <div id="scoreboard-root"></div>
+
+  <script>window.__scoreboard_manual_init = true;</script>
+
+  <script src="../../assets/js/config.js"></script>
+  <!-- notify.js PHẢI load trước scoreboard.js để A3Notify sẵn sàng khi initScoreboard() chạy -->
+  <script src="../../assets/js/notify.js"></script>
+  <script src="scoreboard.js?v=2"></script>
+  <script src="scoreboard-extras.js"></script>
+  <script src="scoreboard-modal.js"></script>
+  <script src="scoreboard-inline-edit.js"></script>
+  <script src="scoreboard-ai.js"></script>
+  <script src="scoreboard-animations.js"></script>
+  <script src="scoreboard-review.js"></script>
+  <!-- Hậu kiểm AI sau khi lưu điểm — chạy ngầm, không chặn lúc chấm -->
+  <script src="scoreboard-post-audit.js"></script>
+
+  <script>
+    const ACCENT_PRESETS = {
+      blue:'#2563eb', violet:'#7c3aed', pink:'#db2777',
+      green:'#059669', amber:'#d97706', red:'#dc2626',
+    };
+    const DEFAULT_ACCENT = ACCENT_PRESETS.blue;
+    const ACCENT_STORAGE_KEYS = ['login-accent','accent-color','accent','desktop-accent','a3k64-accent'];
+    const SESSION_USER_KEY = 'a3k64-user';
+    const ROLE_MAP = {
+      student:'hoc_sinh', admin:'gvcn', gvcn:'gvcn',
+      hoc_sinh:'hoc_sinh', to_truong:'to_truong',
+      lop_truong:'lop_truong', bi_thu:'bi_thu',
+    };
+    const FALLBACK_ROLE = 'hoc_sinh';
+
+    function isValidHexColor(v) { return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v.trim()); }
+    function resolveAccentColor(raw) {
+      if (!raw) return null;
+      const t = raw.trim();
+      if (isValidHexColor(t)) return t;
+      return ACCENT_PRESETS[t.toLowerCase()] ?? null;
+    }
+    function readAccentFromStorage() {
+      for (const key of ACCENT_STORAGE_KEYS) {
+        try { const r = resolveAccentColor(localStorage.getItem(key)); if (r) return r; } catch {}
+      }
+      return DEFAULT_ACCENT;
+    }
+    function normalizeRole(rawRole) {
+      return ROLE_MAP[String(rawRole ?? '').trim().toLowerCase()] ?? FALLBACK_ROLE;
+    }
+    function readSessionUser() {
+      try { const r = sessionStorage.getItem(SESSION_USER_KEY); return r ? JSON.parse(r) : null; }
+      catch (err) { console.warn('[Scoreboard] Không đọc được session user:', err); return null; }
+    }
+    function applyAccentToDocument(accent) {
+      document.documentElement.style.setProperty('--desktop-accent', accent);
+      document.documentElement.style.setProperty('--accent', accent);
+    }
+    function readThemeMode() {
+      try {
+        const raw = (localStorage.getItem('desktop-theme')||localStorage.getItem('login-theme')||localStorage.getItem('theme-mode')||localStorage.getItem('a3k64-theme')||'dark').toLowerCase();
+        const map = {light:'light',sang:'light','sáng':'light',dark:'dark',toi:'dark','tối':'dark'};
+        if (raw==='auto') return window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+        return map[raw]||'dark';
+      } catch { return 'dark'; }
+    }
+    function applyTheme(mode) { document.documentElement.setAttribute('data-theme', mode); }
+
+    const THEME_KEYS = new Set(['desktop-theme','login-theme','theme-mode','a3k64-theme','login-theme-mode','theme']);
+    window.addEventListener('storage', (e) => { if (!e.key||THEME_KEYS.has(e.key)) applyTheme(readThemeMode()); });
+    window.addEventListener('message', (e) => { if (e.data?.type==='a3k64-theme-change') applyTheme(e.data.theme||readThemeMode()); });
+
+    (function boot() {
+      applyTheme(readThemeMode());
+      applyAccentToDocument(readAccentFromStorage());
+      const user       = readSessionUser();
+      const userRole   = normalizeRole(user?.role);
+      const userGroup  = user?.group ?? user?.to ?? null;
+      const actorEmail = user?.email || user?.username || user?.gmail || null;
+      const actorName  = user?.displayName || user?.name || user?.fullName || null;
+      const gasUrl     = window.A3K64_CONFIG?.gasUrl ?? null;
+      try {
+        if (typeof initScoreboard !== 'function') throw new ReferenceError('initScoreboard không được tìm thấy.');
+        initScoreboard({ userRole, userGroup, gasUrl, actorEmail, actorName });
+      } catch (err) {
+        console.error('[Scoreboard] Lỗi khi khởi động:', err);
+        const root = document.getElementById('scoreboard-root');
+        if (root) root.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:12px;color:#f87171;font-family:system-ui,sans-serif;text-align:center;padding:24px;"><strong style="font-size:18px;">Không thể khởi động bảng điểm</strong><span style="font-size:13px;color:#94a3b8;max-width:380px;line-height:1.5;">${err.message??'Lỗi không xác định.'}</span></div>`;
+      }
+    })();
+  </script>
+
+  <script src="../../assets/js/disable-context-menu.js"></script>
+  <script src="../../assets/js/touch-scroll-fix.js"></script>
+</body>
+</html>
