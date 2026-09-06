@@ -26,6 +26,7 @@ const ICONS = {
   calendar:    `<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
   shield:      `<svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
   chevron:     `<svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>`,
+  gamepad:     `<svg viewBox="0 0 24 24"><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="15" cy="13" r="1"/><circle cx="18" cy="11" r="1"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg>`,
 };
 
 function icon(name) {
@@ -47,8 +48,9 @@ const APPS = [
   { key: 'contests',  title: 'Cuộc thi hiện tại',  subtitle: 'Chỉ GVCN, lớp trưởng, bí thư',            icon: 'trophy',    path: '/desktop/cuoc-thi-hien-tai', roles: ['gvcn','lop_truong','bi_thu'] },
   { key: 'students',  title: 'Sơ đồ lớp',          subtitle: 'Học sinh, tổ và chức vụ',                  icon: 'users',     path: '/desktop/so-do-lop'        },
   { key: 'duty',      title: 'Trực nhật',          subtitle: 'Lịch trực tuần & quản lý phạt thi đua',    icon: 'calendar',  path: '/desktop/truc-nhat'        },
+  { key: 'games',     title: 'Games',               subtitle: 'Trò chơi giải trí cho lớp',                icon: 'gamepad',   path: '/desktop/games'            },
 ];
-const SHORTCUTS = ['dashboard', 'settings', 'profile', 'students', 'duty'];
+const SHORTCUTS = ['dashboard', 'settings', 'profile', 'students', 'duty', 'games'];
 
 const QUICK_STATS = [
   { label: 'Tổng điểm tuần', value: '+245', note: 'Tăng 32 điểm',  icon: 'sparkles' },
@@ -608,6 +610,15 @@ function buildWindowContent(app) {
       </div>`;
   }
 
+  // "Games" mở app Games (launcher các trò chơi, hiện có Duck Race), nhúng qua
+  // iframe cùng-origin, cùng quy ước với dashboard/settings/students/duty/profile.
+  if (app.key === 'games') {
+    return `
+      <div class="win-embed">
+        <iframe class="win-embed-frame" src="../modules/games/games-window.html" title="${app.title}" loading="lazy"></iframe>
+      </div>`;
+  }
+
   // Generic placeholder content (replace with real app content later)
   return `
     <section class="win-content">
@@ -693,7 +704,7 @@ function buildSidebar(activeKey) {
 function buildWindowHTML(win) {
   const app = getApp(win.key);
   const isFocused = focusedKey === win.key;
-  const fullWidth = ['settings','dashboard','profile','students','duty'].includes(win.key);
+  const fullWidth = ['settings','dashboard','profile','students','duty','games'].includes(win.key);
   // Chỉ gắn width/height tuỳ chỉnh (từ lần resize tay trước đó) khi cửa sổ
   // KHÔNG maximize — nếu không, inline style sẽ đè lên width:100vw/height
   // của class .maximized (inline có độ ưu tiên cao hơn class) và cửa sổ
