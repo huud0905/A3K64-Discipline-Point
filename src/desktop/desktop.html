@@ -46,6 +46,13 @@
     // Hồi phục lại sessionStorage cho phiên làm việc hiện tại,
     // để phần còn lại của app (vốn chỉ đọc sessionStorage) hoạt động bình thường.
     sessionStorage.setItem('a3k64-user', JSON.stringify(u));
+    // BUG cũ: chỉ khôi phục "a3k64-user" mà quên khôi phục lại
+    // "a3k64-session-token" vào sessionStorage khi phiên đến từ "Ghi nhớ
+    // đăng nhập" (localStorage) — khiến mọi action tự-phục-vụ cần đăng nhập
+    // (đổi mật khẩu/email, cập nhật hồ sơ...) báo "hết phiên" dù desktop vẫn
+    // hiển thị đã đăng nhập bình thường. Khôi phục luôn token ở đây.
+    const remembered = readRememberedSessionToken();
+    if (remembered) sessionStorage.setItem('a3k64-session-token', remembered);
 
     // Nếu user vào desktop bằng thiết bị mobile → chuyển sang mobile shell
     if (window.innerWidth < 768) {
@@ -74,9 +81,25 @@
     return u;
   }
 
+  // Đọc lại sessionToken đã "Ghi nhớ" (login.html lưu dạng JSON
+  // { token, expiresAt } trong localStorage — xem login.html).
+  function readRememberedSessionToken() {
+    let t;
+    try { t = JSON.parse(localStorage.getItem('a3k64-session-token') || 'null'); }
+    catch { return null; }
+    if (!t || !t.token) return null;
+    if (t.expiresAt && Date.now() > t.expiresAt) {
+      localStorage.removeItem('a3k64-session-token');
+      return null;
+    }
+    return t.token;
+  }
+
   window.addEventListener('a3k64-logout', () => {
     sessionStorage.removeItem('a3k64-user');
+    sessionStorage.removeItem('a3k64-session-token');
     localStorage.removeItem('a3k64-user');
+    localStorage.removeItem('a3k64-session-token');
     window.location.href = '../auth/login.html';
   });
 </script>

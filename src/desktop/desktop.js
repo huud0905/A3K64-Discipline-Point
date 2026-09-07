@@ -1453,6 +1453,69 @@ function initDesktop(desktopUser) {
 
   /* ── Load notify.js rồi khởi động broadcast poll ── */
   _initNotify();
+
+  /* ── Đồng bộ giao diện (accent/theme/taskbar) từ backend NGAY sau khi
+     đăng nhập, không cần mở Cài đặt trước — trước đây chỉ settings-window.html
+     mới gọi Sync.load(), nên máy/trình duyệt mới phải mở Cài đặt 1 lần thì
+     giao diện đã lưu mới hiện ra. ── */
+  _syncPersonalizationOnLogin(desktopUser);
+}
+
+/* Bản rút gọn của Sync.load() (settings-sync.js) — không phụ thuộc
+   settings-core.js để tránh trùng tên biến/hàm với desktop.js. Chạy nền,
+   không chặn UI; nếu lỗi/không có mạng thì im lặng dùng localStorage. */
+async function _syncPersonalizationOnLogin(desktopUser) {
+  const gasUrl = window.A3K64_CONFIG?.gasUrl || null;
+  if (!gasUrl || !desktopUser) return;
+
+  try {
+    const username = desktopUser.email || desktopUser.username || desktopUser.uid || '';
+    const url = `${gasUrl}?action=getPersonalization&payload=${encodeURIComponent(JSON.stringify({
+      username, email: desktopUser.email || '', uid: desktopUser.uid || '',
+    }))}`;
+    const res  = await fetch(url);
+    const json = await res.json();
+    const p = json?.data?.personalization || json?.personalization || null;
+    if (!p) return; // chưa có gì lưu trên backend -> giữ nguyên localStorage
+
+    const localUpdated     = Number(localStorage.getItem('settings-local-updated-at') || 0);
+    const remoteUpdatedRaw = json?.data?.updatedAt ?? json?.updatedAt ?? null;
+    const remoteUpdated    = remoteUpdatedRaw ? Date.parse(remoteUpdatedRaw) : 0;
+    if (!(remoteUpdated > localUpdated)) return; // local đang mới hơn/bằng -> khỏi ghi đè
+
+    if (p.theme && ['dark','light','auto'].includes(p.theme)) {
+      ['desktop-theme','login-theme','login-theme-mode','theme-mode','theme','a3k64-theme']
+        .forEach(k => localStorage.setItem(k, p.theme));
+    }
+    const ac = normalizeColor(p.accentColor || p.customAccent);
+    if (ac) {
+      ['desktop-accent','desktop-accent-color','desktop-custom-accent','login-accent-color',
+       'login-custom-accent','custom-accent','customAccent','accent-color']
+        .forEach(k => localStorage.setItem(k, ac));
+    }
+    if (p.taskbarSettings && typeof p.taskbarSettings === 'object') {
+      localStorage.setItem('taskbar-settings', JSON.stringify({ ...taskbarSettings, ...p.taskbarSettings }));
+    }
+    if (Array.isArray(p.recentAccents) && p.recentAccents.length) {
+      localStorage.setItem('recent-accents', JSON.stringify(p.recentAccents));
+    }
+    if (p.desktopTransparency) localStorage.setItem('desktop-transparency', p.desktopTransparency);
+    if (p.accentTaskbar)       localStorage.setItem('accent-taskbar', p.accentTaskbar);
+    if (p.accentBorders)       localStorage.setItem('accent-borders', p.accentBorders);
+    if (remoteUpdated) localStorage.setItem('settings-local-updated-at', remoteUpdated);
+
+    // Áp ngay vào desktop hiện tại (storage event không tự bắn ở cùng 1 tab)
+    accent = readAccent(); applyAccentVars();
+    resolvedTheme = readTheme();
+    const root = document.getElementById('desktop-root');
+    if (root) { root.className = root.className.replace(/theme-\w+/g, '').trim(); root.classList.add(`theme-${resolvedTheme}`); }
+    applyThemeClass();
+    taskbarSettings = readTaskbarSettings();
+    applyDisplayScale();
+    renderTaskbar();
+  } catch (err) {
+    console.warn('[Desktop] Đồng bộ cá nhân hoá sau đăng nhập thất bại:', err);
+  }
 }
 
 function _initPreload(desktopUser) {

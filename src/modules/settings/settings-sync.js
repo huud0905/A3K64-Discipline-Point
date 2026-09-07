@@ -18,6 +18,54 @@ function getGasUrl() {
   try { return window.A3K64_CONFIG?.gasUrl || null; } catch { return null; }
 }
 
+// ─── Đọc session token đăng nhập (do login.html lưu riêng, KHÔNG nằm
+// trong object user) ────────────────────────────────────────────────
+// sessionStorage: chuỗi token thô.
+// localStorage (khi tick "Ghi nhớ đăng nhập"): JSON { token, expiresAt }.
+function readSessionToken() {
+  try {
+    const s = sessionStorage.getItem('a3k64-session-token');
+    if (s) return s;
+  } catch {}
+  try {
+    const l = JSON.parse(localStorage.getItem('a3k64-session-token') || 'null');
+    if (l?.token) {
+      if (l.expiresAt && Date.now() > l.expiresAt) return '';
+      return l.token;
+    }
+  } catch {}
+  return '';
+}
+
+// ─── Gọi 1 action bất kỳ trên backend, tự đính kèm session token ─
+// Dùng cho các action tự-phục-vụ trong trang Tài khoản (đổi mật khẩu,
+// đổi email, cập nhật ngày sinh/SĐT...) — backend xác thực danh tính qua
+// token này (payload.username của client bị bỏ qua, xem ok.js).
+async function postAction(action, payload = {}) {
+  const gasUrl = getGasUrl();
+  if (!gasUrl) return { ok: false, error: 'Chưa cấu hình máy chủ (gasUrl).' };
+  const token = readSessionToken();
+  try {
+    const res  = await fetch(gasUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: 'Bearer ' + token } : {}),
+      },
+      body: JSON.stringify({ action, payload: { ...payload, sessionToken: token } }),
+    });
+    const json = await res.json();
+    // Worker bọc kết quả action thật trong { ok:true, data:{...} } — "ok:true"
+    // ở lớp ngoài chỉ nghĩa là gọi API thành công, KHÔNG phải action thành
+    // công. Trước đây đọc thẳng json.ok nên luôn thấy true, bỏ qua lỗi thật
+    // nằm trong json.data.error (vd. phiên hết hạn) → hiện sai thông báo.
+    if (json && typeof json.data === 'object' && json.data !== null) return json.data;
+    return json; // phòng trường hợp API trả thẳng không bọc "data"
+  } catch (err) {
+    return { ok: false, error: 'Không kết nối được máy chủ. Kiểm tra mạng và thử lại.' };
+  }
+}
+
 // ─── Trạng thái sync ─────────────────────────────────
 const Sync = {
   /** 'idle' | 'loading' | 'saving' | 'saved' | 'error' */
