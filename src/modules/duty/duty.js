@@ -30,6 +30,16 @@ function readDutyUser() {
   try { return JSON.parse(sessionStorage.getItem('a3k64-user') || 'null'); } catch { return null; }
 }
 
+// v11 — session token thật do backend cấp lúc login/googleLogin (xem ok.js).
+// Trang đăng nhập (không nằm trong module Trực nhật) cần lưu đúng key này
+// ngay sau khi login thành công:
+//   sessionStorage.setItem('a3k64-session-token', response.data.sessionToken);
+// Thiếu bước đó thì mọi request Trực nhật sẽ bị backend từ chối vì không xác
+// thực được — kể cả tổ trưởng/GVCN cũng không thao tác được nữa.
+function readDutySessionToken() {
+  try { return sessionStorage.getItem('a3k64-session-token') || ''; } catch { return ''; }
+}
+
 function dutyNotify(msg, type) {
   if (type === 'error') console.error('[duty]', msg);
   else if (DUTY_DEBUG) console.log('[duty]', msg);
@@ -60,9 +70,13 @@ async function dutyApiGet(action, payload) {
   if (DUTY_DEBUG) console.log(`[duty→GET] ${action}`, payload);
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 25000);
+  // v11 — đính kèm session token thật (server tự xác thực, không tin field
+  // role/actor nào trong payload nữa) — bắt buộc để mọi action Trực nhật chạy.
+  const token = readDutySessionToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
   let res;
   try {
-    res = await fetch(`${gasUrl}?${qs}`, { signal: ctrl.signal, cache: 'no-store' });
+    res = await fetch(`${gasUrl}?${qs}`, { signal: ctrl.signal, cache: 'no-store', headers });
   } catch(err) {
     if (err?.name === 'AbortError') throw new Error('Máy chủ phản hồi quá lâu, vui lòng thử lại.');
     throw new Error(`Không kết nối được máy chủ cho "${action}".`);
@@ -85,13 +99,18 @@ async function dutyApiPost(action, payload) {
   if (!gasUrl) throw new Error('Chưa cấu hình GAS URL (config.js).');
   if (DUTY_DEBUG) console.log(`[duty→POST] ${action}`, payload);
 
+  // v11 — đính kèm session token thật ở mọi request ghi.
+  const token = readDutySessionToken();
   let lastNetworkErr = null;
   for (let attempt = 0; attempt <= DUTY_POST_MAX_RETRIES; attempt++) {
     let res;
     try {
       res = await fetch(gasUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ action, ...(payload||{}) }),
       });
     } catch(err) {
