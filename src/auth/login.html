@@ -1020,6 +1020,10 @@ document.getElementById('btn-submit-login').addEventListener('click', function(e
         return;
       }
       const user = json.data.user || {};
+      // v11 — sessionToken do backend cấp (xem ok.js) — BẮT BUỘC phải lưu và
+      // gửi kèm (header Authorization: Bearer <token>) ở mọi request sau,
+      // nếu không mọi action (kể cả GVCN/tổ trưởng) sẽ bị backend từ chối.
+      const sessionToken = json.data.sessionToken || '';
       const remember = document.getElementById('login-remember')?.checked || false;
       const userObject = {
         username: user.username||usernameInput,
@@ -1035,12 +1039,18 @@ document.getElementById('btn-submit-login').addEventListener('click', function(e
       // (an toàn cho máy dùng chung ở lớp). Chỉ khi tick "Ghi nhớ" mới ghi thêm
       // vào localStorage kèm hạn 7 ngày để các trang khác (đọc localStorage) duy trì phiên.
       sessionStorage.setItem('a3k64-user', JSON.stringify(userObject));
+      if (sessionToken) sessionStorage.setItem('a3k64-session-token', sessionToken);
       try {
         if (remember) {
           const withExpiry = { ...userObject, expiresAt: Date.now() + 7*24*60*60*1000 };
           localStorage.setItem('a3k64-user', JSON.stringify(withExpiry));
+          if (sessionToken) {
+            localStorage.setItem('a3k64-session-token',
+              JSON.stringify({ token: sessionToken, expiresAt: Date.now() + 7*24*60*60*1000 }));
+          }
         } else {
           localStorage.removeItem('a3k64-user');
+          localStorage.removeItem('a3k64-session-token');
         }
       } catch(e) {}
       // Kick off prefetch song song ngay (không await — không block chuyển trang).
