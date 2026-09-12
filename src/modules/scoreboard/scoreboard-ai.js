@@ -320,6 +320,27 @@
     return null;
   }
 
+  /**
+   * Chuẩn hoá giá trị "tiet" do Gemini trả về (số nguyên, chuỗi "Tiết 2",
+   * "T2", hoặc null/thiếu) thành số nguyên Tiết (1–10) hoặc null nếu
+   * KHÔNG xác định được — theo yêu cầu KHÔNG được tự đoán số Tiết,
+   * nên bất cứ giá trị nào không rõ ràng đều phải trả về null thay vì
+   * áng chừng một con số nào đó.
+   */
+  function _tietTextToKey(raw) {
+    if (raw === null || raw === undefined || raw === '') return null;
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+      const n = Math.trunc(raw);
+      return (n >= 1 && n <= 10) ? n : null;
+    }
+    const t = String(raw).trim();
+    if (!t) return null;
+    const m = t.match(/(\d{1,2})/);
+    if (!m) return null;
+    const n = parseInt(m[1], 10);
+    return (n >= 1 && n <= 10) ? n : null;
+  }
+
   async function _callGemini(text) {
     // Có key riêng do người dùng nhập → gọi thẳng Gemini bằng key đó.
     // Không có key riêng → gọi qua GAS proxy, dùng key dùng chung được
@@ -401,33 +422,50 @@ thành danh sách JSON. Áp dụng đúng các quy tắc sau:
 1. NGÀY: Đọc Thứ được nhắc tới ngay trước mỗi đoạn nội dung (VD: "Thứ 3: Tiết 2:
    Đức Anh, Na k ghi bài môn sinh" → day = "Thứ 3"). Nếu một dòng không nhắc lại
    Thứ mới, dùng lại Thứ gần nhất đã đọc được ở phía trên trong văn bản.
-2. ĐỐI CHIẾU QUY ĐỊNH CHUẨN: So khớp lỗi/thành tích trong văn bản với DANH SÁCH
+2. TIẾT (tách RIÊNG khỏi Thứ, bắt buộc phải cẩn thận — không được gộp chung với
+   bước 1): Đọc số Tiết được nhắc ngay sau Thứ trong cùng đoạn (VD: "Thứ 3: Tiết 2:
+   Đức Anh, Na k ghi bài môn sinh" → tiet = 2). Nếu một dòng không nhắc lại Tiết
+   mới nhưng vẫn thuộc cùng đoạn với Tiết đã đọc ở ngay phía trên (chưa gặp Thứ
+   hoặc Tiết mới nào chen giữa), dùng lại Tiết gần nhất đó. TUYỆT ĐỐI KHÔNG được
+   tự suy đoán/áng chừng số Tiết khi văn bản không hề nhắc tới — nếu không tìm
+   được Tiết nào áp dụng cho dòng đó (kể cả sau khi dò ngược lên trên), đặt
+   "tiet": null. Không dùng 0, không bịa số, không lấy đại Tiết của đoạn khác.
+3. MẶC ĐỊNH GVNN: Nếu một dòng có định dạng "Thứ : Môn : Tên" (hoặc biến thể như
+   "Chiều thứ X : Môn : Tên", "Sáng thứ X : Môn : Tên") mà KHÔNG ghi kèm lỗi cụ
+   thể nào phía sau tên học sinh — tức là sau tên chỉ là hết dòng, hoặc chỉ có
+   "lần 2", "lần 3"... — thì LUÔN hiểu đây là vi phạm "Giáo Viên Nhắc Nhở" (GVNN).
+   Đặt "matched_rule" = "Giáo Viên Nhắc Nhở", "category" = "NE_NEP".
+   Ngược lại, nếu sau tên có mô tả lỗi rõ ràng (VD: "ngủ trong giờ", "không ghi bài",
+   "nói chuyện"...) thì khớp với quy định chuẩn theo bước 4 bên dưới như bình thường.
+   Môn học đọc được trong dòng (VD: "Toán") ghi vào "subject" — kể cả với GVNN.
+4. ĐỐI CHIẾU QUY ĐỊNH CHUẨN: So khớp lỗi/thành tích trong văn bản với DANH SÁCH
    QUY ĐỊNH CHUẨN ở trên để tìm quy định gần nghĩa nhất → lấy đúng "tên" của quy
    định đó làm "matched_rule" và lấy "điểm" tương ứng làm "score" mặc định.
-3. ƯU TIÊN ĐIỂM GHI RÕ: Nếu người dùng có ghi rõ số điểm trong ngoặc (VD: "(-50)"),
+5. ƯU TIÊN ĐIỂM GHI RÕ: Nếu người dùng có ghi rõ số điểm trong ngoặc (VD: "(-50)"),
    LUÔN ưu tiên lấy đúng số điểm đó làm "score" thay vì điểm mặc định của quy định
-   đã khớp ở bước 2 (nhưng vẫn giữ "matched_rule" là tên quy định gần nhất).
-4. LOẠI ĐÁNH GIÁ: Lấy đúng "loai" (category) của quy định đã khớp ở bước 2 làm giá
+   đã khớp ở bước 4 (nhưng vẫn giữ "matched_rule" là tên quy định gần nhất).
+6. LOẠI ĐÁNH GIÁ: Lấy đúng "loai" (category) của quy định đã khớp ở bước 4 làm giá
    trị "category" của dòng đó. Nếu không khớp được quy định chuẩn nào, tự suy luận
    loại hợp lý nhất theo ngữ cảnh nội dung (mặc định NE_NEP nếu không rõ).
-5. MÔN HỌC: Nếu vi phạm/thành tích liên quan đến một môn học cụ thể (thường thuộc
+7. MÔN HỌC: Nếu vi phạm/thành tích liên quan đến một môn học cụ thể (thường thuộc
    loại HOC_TAP), nhận diện và chuẩn hóa sang tên môn học chính thức trong danh sách
    ở trên, ghi vào trường "subject". Nếu không liên quan đến môn học nào (ví dụ: vi
    phạm nề nếp chung, vắng chào cờ…) thì "subject" = null.
-6. FUZZY MATCHING TÊN: Khớp tên viết tắt, nickname, họ đơn trong văn bản với tên
+8. FUZZY MATCHING TÊN: Khớp tên viết tắt, nickname, họ đơn trong văn bản với tên
    đầy đủ trong DANH SÁCH HỌC SINH.
-7. UNKNOWN: Nếu không khớp được học sinh nào → student_id = "UNKNOWN",
+9. UNKNOWN: Nếu không khớp được học sinh nào → student_id = "UNKNOWN",
    student_name = tên xuất hiện y nguyên trong văn bản.
-8. XỬ LÝ LỖI TẬP THỂ:
+10. XỬ LÝ LỖI TẬP THỂ:
    - "Tổ N" / "Cả tổ N" → nhân bản lỗi/thưởng đó cho TẤT CẢ học sinh thuộc Tổ N
      trong danh sách phân tổ ở trên, mỗi học sinh một entry riêng.
    - "Cả lớp" / "Tất cả" / "Toàn lớp" → nhân bản cho TẤT CẢ học sinh trong danh sách.
    - Có cụm "mỗi người" / "mỗi em" → áp dụng điểm riêng cho từng cá nhân (KHÔNG
      nhân điểm lên theo số người).
-9. GIỚI HẠN PHẠM VI (bắt buộc): Chỉ trả kết quả cho học sinh CÓ TÊN trong danh
+11. GIỚI HẠN PHẠM VI (bắt buộc): Chỉ trả kết quả cho học sinh CÓ TÊN trong danh
    sách được cấp ở trên. Bỏ qua hoàn toàn tên học sinh KHÔNG thuộc danh sách này.
-10. OUTPUT: Chỉ trả về JSON thuần, KHÔNG có markdown, KHÔNG có backtick, KHÔNG
-   giải thích gì thêm ngoài JSON.
+12. OUTPUT: Chỉ trả về JSON thuần, KHÔNG có markdown, KHÔNG có backtick, KHÔNG
+   giải thích gì thêm ngoài JSON. Trường "tiet" LUÔN phải xuất hiện ở mỗi phần tử —
+   là số nguyên nếu đọc được, hoặc null nếu không đọc được (không được bỏ trường này).
 
 MẪU KẾT QUẢ JSON TRẢ VỀ:
 [
@@ -435,6 +473,7 @@ MẪU KẾT QUẢ JSON TRẢ VỀ:
     "student_id": "vi-kim-na",
     "student_name": "Vi Kim Na",
     "day": "Thứ 3",
+    "tiet": 2,
     "reason": "Không ghi bài môn Sinh",
     "matched_rule": "Không ghi bài",
     "category": "HOC_TAP",
@@ -445,7 +484,8 @@ MẪU KẾT QUẢ JSON TRẢ VỀ:
     "student_id": "nguyen-van-a",
     "student_name": "Nguyễn Văn A",
     "day": "Thứ 2",
-    "reason": "Đi học muộn",
+    "tiet": null,
+    "reason": "Đi học muộn (văn bản không ghi rõ Tiết)",
     "matched_rule": "Đi học muộn",
     "category": "NE_NEP",
     "subject": null,
@@ -798,6 +838,7 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
     const dayOptions = [
       {v:2,l:'T2'},{v:3,l:'T3'},{v:4,l:'T4'},{v:5,l:'T5'},{v:6,l:'T6'},{v:7,l:'T7'},{v:0,l:'CN'},
     ];
+    const tietOptions = [1,2,3,4,5,6,7,8,9,10];
     const categoryOptions = [
       {v:'NE_NEP',l:'Nề nếp'},{v:'HOC_TAP',l:'Học tập'},{v:'PHONG_TRAO',l:'Phong trào'},
     ];
@@ -807,12 +848,16 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
     const students = _students();
     const rows = _results.map((r, i) => {
       const unmatched = r.student_id === 'UNKNOWN' || !r.student_id;
+      const missingTiet = r.tiet === null || r.tiet === undefined || r.tiet === '';
       const scoreClass = Number(r.score) >= 0 ? 'pos' : 'neg';
       const selectOpts = students.map(s =>
         `<option value="${_esc(s.id)}" ${s.id === r.student_id ? 'selected' : ''}>${_esc(s.name)}</option>`
       ).join('');
       const dayOpts = dayOptions.map(d =>
         `<option value="${d.v}" ${Number(r.day) === d.v ? 'selected' : ''}>${d.l}</option>`
+      ).join('');
+      const tietOpts = `<option value="" ${missingTiet ? 'selected' : ''}>—</option>` + tietOptions.map(n =>
+        `<option value="${n}" ${Number(r.tiet) === n ? 'selected' : ''}>Tiết ${n}</option>`
       ).join('');
       const categoryOpts = categoryOptions.map(c =>
         `<option value="${c.v}" ${(r.category||'NE_NEP') === c.v ? 'selected' : ''}>${c.l}</option>`
@@ -822,9 +867,12 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
       const contentValue = r.matched_rule || r.reason || '';
       const showSubReason = r.matched_rule && r.reason && r.reason !== r.matched_rule;
 
-      return `<tr class="ai-row${unmatched ? ' unmatched' : ''}" data-idx="${i}">
+      return `<tr class="ai-row${unmatched ? ' unmatched' : ''}${missingTiet ? ' missing-tiet' : ''}" data-idx="${i}">
         <td class="ai-td ai-td-day">
           <select class="ai-day-badge" data-idx="${i}" data-field="day" title="Sửa Thứ nếu AI đọc sai">${dayOpts}</select>
+        </td>
+        <td class="ai-td ai-td-tiet">
+          <select class="ai-tiet-badge${missingTiet ? ' missing' : ''}" data-idx="${i}" data-field="tiet" title="${missingTiet ? 'AI không đọc được Tiết — vui lòng chọn thủ công' : 'Sửa Tiết nếu AI đọc sai'}">${tietOpts}</select>
         </td>
         <td class="ai-td ai-td-student">
           ${unmatched
@@ -871,16 +919,22 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
     }).join('');
 
     const unmatchedCount = _results.filter(r => r.student_id === 'UNKNOWN').length;
+    const missingTietCount = _results.filter(r => r.tiet === null || r.tiet === undefined || r.tiet === '').length;
 
     return `
       ${unmatchedCount ? `<div class="ai-unmatched-warn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         <strong>${unmatchedCount} dòng</strong> chưa khớp tên — hãy chọn thủ công trước khi áp dụng.
       </div>` : ''}
+      ${missingTietCount ? `<div class="ai-unmatched-warn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <strong>${missingTietCount} dòng</strong> chưa xác định Tiết (văn bản không ghi rõ) — hãy chọn thủ công trước khi áp dụng.
+      </div>` : ''}
       <table class="ai-preview-table">
         <thead>
           <tr>
             <th class="ai-th ai-th-day">Thứ</th>
+            <th class="ai-th ai-th-tiet">Tiết</th>
             <th class="ai-th ai-th-student">Học sinh</th>
             <th class="ai-th ai-th-category">Loại</th>
             <th class="ai-th ai-th-subject">Môn học</th>
@@ -1044,6 +1098,10 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
     if (field === 'day') {
       _results[idx].day = Number(el.value);
     }
+    if (field === 'tiet') {
+      _results[idx].tiet = el.value === '' ? null : Number(el.value);
+      _refreshPreview(); // cập nhật lại cảnh báo "thiếu Tiết" + highlight hàng
+    }
     if (field === 'category') {
       _results[idx].category = el.value;
       _refreshPreview();
@@ -1104,6 +1162,7 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
         student_id:   item.student_id || 'UNKNOWN',
         student_name: item.student_name || '',
         day:          _dayTextToKey(item.day) ?? 2,
+        tiet:         _tietTextToKey(item.tiet),
         reason:       item.reason || '',
         matched_rule: item.matched_rule || '',
         category:     (_sb().normalizeRuleCategory || (c=>c))(String(item.category || item.loai || '').toUpperCase()),
@@ -1149,19 +1208,22 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
   ──────────────────────────────────────────────────────── */
   /**
    * Tạo chuỗi title lưu vào database theo cú pháp chuẩn:
-   *   Có môn:    Thứ N: [Loại]: [Môn] Nội dung (±pts)
-   *   Không môn: Thứ N: [Loại] Nội dung (±pts)
+   *   Có môn:    Thứ N: Tiết N: [Loại]: [Môn] Nội dung (±pts)
+   *   Không môn: Thứ N: Tiết N: [Loại] Nội dung (±pts)
    *
-   * Không có prefix [Tự tính].
+   * Không có prefix [Tự tính]. Tiết luôn có mặt vì _applyResults() đã
+   * chặn không cho áp dụng khi còn dòng thiếu Tiết (xem _runAnalysis /
+   * _applyResults) — tiet truyền vào đây không bao giờ là null.
    */
-  function _buildEventTitle(day, category, subject, content, pts) {
+  function _buildEventTitle(day, tiet, category, subject, content, pts) {
     const dayStr = day === 0 ? 'CN' : `Thứ ${day}`;
+    const tietStr = Number.isFinite(Number(tiet)) ? `: Tiết ${Number(tiet)}` : '';
     const catLabel = _categoryLabel(category);
     const scoreStr = pts > 0 ? `(+${pts})` : `(${pts})`;
     if (subject) {
-      return `${dayStr}: [${catLabel}]: [${subject}] ${content} ${scoreStr}`;
+      return `${dayStr}${tietStr}: [${catLabel}]: [${subject}] ${content} ${scoreStr}`;
     }
-    return `${dayStr}: [${catLabel}] ${content} ${scoreStr}`;
+    return `${dayStr}${tietStr}: [${catLabel}] ${content} ${scoreStr}`;
   }
 
   /** Chuyển category code → nhãn hiển thị tiếng Việt */
@@ -1187,22 +1249,42 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
       _refreshAll();
       return;
     }
+    // Validate: không cho apply nếu còn dòng thiếu Tiết — theo yêu cầu AI KHÔNG
+    // được tự đoán số Tiết, người dùng phải tự chọn thủ công trước khi áp dụng.
+    const missingTiets = _results.filter(r => r.tiet === null || r.tiet === undefined || r.tiet === '');
+    if (missingTiets.length) {
+      _errorMsg = `Còn ${missingTiets.length} dòng chưa xác định Tiết. Hãy chọn Tiết thủ công trước khi áp dụng.`;
+      _refreshAll();
+      return;
+    }
 
     const applyBtn = root?.querySelector('#ai-apply-btn');
     if (applyBtn) { applyBtn.disabled = true; applyBtn.textContent = 'Đang áp dụng…'; }
 
     try {
-      const additions = _results.map(r => {
+      // GVNN ("Giáo Viên Nhắc Nhở") KHÔNG dùng điểm cố định như các lỗi
+      // khác — điểm trừ tăng luỹ tiến theo số lần vi phạm trong CÙNG 1 tiết,
+      // do backend tự đếm (action 'addGvnn'), không thể tính trước ở client.
+      // Tách riêng các dòng khớp lỗi này ra khỏi mảng additions gộp thường.
+      // Dùng isGvnnTitle() (startsWith) thay vì so khớp tuyệt đối vì tên rule
+      // thật trong DB có thể có hậu tố (VD: "Giáo Viên Nhắc Nhở - Lần 1").
+      const _isGvnn = _sb().isGvnnTitle || (t => String(t||'').trim() === (_sb().GVNN_TITLE || 'Giáo Viên Nhắc Nhở'));
+      const normalRows = [];
+      const gvnnRows   = [];
+      _results.forEach(r => (_isGvnn(r.matched_rule) ? gvnnRows : normalRows).push(r));
+
+      const additions = normalRows.map(r => {
         const pts      = Number(r.score) || 0;
         const rowDay   = Number.isFinite(Number(r.day)) ? Number(r.day) : 2;
+        const rowTiet  = Number.isFinite(Number(r.tiet)) ? Number(r.tiet) : null; // đã bị chặn null ở validate phía trên
         const category = r.category || fallbackCategory;
         const content  = r.matched_rule || r.reason || 'Ghi chú AI';
         const subject  = r.subject || null;
 
         // Cấu trúc title chuẩn (KHÔNG có prefix [Tự tính]):
-        //   Có môn: Thứ N: [Loại]: [Môn] Nội dung (điểm)
-        //   Không môn: Thứ N: [Loại] Nội dung (điểm)
-        const title    = _buildEventTitle(rowDay, category, subject, content, pts);
+        //   Có môn: Thứ N: Tiết N: [Loại]: [Môn] Nội dung (điểm)
+        //   Không môn: Thứ N: Tiết N: [Loại] Nội dung (điểm)
+        const title    = _buildEventTitle(rowDay, rowTiet, category, subject, content, pts);
 
         return {
           studentId:  r.student_id,
@@ -1211,13 +1293,46 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
           points:     pts,
           type:       pts >= 0 ? 'CONG' : 'TRU',
           category,
+          // dayLabel/tiet giữ nguyên dạng tách riêng (không chỉ gộp vào title)
+          // để backend có thể dùng cho các logic theo-tiết trong tương lai
+          // (VD: đếm số lần vi phạm trong cùng 1 tiết) mà không cần parse lại title.
+          dayLabel:   rowDay === 0 ? 'CN' : `Thứ ${rowDay}`,
+          tiet:       rowTiet,
           note:       'AI Auto-Parsing',
           createdBy:  'AI',
           createdAt:  (_sb().newEventDateForDay || (()=>new Date().toISOString()))(rowDay),
         };
       });
 
-      await _sb().saveScoreChanges({ additions, deletions: [] });
+      if (additions.length) {
+        await _sb().saveScoreChanges({ additions, deletions: [] });
+      }
+
+      // Các dòng GVNN: mỗi dòng là 1 request 'addGvnn' RIÊNG, gọi TUẦN TỰ
+      // (await từng cái) — xem addGvnnEvent() trong scoreboard.js để biết
+      // lý do không được gộp/song song. Lỗi ở 1 dòng không rollback các
+      // dòng GVNN khác đã lưu thành công trước đó.
+      let gvnnSuccessCount = 0;
+      const gvnnErrors = [];
+      for (const r of gvnnRows) {
+        const rowDay   = Number.isFinite(Number(r.day)) ? Number(r.day) : 2;
+        const dayLabel = rowDay === 0 ? 'CN' : `Thứ ${rowDay}`;
+        const tiet     = Number(r.tiet);
+        const res = await _sb().addGvnnEvent({ studentId: r.student_id, week, dayLabel, tiet });
+        if (res?.ok) gvnnSuccessCount++;
+        else gvnnErrors.push(`${r.student_name || r.student_id}: ${res?.error || 'lỗi không rõ'}`);
+      }
+
+      const totalSaved = additions.length + gvnnSuccessCount;
+
+      if (gvnnErrors.length) {
+        // Lưu thành công 1 phần — KHÔNG hoàn tác các dòng đã lưu (additions
+        // gộp lẫn các dòng GVNN đã ghi thành công), chỉ báo lỗi phần còn lại.
+        _errorMsg = `Đã lưu ${totalSaved}/${_results.length} mục. Lỗi ghi GVNN cho ${gvnnErrors.length} dòng: ${gvnnErrors.slice(0, 3).join('; ')}${gvnnErrors.length > 3 ? '…' : ''}`;
+        if (applyBtn) { applyBtn.disabled = false; applyBtn.textContent = 'Xác nhận áp dụng'; }
+        _refreshAll();
+        return;
+      }
 
       // Success feedback
       if (root) {
@@ -1227,7 +1342,7 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="36" height="36"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
             <div class="ai-success-title">Áp dụng thành công!</div>
-            <div class="ai-success-sub">Đã ghi <strong>${additions.length}</strong> mục điểm vào Tuần ${week}.</div>
+            <div class="ai-success-sub">Đã ghi <strong>${totalSaved}</strong> mục điểm vào Tuần ${week}.</div>
             <button type="button" class="ai-success-close" id="ai-success-close">Đóng</button>
           </div>
         </div>`;
@@ -1649,6 +1764,7 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
   border-bottom: 1px solid rgba(148,163,184,.1);
 }
 .ai-th-day     { width: 60px; text-align: center; }
+.ai-th-tiet    { width: 72px; text-align: center; }
 .ai-th-student { width: 200px; }
 .ai-th-category{ width: 100px; text-align: center; }
 .ai-th-reason  { width: auto; }
@@ -1662,6 +1778,8 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
 .ai-row:last-child .ai-td { border-bottom: 0; }
 .ai-row.unmatched { background: rgba(249,115,22,.06); }
 .ai-row.unmatched:hover { background: rgba(249,115,22,.12); }
+.ai-row.missing-tiet { background: rgba(249,115,22,.06); }
+.ai-row.missing-tiet:hover { background: rgba(249,115,22,.12); }
 
 .ai-td-day { text-align: center; }
 .ai-day-badge {
@@ -1673,6 +1791,22 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
   text-align: center; text-align-last: center; cursor: pointer;
 }
 .ai-day-badge:focus { outline: none; border-color: var(--accent); }
+
+.ai-td-tiet { text-align: center; }
+.ai-tiet-badge {
+  appearance: none; -webkit-appearance: none;
+  width: 64px; height: 24px; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, rgba(148,163,184,.2));
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-mid));
+  color: var(--accent); font-size: 11px; font-weight: 900;
+  text-align: center; text-align-last: center; cursor: pointer;
+}
+.ai-tiet-badge:focus { outline: none; border-color: var(--accent); }
+.ai-tiet-badge.missing {
+  border-color: rgba(249,115,22,.55);
+  background: rgba(249,115,22,.14);
+  color: #fb923c;
+}
 
 .ai-td-category { text-align: center; }
 .ai-category-badge {
@@ -2032,6 +2166,7 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
     table-layout: auto;
   }
   .ai-th-day     { width: 60px; }
+  .ai-th-tiet    { width: 68px; }
   .ai-th-student { width: 200px; }
   .ai-th-category{ width: 100px; }
   .ai-th-subject { width: 110px; }

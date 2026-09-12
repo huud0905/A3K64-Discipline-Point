@@ -55,6 +55,29 @@ const WEEK_CREATORS     = [ROLE.GROUP_LEADER, ROLE.HOMEROOM, ROLE.CLASS_MONITOR,
 const SCORE_TYPE = { PLUS: 'CONG', MINUS: 'TRU' };
 const CATEGORY = { STUDY: 'HOC_TAP', DISCIPLINE: 'NE_NEP', MOVEMENT: 'PHONG_TRAO' };
 
+/** Tên lỗi "Giáo Viên Nhắc Nhở" — GVNN_TITLE là chuỗi được GHI VÀO DB khi
+ *  gọi action 'addGvnn' (PHẢI khớp CHÍNH XÁC với backend/ok.js). Lỗi này
+ *  KHÔNG dùng điểm cố định như các lỗi khác — điểm trừ tăng luỹ tiến theo
+ *  số lần vi phạm trong CÙNG 1 tiết (lần 1 -20, lần 2 -40, lần 3 -60...),
+ *  do server tự đếm khi gọi action 'addGvnn' (xem addGvnnEvent() bên dưới)
+ *  — không được tính trước ở client. */
+const GVNN_TITLE = 'Giáo Viên Nhắc Nhở';
+
+/**
+ * Nhận diện 1 rule/matched_rule có PHẢI là lỗi GVNN hay không.
+ * ------------------------------------------------------------
+ * KHÔNG so khớp tuyệt đối (===) với GVNN_TITLE — tên rule thật trong bảng
+ * nội quy có thể có hậu tố (VD: "Giáo Viên Nhắc Nhở - Lần 1") do trước đây
+ * phải tạo thủ công nhiều mức "Lần 1/2/3..." với điểm cố định cho từng mức
+ * (workaround khi chưa có cơ chế luỹ tiến tự động). Dùng startsWith() để
+ * nhận diện mọi biến thể như vậy đều là lỗi GVNN — MỌI biến thể khi chọn
+ * đều chuyển sang luồng hỏi Tiết + tính luỹ tiến tự động (addGvnnEvent),
+ * bỏ qua điểm cố định gắn sẵn trên rule đó.
+ */
+function isGvnnTitle(title) {
+  return String(title || '').trim().startsWith(GVNN_TITLE);
+}
+
 /** Xếp loại kết quả theo tổng điểm — ngưỡng giữ nguyên như bản gốc. */
 const SCORE_STATUS = { GOOD: 'Tốt', FAIR: 'Khá', PASS: 'Đạt', FAIL: 'CĐ' };
 const SCORE_STATUS_THRESHOLDS = [
@@ -271,6 +294,12 @@ function getScoreStatus(total) {
   return match ? match.status : SCORE_STATUS.FAIL;
 }
 function statusClass(s) { return s.toLowerCase().replace(/\s+/g,'-'); }
+function scoreClass(total) {
+  if (total >= 50)  return 'score-great';
+  if (total >= 0)   return 'score-ok';
+  if (total >= -50) return 'score-warn';
+  return 'score-bad';
+}
 function statusTone(s) {
   const l=s.toLowerCase();
   if(l.includes('tốt')) return 'good';
@@ -958,6 +987,94 @@ async function saveScoreChanges(changes) {
   }
 }
 
+/**
+ * addGvnnEvent({studentId, week, dayLabel, tiet})
+ * ------------------------------------------------------------
+ * Ghi 1 lần vi phạm "Giáo Viên Nhắc Nhở" (GVNN) theo action 'addGvnn' ở
+ * backend — KHÁC với saveScoreChanges(): điểm trừ ở đây KHÔNG được tính
+ * trước ở client, mà server tự đếm số lần đã ghi trong CÙNG (studentId,
+ * week, dayLabel, tiet) rồi tính luỹ tiến (lần 1 -20, lần 2 -40, lần 3
+ * -60...) ngay tại thời điểm INSERT.
+ *
+ * QUAN TRỌNG — thứ tự gọi: nếu cần ghi NHIỀU lần GVNN cùng lúc cho cùng
+ * 1 học sinh/tiết (VD: AI parse ra 3 dòng GVNN cùng tiết, hoặc chấm tay
+ * bấm nút GVNN 3 lần liên tiếp), PHẢI gọi hàm này TUẦN TỰ — await xong
+ * lần gọi trước rồi mới gọi lần sau. Gọi song song (Promise.all/gộp mảng)
+ * sẽ khiến tất cả các lần đều đọc thấy occurrence=1 (vì bản ghi trước
+ * chưa kịp lưu vào DB) và đều bị trừ sai (-20 thay vì -20/-40/-60).
+ *
+ * Không throw khi lỗi nghiệp vụ (thiếu quyền, thiếu trường, server từ
+ * chối) — trả về { ok:false, error } để nơi gọi (scoreboard-ai.js,
+ * scoreboard-modal.js) tự xử lý riêng cho từng dòng GVNN, không làm
+ * rollback các dòng GVNN khác đã lưu thành công trước đó trong cùng 1
+ * lượt áp dụng hàng loạt.
+ *
+ * Trả về khi thành công: { ok:true, event, occurrence, periodTotal }.
+ */
+async function addGvnnEvent({ studentId, week, dayLabel, tiet }) {
+  const { rawSummaries, canEditStudent } = getDerived();
+  const st = rawSummaries.find(s => s.id === studentId);
+  if (!st || !canEditStudent(st)) {
+    return { ok: false, error: 'Không có quyền chấm điểm học sinh này.' };
+  }
+  if (!week || !tiet) {
+    return { ok: false, error: 'Thiếu Tuần hoặc Tiết.' };
+  }
+  if (state.dataSource !== DATA_SOURCE.GAS || !gasUrl) {
+    return { ok: false, error: 'Chưa kết nối máy chủ (không ở chế độ GAS).' };
+  }
+
+  savingActive = true;
+  markActivity();
+  try {
+    const body = JSON.stringify({
+      action: 'addGvnn',
+      studentId, week, dayLabel, tiet,
+      createdBy: userEmail || undefined,
+      createdByName: userName || undefined,
+    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), GAS_SAVE_TIMEOUT_MS);
+    let res;
+    try {
+      res = await fetch(gasUrl, { method: 'POST', body, signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    const json = await res.json();
+
+    if (json?.ok === false) {
+      return { ok: false, error: json.error || 'Máy chủ từ chối ghi GVNN.' };
+    }
+    const resultData = json?.data || {};
+
+    // Áp dữ liệu bảng điểm mới nhất (đã bao gồm bản ghi GVNN vừa tạo) —
+    // dùng normalizeScoreboardPayload() như saveScoreChanges() vì response
+    // của addGvnnAction cũng lồng scoreboard trong data.scoreboard.
+    if (resultData.scoreboard) {
+      applyRemoteData(normalizeScoreboardPayload(json), { silent: true, notify: false });
+    }
+    if (resultData.event) {
+      const actor = userName || 'Ai đó';
+      const sn = state.students.find(s => s.id === studentId)?.name || st.name || 'học sinh';
+      notifyScoreEdit(actor, sn);
+    }
+
+    return { ok: true, event: resultData.event, occurrence: resultData.occurrence, periodTotal: resultData.periodTotal };
+  } catch (err) {
+    console.error('[addGvnnEvent] Lỗi khi ghi GVNN:', err);
+    const timedOut = err?.name === 'AbortError';
+    return {
+      ok: false,
+      error: timedOut
+        ? `Google Sheets phản hồi quá lâu (>${GAS_SAVE_TIMEOUT_MS / 1000}s).`
+        : String(err?.message || 'Không ghi được GVNN lên máy chủ.'),
+    };
+  } finally {
+    savingActive = false;
+  }
+}
+
 /* ============================================================
    12. TOAST — helper thống nhất cho toàn bộ scoreboard
    ============================================================ */
@@ -1150,7 +1267,7 @@ function buildPodium(summaries, canEditStudent, highlightName) {
               <div class="podium-rank">${ic}<span>#${rank}</span></div>
               <div class="podium-avatar" style="${isCur?'box-shadow:0 0 0 3px var(--accent),0 0 24px color-mix(in srgb,var(--accent) 50%,transparent);':''}"><span>${student.avatarInitial||lastNameInitial(student.name)}</span></div>
               <strong style="${isCur?'color:var(--accent);text-shadow:0 0 16px color-mix(in srgb,var(--accent) 60%,transparent);font-weight:900;':''}">${student.name}</strong>
-              <span class="${student.total>=0?'score-positive':'score-negative'}">${formatScore(student.total)}</span>
+              <span class="${scoreClass(student.total)}">${formatScore(student.total)}</span>
             </button>`;
         }).join('')}
       </div>
@@ -1176,7 +1293,7 @@ function buildCompactTable(students, startIndex, canEditStudent, highlightName) 
                   <button type="button" class="student-name-button" onclick="openProfile('${s.id}')">${s.name}</button>
                   ${s.role?`<span class="student-role">${s.role}</span>`:''}
                 </td>
-                <td class="${s.total>=0?'score-positive':'score-negative'}">${formatScore(s.total)}</td>
+                <td class="${scoreClass(s.total)}">${formatScore(s.total)}</td>
                 <td class="rank-text">#${s.rank}</td>
                 <td><span class="status-pill status-${statusClass(s.status)}">${s.status}</span></td>
               </tr>`;
@@ -1248,7 +1365,7 @@ function buildStudentTable(students, opts={}) {
                 <td class="point-cell score-positive">${vpos>0?formatScore(vpos):'0'}</td>
                 <td><div class="event-stack">${minus.length?minus.map(e=>`<span class="event-line event-minus">${e.title}</span>`).join(''):'<span class="muted-dash">-</span>'}</div></td>
                 <td class="point-cell score-negative">${vneg<0?vneg:'0'}</td>
-                <td class="total-cell ${s.total>=0?'score-positive':'score-negative'}">${formatScore(s.total)}</td>
+                <td class="total-cell ${scoreClass(s.total)}">${formatScore(s.total)}</td>
                 <td><span class="status-pill status-${statusClass(s.status)}">${s.status}</span></td>
                 <td>
                   <button class="edit-score-button" type="button"
@@ -1299,7 +1416,7 @@ function buildStudentTable(students, opts={}) {
               <div class="ssc-score-divider"></div>
               <div class="ssc-score-item">
                 <span class="ssc-score-label">Tổng</span>
-                <span class="ssc-score-val ${s.total>=0?'score-positive':'score-negative'}">${formatScore(s.total)}</span>
+                <span class="ssc-score-val ${scoreClass(s.total)}">${formatScore(s.total)}</span>
               </div>
               <span class="status-pill status-${statusClass(s.status)} ssc-badge">${s.status}</span>
             </div>
@@ -1551,7 +1668,7 @@ function buildSidebar(d) {
       </div>
       <div class="left-mini-section">
         <div class="left-mini-title">Tóm tắt tuần</div>
-        <div class="mini-stat"><span>Tổng điểm</span><strong class="${d.totalScore>=0?'score-positive':'score-negative'}">${d.totalScore>0?`+${d.totalScore}`:d.totalScore}</strong></div>
+        <div class="mini-stat"><span>Tổng điểm</span><strong class="${scoreClass(d.totalScore)}">${d.totalScore>0?`+${d.totalScore}`:d.totalScore}</strong></div>
         <div class="mini-stat"><span>Ổn định</span><strong>${d.goodCount}/${d.groupFiltered.length}</strong></div>
         <div class="mini-stat"><span>Cần chú ý</span><strong>${d.warnCount}</strong></div>
         <div class="mini-stat"><span>Tổ dẫn đầu</span><strong>${d.topGroup?.label||'Chưa có'}</strong></div>
@@ -1932,6 +2049,9 @@ function initScoreboard(opts={}) {
     SafeStorage:          { get: () => SafeStorage,          configurable: true },
     makeDraftEvent:       { get: () => makeDraftEvent,       configurable: true },
     saveScoreChanges:     { get: () => saveScoreChanges,     configurable: true },
+    addGvnnEvent:         { get: () => addGvnnEvent,         configurable: true },
+    GVNN_TITLE:           { get: () => GVNN_TITLE,           configurable: true },
+    isGvnnTitle:          { get: () => isGvnnTitle,          configurable: true },
     formatSavedTitle:     { get: () => formatSavedTitle,     configurable: true },
     newEventDateForDay:   { get: () => newEventDateForDay,   configurable: true },
   });

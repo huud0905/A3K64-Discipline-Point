@@ -815,9 +815,13 @@ window.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeCtxMenu();
 });
 
-// Listen for deeplink from parent (desktop.js can postMessage to open a student)
-window.addEventListener('message', e => {
-  if (e.data?.type === 'profile-open') openStudent(e.data.studentId, e.data.week);
+// Lắng nghe deeplink từ desktop.js bridge
+window.addEventListener('message', function(e) {
+  if (!e.data) return;
+  if (e.data.type === 'profile-open' || e.data.type === 'a3k64-open-profile') {
+    const sid = e.data.studentId || e.data.id;
+    if (sid) openStudent(sid, e.data.week);
+  }
 });
 
 applyTheme();
@@ -827,8 +831,14 @@ applyTheme();
   render();
   await loadData();
   tabs = tabs.map(t => t.kind === 'student' ? { ...t, title: studentTitle(t.id) } : t);
-  if (tabs.length && tabs[0].kind === 'new') {
+
+  // Nếu URL có ?studentId= (mở từ scoreboard fallback) → mở thẳng học sinh đó
+  const urlStudentId = new URLSearchParams(location.search).get('studentId');
+  if (urlStudentId) {
+    openStudent(urlStudentId, latestWeek());
+  } else if (tabs.length && tabs[0].kind === 'new') {
     openStudent(null, latestWeek());
   }
+
   render();
 })();

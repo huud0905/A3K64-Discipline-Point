@@ -549,7 +549,18 @@ function toggleFocusMode() {
 }
 document.addEventListener('fullscreenchange', () => {
   focusMode = !!document.fullscreenElement;
-  render();
+  // KHÔNG gọi render() — sẽ rebuild root.innerHTML, phá huỷ toàn bộ
+  // iframe đang mở và khiến chúng reload từ đầu mỗi khi bật/tắt fullscreen.
+  // Chỉ patch đúng button toggle trên taskbar (text ON/OFF + class .on)
+  // và cập nhật --root-w/h cho đúng với kích thước fullscreen mới.
+  const btn = document.querySelector('.task-focus-switch');
+  if (btn) {
+    btn.classList.toggle('on', focusMode);
+    const knob = btn.querySelector('.task-focus-text');
+    if (knob) knob.textContent = focusMode ? 'ON' : 'OFF';
+  }
+  // Fullscreen thay đổi innerWidth/innerHeight — cần tính lại scale/root vars
+  applyDisplayScale();
 });
 
 /* ---------- Build HTML ---------- */
@@ -1931,4 +1942,47 @@ window.addEventListener('message', function(e) {
   const title = String(e.data.title || 'Thông báo');
   const body  = String(e.data.body  || '');
   if (typeof notifAdd === 'function') notifAdd(title, body);
+});
+
+/* ══════════════════════════════════════════════════════
+   PROFILE BRIDGE — scoreboard bấm tên học sinh →
+   mở cửa sổ Profile bên trong desktop, forward studentId
+   vào iframe Profile qua postMessage.
+══════════════════════════════════════════════════════ */
+window.addEventListener('message', function(e) {
+  if (!e.data || e.data.type !== 'a3k64-open-profile') return;
+  const studentId = e.data.studentId;
+  if (!studentId) return;
+
+  // 1. Mở (hoặc focus) cửa sổ Profile
+  const profileApp = APPS.find(function(a) { return a.key === 'profile'; });
+  if (profileApp) openApp(profileApp);
+
+  // 2. Forward studentId vào iframe Profile
+  //    Thử ngay, nếu iframe chưa load xong thì chờ onload rồi gửi lại.
+  function sendToProfileFrame() {
+    const frame = document.querySelector('#win-profile iframe.win-embed-frame');
+    if (frame && frame.contentWindow) {
+      frame.contentWindow.postMessage({ type: 'profile-open', studentId: studentId }, '*');
+    }
+  }
+
+  // Iframe có thể vừa được tạo → cần đợi load
+  const frame = document.querySelector('#win-profile iframe.win-embed-frame');
+  if (frame) {
+    if (frame.contentDocument && frame.contentDocument.readyState === 'complete') {
+      // Đã load xong — gửi ngay + thêm 1 lần backup sau 300ms (phòng race condition)
+      sendToProfileFrame();
+      setTimeout(sendToProfileFrame, 300);
+    } else {
+      // Chưa load xong — đợi onload
+      frame.addEventListener('load', function onLoad() {
+        frame.removeEventListener('load', onLoad);
+        setTimeout(sendToProfileFrame, 80);
+      });
+    }
+  } else {
+    // Frame chưa xuất hiện trong DOM (openApp vừa chạy, renderWindows chưa xong)
+    setTimeout(sendToProfileFrame, 350);
+  }
 });

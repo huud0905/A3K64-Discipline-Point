@@ -837,9 +837,23 @@
     const todayKey = (() => { const d = new Date().getDay(); return d === 0 ? 0 : d + 1; })();
     const activeDay = day ?? (_activeDay === -1 ? todayKey : _activeDay);
     const title = String(payload.title || '').trim();
+    if (!title) return;
+
+    // GVNN ("Giáo Viên Nhắc Nhở") KHÔNG dùng điểm cố định như các lỗi khác —
+    // điểm trừ tăng luỹ tiến theo số lần vi phạm trong CÙNG 1 tiết, do
+    // server tự đếm khi lưu (action 'addGvnn'). Tách sang luồng riêng vì cần
+    // hỏi "Tiết" (chưa có khái niệm Tiết ở modal này) và không thể tính
+    // điểm thật ngay tại đây. Dùng isGvnnTitle() (startsWith) thay vì so
+    // khớp tuyệt đối vì tên rule thật trong DB có thể có hậu tố (VD:
+    // "Giáo Viên Nhắc Nhở - Lần 1"). Xem _stageGvnn() bên dưới.
+    if (isGvnnTitle(title)) {
+      _stageGvnn(activeDay);
+      return;
+    }
+
     const count = Math.max(1, Math.trunc(_violationCount || 1));
     const points = payload.points * count;
-    if (!title || !points) return;
+    if (!points) return;
 
     const cat = payload.category || _cat();
     const subj = _sub();
@@ -861,7 +875,174 @@
     _patchHistoryBadges();
     _patchFooter();
 
-    // Visual feedback: flash nút Thêm
+    _flashAddFeedback();
+  }
+
+  /** Khoá đếm "1 tiết" phía client — PHẢI khớp cách backend ghép
+   *  (dayLabel, tiet) trong gvnnPeriodKey() (ok.js), gồm cả tiền tố
+   *  GVNN_NOTE_PREFIX ('GVNN::') dùng để tách biệt với note của các lỗi
+   *  khác (vì đếm chỉ dựa vào cột note, KHÔNG dựa vào title — title giờ
+   *  hiển thị đầy đủ Thứ/Tiết/lần nên mỗi bản ghi có title khác nhau). */
+  const GVNN_NOTE_PREFIX = 'GVNN::';
+  function _gvnnPeriodKeyLocal(dayLabel, tiet) {
+    return `${GVNN_NOTE_PREFIX}${dayLabel}__${tiet}`;
+  }
+
+  /** Đếm ước tính số lần GVNN đã có — gồm bản ghi ĐÃ LƯU trong DB (đọc từ
+   *  state.events, nguồn dữ liệu chung của toàn app, không chỉ của modal
+   *  này — cần thiết vì chấm hàng loạt/theo tổ có thể nhắm tới học sinh
+   *  KHÁC học sinh đang mở modal) CỘNG bản ghi ĐANG CHỜ LƯU trong modal
+   *  (_draftEvents, đánh dấu _gvnn:true). CHỈ dùng để hiển thị điểm DỰ KIẾN
+   *  trên UI — điểm THẬT do server tính lại tại đúng thời điểm gọi action
+   *  'addGvnn' (xem addGvnnEvent() trong scoreboard.js), có thể lệch nếu có
+   *  người khác cũng vừa ghi GVNN cho học sinh này trong lúc modal đang mở. */
+  function _gvnnCountFor(studentId, dayLabel, tiet) {
+    const periodKey = _gvnnPeriodKeyLocal(dayLabel, tiet);
+    const savedCount = state.events.filter(e =>
+      e.studentId === studentId && e.week === state.week && e.note === periodKey
+    ).length;
+    const stagedCount = _draftEvents.filter(e =>
+      e._gvnn && _isDraft(e.id) && e.studentId === studentId &&
+      e.dayLabel === dayLabel && e.tiet === tiet
+    ).length;
+    return savedCount + stagedCount;
+  }
+
+  /** Thêm 1 hoặc nhiều lượt vi phạm GVNN cùng lúc. Hỏi "Tiết" + "Số lần"
+   *  trong CÙNG 1 hộp thoại (xem _showGvnnDialog()) — không hỏi lại nhiều
+   *  lần nếu cần ghi liên tiếp nhiều lượt trong cùng 1 tiết. Điểm hiển thị
+   *  ở đây chỉ là DỰ KIẾN; điểm thật được tính lại khi bấm "Lưu thay đổi"
+   *  (mỗi dòng GVNN gọi 1 request 'addGvnn' riêng, xem _handleSave()). */
+  async function _stageGvnn(activeDay) {
+    const dayLabel = activeDay === 0 ? 'CN' : `Thứ ${activeDay}`;
+    const input = await _showGvnnDialog();
+    if (!input) return; // người dùng huỷ
+    const { tiet, count } = input;
+
+    const targetIds = _getTargetIds();
+    const newDrafts = [];
+
+    targetIds.forEach(studentId => {
+      for (let i = 0; i < count; i++) {
+        const queuedForThisStudent = newDrafts.filter(d => d.studentId === studentId).length;
+        const occurrence = _gvnnCountFor(studentId, dayLabel, tiet) + queuedForThisStudent + 1;
+        const previewPoints = -(occurrence * 20);
+        newDrafts.push(makeDraftEvent({
+          studentId, week: state.week,
+          title: `${dayLabel}: Tiết ${tiet}: [Nề nếp] ${GVNN_TITLE} — lần ${occurrence} (dự kiến ${previewPoints})`,
+          points: previewPoints, type: 'TRU',
+          category: CATEGORY.DISCIPLINE, note: _bulkNote.trim() || undefined,
+          createdBy: 'Web', createdAt: newEventDateForDay(activeDay),
+          _gvnn: true, dayLabel, tiet,
+        }));
+      }
+    });
+
+    _draftEvents = [...newDrafts, ..._draftEvents];
+
+    _patchDayTabs();
+    _patchMatrix();
+    _patchReviewPanel();
+    _patchHistoryBadges();
+    _patchFooter();
+
+    _flashAddFeedback();
+  }
+
+  /**
+   * _showGvnnDialog() → Promise<{tiet, count} | null>
+   * ------------------------------------------------------------
+   * Hộp thoại riêng (KHÔNG dùng window.prompt() mặc định của trình duyệt)
+   * hỏi 1 LẦN DUY NHẤT cả "Tiết mấy" lẫn "Số lần" — để ghi liên tiếp nhiều
+   * lượt GVNN trong cùng 1 tiết chỉ cần nhập 1 lần, không phải lặp lại
+   * thao tác nhập Tiết nhiều lần. Trả về null nếu người dùng bấm Huỷ/Esc/
+   * bấm ra ngoài; trả về {tiet, count} (số nguyên dương) nếu xác nhận.
+   */
+  function _showGvnnDialog() {
+    return new Promise(resolve => {
+      // Phòng trường hợp dialog cũ chưa kịp gỡ (double-trigger nhanh)
+      document.getElementById('v2-gvnn-dialog-backdrop')?.remove();
+
+      const backdrop = document.createElement('div');
+      backdrop.id = 'v2-gvnn-dialog-backdrop';
+      backdrop.className = 'v2-gvnn-backdrop';
+      backdrop.innerHTML = `
+        <div class="v2-gvnn-card" role="dialog" aria-modal="true" aria-labelledby="v2-gvnn-title">
+          <div class="v2-gvnn-header">
+            <div class="v2-gvnn-icon">🔔</div>
+            <div class="v2-gvnn-title" id="v2-gvnn-title">Ghi nhận Giáo Viên Nhắc Nhở</div>
+          </div>
+          <div class="v2-gvnn-sub">Điểm trừ tự tăng dần theo số lần trong CÙNG 1 tiết (lần 1 −20, lần 2 −40, lần 3 −60...).</div>
+          <div class="v2-gvnn-field">
+            <label for="v2-gvnn-tiet">Tiết mấy?</label>
+            <input type="number" id="v2-gvnn-tiet" min="1" max="20" step="1" inputmode="numeric" autocomplete="off" />
+          </div>
+          <div class="v2-gvnn-field">
+            <label for="v2-gvnn-count">Số lần</label>
+            <input type="number" id="v2-gvnn-count" min="1" max="20" step="1" value="1" inputmode="numeric" autocomplete="off" />
+          </div>
+          <div class="v2-gvnn-error" id="v2-gvnn-error" hidden></div>
+          <div class="v2-gvnn-divider"></div>
+          <div class="v2-gvnn-actions">
+            <button type="button" class="v2-gvnn-btn cancel" id="v2-gvnn-cancel">Huỷ</button>
+            <button type="button" class="v2-gvnn-btn confirm" id="v2-gvnn-confirm">Xác nhận</button>
+          </div>
+        </div>`;
+      document.body.appendChild(backdrop);
+
+      const tietInput  = backdrop.querySelector('#v2-gvnn-tiet');
+      const countInput = backdrop.querySelector('#v2-gvnn-count');
+      const errorEl    = backdrop.querySelector('#v2-gvnn-error');
+      const cancelBtn  = backdrop.querySelector('#v2-gvnn-cancel');
+      const confirmBtn = backdrop.querySelector('#v2-gvnn-confirm');
+
+      let settled = false;
+      function cleanup() {
+        document.removeEventListener('keydown', onKeydown);
+        backdrop.remove();
+      }
+      function finish(result) {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(result);
+      }
+      function showError(msg) {
+        errorEl.textContent = msg;
+        errorEl.hidden = false;
+      }
+      function submit() {
+        const tiet = Number(tietInput.value);
+        const count = Number(countInput.value);
+        if (!Number.isFinite(tiet) || tiet <= 0) {
+          showError('Vui lòng nhập số Tiết hợp lệ (VD: 3).');
+          tietInput.focus();
+          return;
+        }
+        if (!Number.isFinite(count) || count <= 0) {
+          showError('Số lần phải lớn hơn 0.');
+          countInput.focus();
+          return;
+        }
+        finish({ tiet: Math.trunc(tiet), count: Math.trunc(count) });
+      }
+      function onKeydown(e) {
+        if (e.key === 'Escape') { e.preventDefault(); finish(null); }
+        if (e.key === 'Enter') { e.preventDefault(); submit(); }
+      }
+
+      cancelBtn.addEventListener('click', () => finish(null));
+      confirmBtn.addEventListener('click', submit);
+      backdrop.addEventListener('click', e => { if (e.target === backdrop) finish(null); });
+      document.addEventListener('keydown', onKeydown);
+
+      setTimeout(() => tietInput.focus(), 30);
+    });
+  }
+
+  /** Hiệu ứng flash nút "Thêm" + dòng vừa thêm trong panel review — tách
+   *  riêng vì dùng chung giữa _stageScore() (lỗi thường) và _stageGvnn(). */
+  function _flashAddFeedback() {
     const addBtn = _getRoot()?.querySelector('#v2-add-btn');
     if (addBtn) {
       addBtn.classList.remove('flash');
@@ -956,9 +1137,41 @@
     _isSaving = true;
     _patchFooter();
 
-    const additions = draftAdditions.map(({ id: _id, ...ev }) => ev);
+    // Tách các dòng GVNN ("Giáo Viên Nhắc Nhở") ra khỏi mảng additions gộp
+    // thường — điểm của chúng phải do server tính lại (luỹ tiến theo tiết),
+    // không thể gửi thẳng points đã ước tính ở _stageGvnn() lên saveScoreChanges.
+    const normalAdditions = draftAdditions
+      .filter(e => !e._gvnn)
+      .map(({ id: _id, ...ev }) => ev);
+    const gvnnAdditions = draftAdditions.filter(e => e._gvnn);
+
     try {
-      await saveScoreChanges({ additions, deletions: _deletedIds });
+      if (normalAdditions.length || _deletedIds.length) {
+        await saveScoreChanges({ additions: normalAdditions, deletions: _deletedIds });
+      }
+
+      // Mỗi dòng GVNN gọi 1 request 'addGvnn' RIÊNG, TUẦN TỰ (await từng
+      // cái) — occurrence do server đếm tại đúng thời điểm ghi, KHÔNG được
+      // gộp/song song (xem addGvnnEvent() trong scoreboard.js). Lỗi ở 1
+      // dòng KHÔNG rollback các dòng GVNN khác đã lưu thành công.
+      const failedGvnn = [];
+      for (const draft of gvnnAdditions) {
+        const res = await addGvnnEvent({
+          studentId: draft.studentId, week: draft.week,
+          dayLabel: draft.dayLabel, tiet: draft.tiet,
+        });
+        if (!res?.ok) failedGvnn.push({ draft, error: res?.error });
+      }
+
+      if (failedGvnn.length) {
+        const { rawSummaries } = getDerived();
+        const detail = failedGvnn.map(f => {
+          const sName = rawSummaries.find(s => s.id === f.draft.studentId)?.name || f.draft.studentId;
+          return `${sName}: ${f.error || 'lỗi không rõ'}`;
+        }).join('; ');
+        _notify(`Còn ${failedGvnn.length} dòng GVNN chưa lưu được: ${detail}`, 'error');
+      }
+
       // Hiện indicator "Đã lưu" trước khi đóng
       const indicator = _getRoot()?.querySelector('#v2-saved-indicator');
       if (indicator) {
@@ -2008,6 +2221,158 @@
   .v2-rules-grid { grid-template-columns: 1fr; }
   .v2-header-name { font-size: 14.5px; }
   .v2-score-chip, .v2-score-status { font-size: 10px; padding: 0 6px; }
+}
+
+/* ================================================================
+   GVNN PROMPT — hộp thoại riêng hỏi "Tiết mấy? / Mấy lần?" khi chọn
+   lỗi "Giáo Viên Nhắc Nhở", thay cho window.prompt() mặc định của
+   trình duyệt. Nổi TRÊN modal chấm điểm (z-index cao hơn #a3-score-
+   modal-root) vì được mở trong lúc modal chấm điểm đang mở.
+   ================================================================ */
+.v2-gvnn-backdrop {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(2, 6, 14, .72);
+  backdrop-filter: blur(8px) saturate(1.4);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  animation: v2FadeIn .18s ease both;
+}
+.v2-gvnn-card {
+  width: 100%; max-width: 360px;
+  background: linear-gradient(160deg, #111f33 0%, #0c1826 100%);
+  border: 1px solid rgba(148,163,184,.14);
+  border-top-color: rgba(148,163,184,.26);
+  border-radius: 22px;
+  padding: 24px 24px 20px;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,.5),
+    0 24px 64px rgba(0,0,0,.6),
+    0 4px 16px rgba(0,0,0,.35);
+  animation: v2PopIn .2s cubic-bezier(.2,.9,.2,1) both;
+}
+
+/* ── Header: icon + title ── */
+.v2-gvnn-header {
+  display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px;
+}
+.v2-gvnn-icon {
+  flex-shrink: 0;
+  width: 36px; height: 36px; border-radius: 10px;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent) 32%, transparent),
+    color-mix(in srgb, var(--accent) 14%, transparent));
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+/* FIX typography: tiêu đề gọn, nhẹ hơn, letter-spacing rộng hơn chút */
+.v2-gvnn-title {
+  font-size: 14.5px; font-weight: 700; color: #e2e8f0;
+  letter-spacing: -.01em; line-height: 1.4;
+  padding-top: 2px;
+}
+
+/* FIX contrast: sub-text dùng màu sáng hơn (#94a3b8 → #a8b8cc) */
+.v2-gvnn-sub {
+  font-size: 12px; color: #a8b8cc;
+  line-height: 1.65; margin-bottom: 20px;
+  padding: 10px 13px;
+  background: rgba(148,163,184,.07);
+  border-left: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  border-radius: 0 8px 8px 0;
+  letter-spacing: .01em;
+}
+
+/* ── Fields ── */
+.v2-gvnn-field {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 11px;
+}
+/* FIX typography: label nhẹ hơn, tracking rõ hơn */
+.v2-gvnn-field label {
+  font-size: 13px; font-weight: 500; color: #cbd5e1;
+  letter-spacing: .005em; line-height: 1.5;
+}
+/* FIX input consistency: cả 2 ô dùng chung style, bỏ spinner mặc định */
+.v2-gvnn-field input {
+  width: 96px; height: 42px; text-align: center;
+  border: 1.5px solid rgba(148,163,184,.22);
+  border-radius: 12px;
+  background: rgba(255,255,255,.05);
+  color: #f1f5f9;
+  font-size: 16px; font-weight: 700;
+  letter-spacing: -.01em;
+  transition: border-color .15s, box-shadow .15s, background .15s;
+  /* Ẩn spinner để 2 input trông giống nhau trên mọi trình duyệt */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.v2-gvnn-field input::-webkit-outer-spin-button,
+.v2-gvnn-field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.v2-gvnn-field input:hover {
+  border-color: rgba(148,163,184,.36);
+  background: rgba(255,255,255,.07);
+}
+.v2-gvnn-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.v2-gvnn-divider {
+  height: 1px;
+  background: rgba(148,163,184,.09);
+  margin: 16px -24px 16px;
+}
+
+/* FIX error: dùng display:none khi hidden thay vì để box rỗng hiện ra */
+.v2-gvnn-error {
+  font-size: 12px; font-weight: 600; color: #fca5a5;
+  display: none; align-items: center; gap: 6px;
+  margin: -4px 0 12px;
+  padding: 9px 13px;
+  background: rgba(248,113,113,.1);
+  border: 1px solid rgba(248,113,113,.25);
+  border-radius: 10px;
+  line-height: 1.5;
+}
+.v2-gvnn-error:not([hidden]) { display: flex; }
+
+/* ── Actions ── */
+.v2-gvnn-actions {
+  display: flex; gap: 10px;
+}
+.v2-gvnn-btn {
+  flex: 1; height: 44px; border-radius: 13px;
+  font-size: 13.5px; font-weight: 600; cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: transform .12s ease, filter .12s ease, background .15s, box-shadow .15s;
+  letter-spacing: .01em;
+}
+.v2-gvnn-btn:active { transform: scale(.96); }
+
+/* FIX contrast: nút Huỷ dùng màu chữ sáng hơn (#cbd5e1) đạt WCAG AA */
+.v2-gvnn-btn.cancel {
+  background: rgba(148,163,184,.1);
+  border-color: rgba(148,163,184,.18);
+  color: #cbd5e1;
+}
+.v2-gvnn-btn.cancel:hover {
+  background: rgba(148,163,184,.18);
+  border-color: rgba(148,163,184,.28);
+  color: #e2e8f0;
+}
+.v2-gvnn-btn.confirm {
+  background: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 75%, white);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 38%, transparent);
+}
+.v2-gvnn-btn.confirm:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 48%, transparent);
 }
     `;
     document.head.appendChild(st);
