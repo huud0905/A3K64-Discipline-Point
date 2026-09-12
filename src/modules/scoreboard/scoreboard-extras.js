@@ -80,8 +80,11 @@ function extraGetScoreboardPayload() {
 function extraGetCurrentWeek(weeks) {
   return weeks.includes(state.week) ? state.week : (weeks[weeks.length - 1] || 1);
 }
+// In đầy đủ từng lý do cộng/trừ (chưa gộp) — trả về MẢNG, mỗi phần tử là
+// 1 dòng lý do, để chỗ render xuống hàng riêng cho từng dòng thay vì nhét
+// chung 1 chuỗi rồi bị line-clamp cắt chữ như trước.
 function extraEventTitles(events, positive) {
-  return events.filter(e => positive ? e.points > 0 : e.points < 0).map(e => (e.title || '').trim()).filter(Boolean).join(' • ');
+  return events.filter(e => positive ? e.points > 0 : e.points < 0).map(e => (e.title || '').trim()).filter(Boolean);
 }
 function extraGetMembersForCurrentWeek() {
   const payload = extraGetScoreboardPayload();
@@ -492,11 +495,17 @@ function extraGetMembersForCurrentWeek() {
 
   function renderGroup(members, week, group) {
     const data = members.filter(m => Number(m.group) === group).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'vi'));
-    const clamp = 'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.25;';
+    // In đầy đủ từng lý do, mỗi lý do 1 hàng riêng (không còn line-clamp nên
+    // không bị cắt chữ nữa) — dấu "+"/"-" và nội dung được canh thẳng cột
+    // bằng flex, giãn cách đều giữa các dòng cho dễ đọc.
+    const renderReasonLines = (items, color, sign) => {
+      if (!items || !items.length) return '';
+      return items.map(t => `<div style="display:flex;gap:5px;align-items:flex-start;margin-top:4px;font-size:12px;line-height:1.4;color:${color};"><span style="flex:0 0 auto;font-weight:800;">${sign}</span><span>${extraEsc(t)}</span></div>`).join('');
+    };
     const rowHtml = (member, index) => {
-      const plusShort = member.plusText ? `<div style="margin-top:3px;font-size:12px;color:#059669;${clamp}">+ ${extraEsc(member.plusText)}</div>` : '';
-      const minusShort = member.minusText ? `<div style="margin-top:2px;font-size:12px;color:#e11d48;${clamp}">- ${extraEsc(member.minusText)}</div>` : '';
-      const nameCell = `<div style="font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${extraEsc(member.name)}</div>${plusShort}${minusShort}`;
+      const plusLines = renderReasonLines(member.plusText, '#059669', '+');
+      const minusLines = renderReasonLines(member.minusText, '#e11d48', '-');
+      const nameCell = `<div style="font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${extraEsc(member.name)}</div>${plusLines}${minusLines}`;
       return `<tr style="${rowBg(index)}">${td(String(index+1),'text-align:center;font-weight:700;color:#475569;')}${td(nameCell,'text-align:left;')}${td(`<span style="font-weight:800;">${member.positive>0?extraEsc(formatScore(member.positive)):''}</span>`,`text-align:center;color:#059669;${NUM_CELL_STYLE}`)}${td(`<span style="font-weight:800;">${member.negative<0?extraEsc(member.negative):''}</span>`,`text-align:center;color:#e11d48;${NUM_CELL_STYLE}`)}${td(`<span style="font-weight:800;font-size:15px;">${extraEsc(formatScore(member.total))}</span>`,`text-align:center;color:${member.total>=0?'#059669':'#e11d48'};${NUM_CELL_STYLE}`)}${td(`#${extraEsc(member.rank||'-')}`,'text-align:center;color:#475569;')}${td(statusBadge(member.status),'text-align:center;')}</tr>`;
     };
     return pageWrap(`${screenshotHeader(`BẢNG ĐIỂM THI ĐUA - TUẦN ${week} - TỔ ${group}`)}<table style="width:100%;border-collapse:collapse;font-size:15px;table-layout:fixed;"><thead><tr>${th('STT','width:32px;text-align:center;')}${th('Họ tên','text-align:left;')}${th('Cộng','width:64px;text-align:center;')}${th('Trừ','width:64px;text-align:center;')}${th('Tổng','width:64px;text-align:center;')}${th('Thứ','width:44px;text-align:center;')}${th('XL','width:70px;text-align:center;')}</tr></thead><tbody>${data.map(rowHtml).join('') || `<tr>${td('Không có dữ liệu tổ này.','text-align:center;color:#6b7280;')}</tr>`}</tbody></table>`);
