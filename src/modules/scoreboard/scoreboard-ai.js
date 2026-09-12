@@ -85,6 +85,10 @@
   let _results   = [];   // [{studentId,studentName,reason,score,_matched}]
   let _rawText   = '';
   let _errorMsg  = '';
+  /* Chế độ nhập liệu: 'text' | 'image' */
+  let _inputMode = 'text';
+  /* Dữ liệu ảnh đã upload: { base64: string, mimeType: string, name: string } | null */
+  let _imageData = null;
   /* Trạng thái thu gọn cột nhập liệu (PC) để bảng xem trước chiếm
      toàn bộ chiều rộng — lưu localStorage để nhớ lựa chọn giữa các lần mở. */
   let _leftCollapsed = (() => {
@@ -341,6 +345,231 @@
     return (n >= 1 && n <= 10) ? n : null;
   }
 
+  /* ────────────────────────────────────────────────────────
+     POST-PROCESS: Phát hiện Gemini gộp dòng GVNN lặp lại
+  ──────────────────────────────────────────────────────────
+   Gemini đôi khi bỏ qua quy tắc "mỗi lần xuất hiện = 1 entry riêng"
+   và gộp nhiều lần cùng học sinh/tiết thành 1 entry duy nhất.
+   Hàm này:
+   1. Quét raw text theo ngữ cảnh ngày/tiết đang chạy (carry-over)
+   2. Đếm số lần mỗi tên học sinh xuất hiện trong mỗi khoá (ngày, tiết)
+   3. So sánh với số entry AI trả về — nếu AI trả ít hơn, nhân bản thêm
+   Chỉ áp dụng cho GVNN (matched_rule = "Giáo Viên Nhắc Nhở").
+  ──────────────────────────────────────────────────────── */
+  /* ──────────────────────────────────────────────────────
+     POST-PROCESS: Tính lại điểm + chữ "Lần N" hiển thị GVNN
+     theo CẤP SỐ CỘNG
+  ──────────────────────────────────────────────────────────
+   Gemini luôn trả "score" theo điểm GỐC cố định (VD: -20 cho mọi dòng
+   GVNN) và "matched_rule" là tên quy định TĨNH (VD: "Giáo Viên Nhắc Nhở
+   - Lần 1" cho MỌI dòng, kể cả dòng thứ 2/3 cùng tiết) — vì bản thân AI
+   không biết đây là lần thứ mấy trong tiết, việc đếm đó hoàn toàn do
+   backend làm khi LƯU THẬT (xem addGvnnAction trong ok.js, gọi tuần tự
+   qua addGvnnEvent — điểm lưu vào DB luôn đúng luỹ tiến).
+   Nhưng nếu không tính lại ở đây, bảng XEM TRƯỚC (preview) sẽ hiển thị
+   SAI cả điểm lẫn chữ — mọi dòng GVNN cùng hiện "-20" và "Lần 1" dù là
+   lần thứ 2/3, khiến giáo viên tưởng nhầm là lỗi rồi mới áp dụng thì kết
+   quả thật lại khác → gây hoang mang, dù bản thân việc lưu điểm không hề
+   sai.
+   Hàm này CHỈ sửa "score" và "matched_rule" để HIỂN THỊ cho đúng —
+   KHÔNG ảnh hưởng gì tới luồng lưu thật (GVNN luôn dùng addGvnnEvent,
+   backend tự đếm lại từ DB, không phụ thuộc giá trị hiển thị ở đây).
+   Giới hạn: chỉ đếm được số lần XUẤT HIỆN TRONG PHIÊN PHÂN TÍCH NÀY
+   (theo đúng thứ tự trong mảng results, nhóm theo ngày+tiết+học sinh).
+   Nếu học sinh đó trong tuần đã có sẵn vài lần GVNN cùng tiết được lưu
+   từ trước (lần phân tích/áp dụng trước đó), preview ở đây sẽ không biết
+   để cộng dồn tiếp — điểm thật khi áp dụng vẫn đúng (backend đếm lại từ
+   DB), chỉ preview có thể thấp hơn số thật trong trường hợp hiếm này.
+  ──────────────────────────────────────────────────────── */
+  function _applyGvnnProgressiveScores(results) {
+    if (!results || !results.length) return results;
+    const GVNN_RULE = 'Giáo Viên Nhắc Nhở';
+    const GVNN_STEP = 20;
+    const _isGvnn = t => String(t || '').trim().startsWith(GVNN_RULE);
+
+    const occurrenceCount = {}; // key "day|tiet|student_id" -> số lần đã gặp
+    return results.map(r => {
+      if (!_isGvnn(r.matched_rule)) return r;
+      const key = `${r.day}|${r.tiet}|${r.student_id}`;
+      const occurrence = (occurrenceCount[key] || 0) + 1;
+      occurrenceCount[key] = occurrence;
+      // Ghi đè matched_rule tĩnh của Gemini bằng đúng số lần thực tế, để
+      // chữ hiển thị luôn khớp với điểm vừa tính lại (tránh trường hợp
+      // điểm đã đúng -20/-40 nhưng chữ vẫn lì "Lần 1" ở cả 2 dòng).
+      return { ...r, score: -(occurrence * GVNN_STEP), matched_rule: `${GVNN_RULE} - Lần ${occurrence}` };
+    });
+  }
+
+  function _fixGvnnMerge(results, rawText, students) {
+    // Nếu không có raw text (chế độ ảnh) hoặc không có kết quả → bỏ qua
+    if (!rawText || !results || !results.length) return results;
+
+    const GVNN_RULE = 'Giáo Viên Nhắc Nhở';
+    const _isGvnn   = t => String(t || '').trim().startsWith(GVNN_RULE);
+
+    // Chỉ xử lý các entry GVNN; nếu không có → trả luôn
+    const hasGvnn = results.some(r => _isGvnn(r.matched_rule));
+    if (!hasGvnn) return results;
+
+    // ─── Bước 1: Xây bảng chuẩn hoá tên học sinh ───────────────────────
+    // normKey: lowercase, bỏ dấu, bỏ khoảng trắng — để fuzzy-match
+    function _nk(s) {
+      return String(s || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd').replace(/\s+/g, '');
+    }
+    // Map normKey(tên) → student object
+    const studentByNorm = {};
+    (students || []).forEach(s => { studentByNorm[_nk(s.name)] = s; });
+
+    // ─── Bước 2: Quét raw text, đếm số lần mỗi (normKey(tên), day, tiet) xuất hiện ──
+    // Regex nhận diện: Thứ N, T2-T7, thứ hai/ba...
+    const DAY_PATTERNS = [
+      /thứ\s*([2-7])/i,
+      /t([2-7])\b/i,
+      /chủ\s*nhật|chu\s*nhat|^cn\s*:/i,
+    ];
+    const TIET_PATTERN = /tiết\s*(\d{1,2})/i;
+
+    // Bảng: key = "day|tiet|normStudentName" → count
+    const rawCounts = {};
+
+    const lines = rawText.split(/\r?\n/);
+    let curDay  = null; // ngày đang carry-over (số 2-7 hoặc 0)
+    let curTiet = null; // tiết đang carry-over (số 1-10)
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      // Cập nhật ngày nếu dòng này có Thứ mới
+      let dayFound = null;
+      for (const pat of DAY_PATTERNS) {
+        const m = line.match(pat);
+        if (m) {
+          if (/chủ|chu/i.test(m[0])) { dayFound = 0; }
+          else { dayFound = parseInt(m[1] || m[0].replace(/\D/g, ''), 10) || null; }
+          break;
+        }
+      }
+      if (dayFound !== null) curDay = dayFound;
+
+      // Cập nhật tiết nếu dòng này có Tiết mới
+      const tietMatch = line.match(TIET_PATTERN);
+      if (tietMatch) {
+        const tn = parseInt(tietMatch[1], 10);
+        if (tn >= 1 && tn <= 10) curTiet = tn;
+      }
+
+      if (curDay === null || curTiet === null) continue; // chưa đủ ngữ cảnh
+
+      // Tách phần nội dung sau "Thứ X:" và "Tiết Y:" và "Môn:" (nếu có)
+      // để lấy phần tên học sinh
+      let content = line
+        .replace(/thứ\s*[2-7]/i, '')
+        .replace(/t[2-7]\b/i, '')
+        .replace(/chủ\s*nhật|chu\s*nhat/i, '')
+        .replace(/tiết\s*\d{1,2}/i, '')
+        // bỏ tên môn học chuẩn
+        .replace(/\b(toán|vật\s*lí|vật\s*ly|hoá\s*học|hoa\s*hoc|hoá|hoa|sinh\s*học|sinh|tin\s*học|tin|ngữ\s*văn|van|lịch\s*sử|su|tiếng\s*anh|anh|quốc\s*phòng|qp|thể\s*dục|td|gdđp|tnhn|chào\s*cờ|cc|shl|lý)\b/gi, '')
+        .replace(/[:\-,;]+/g, ' ')
+        .trim();
+
+      if (!content) continue;
+
+      // Tách các token (tên học sinh có thể được liệt kê cách nhau bởi dấu phẩy/và)
+      const nameParts = content.split(/[,;&và]+/i).map(t => t.trim()).filter(Boolean);
+      for (const namePart of nameParts) {
+        const nk = _nk(namePart);
+        if (!nk || nk.length < 2) continue;
+
+        // Fuzzy: tìm học sinh có normKey bắt đầu bằng nk, hoặc nk chứa trong normKey
+        const matched = Object.keys(studentByNorm).find(k =>
+          k.startsWith(nk) || nk.startsWith(k) || (nk.length >= 4 && k.includes(nk))
+        );
+        if (!matched) continue;
+
+        const key = `${curDay}|${curTiet}|${matched}`;
+        rawCounts[key] = (rawCounts[key] || 0) + 1;
+      }
+    }
+
+    // ─── Bước 3: So sánh với AI results và nhân bản thiếu ───────────────
+    // Đếm số entry AI đã trả cho mỗi (day, tiet, normStudentName)
+    const aiCounts = {};
+    results.forEach(r => {
+      if (!_isGvnn(r.matched_rule)) return;
+      const nk = _nk(r.student_name);
+      if (!nk) return;
+      // Map sang normKey học sinh thực tế (có thể AI trả tên đầy đủ)
+      const matched = Object.keys(studentByNorm).find(k =>
+        k === nk || k.startsWith(nk) || nk.startsWith(k) || (nk.length >= 4 && k.includes(nk))
+      );
+      if (!matched) return;
+      const key = `${r.day}|${r.tiet}|${matched}`;
+      aiCounts[key] = (aiCounts[key] || 0) + 1;
+    });
+
+    // Nhân bản các entry thiếu
+    const additions = [];
+    for (const [key, rawCount] of Object.entries(rawCounts)) {
+      const aiCount = aiCounts[key] || 0;
+      if (rawCount <= aiCount) continue; // AI đã đủ hoặc nhiều hơn → OK
+
+      const [dayStr, tietStr, normName] = key.split('|');
+      const day  = parseInt(dayStr,  10);
+      const tiet = parseInt(tietStr, 10);
+      const stu  = studentByNorm[normName];
+      if (!stu) continue;
+
+      // Tìm 1 entry GVNN mẫu của cùng học sinh/tiết để clone
+      const template = results.find(r =>
+        _isGvnn(r.matched_rule) &&
+        r.day  === day  &&
+        r.tiet === tiet &&
+        _nk(r.student_name) === normName
+      ) || results.find(r =>
+        _isGvnn(r.matched_rule) &&
+        r.day === day &&
+        r.tiet === tiet &&
+        Object.keys(studentByNorm).find(k =>
+          (k.startsWith(_nk(r.student_name)) || _nk(r.student_name).startsWith(k)) &&
+          k === normName
+        )
+      );
+      if (!template) continue;
+
+      const missing = rawCount - aiCount;
+      for (let i = 0; i < missing; i++) {
+        additions.push({
+          ...template,
+          student_id:   stu.id,
+          student_name: stu.name,
+          _autoDuplicated: true, // flag để UI có thể highlight
+        });
+      }
+    }
+
+    if (!additions.length) return results;
+
+    // Chèn các bản sao sau entry gốc tương ứng (giữ nhóm ngày/tiết liền nhau)
+    const out = [...results];
+    for (const dup of additions) {
+      // Tìm vị trí entry gốc cuối cùng cùng (day, tiet, student) để chèn sau
+      let insertAfter = out.findLastIndex(r =>
+        r.day === dup.day &&
+        r.tiet === dup.tiet &&
+        r.student_id === dup.student_id &&
+        _isGvnn(r.matched_rule)
+      );
+      if (insertAfter === -1) insertAfter = out.length - 1;
+      out.splice(insertAfter + 1, 0, dup);
+    }
+
+    console.info(`[AI] _fixGvnnMerge: thêm ${additions.length} entry bị gộp nhầm (raw vs AI: ${JSON.stringify(rawCounts)} vs ${JSON.stringify(aiCounts)})`);
+    return out;
+  }
+
   async function _callGemini(text) {
     // Có key riêng do người dùng nhập → gọi thẳng Gemini bằng key đó.
     // Không có key riêng → gọi qua GAS proxy, dùng key dùng chung được
@@ -436,34 +665,52 @@ thành danh sách JSON. Áp dụng đúng các quy tắc sau:
    "lần 2", "lần 3"... — thì LUÔN hiểu đây là vi phạm "Giáo Viên Nhắc Nhở" (GVNN).
    Đặt "matched_rule" = "Giáo Viên Nhắc Nhở", "category" = "NE_NEP".
    Ngược lại, nếu sau tên có mô tả lỗi rõ ràng (VD: "ngủ trong giờ", "không ghi bài",
-   "nói chuyện"...) thì khớp với quy định chuẩn theo bước 4 bên dưới như bình thường.
+   "nói chuyện"...) thì khớp với quy định chuẩn theo bước 5 bên dưới như bình thường.
    Môn học đọc được trong dòng (VD: "Toán") ghi vào "subject" — kể cả với GVNN.
-4. ĐỐI CHIẾU QUY ĐỊNH CHUẨN: So khớp lỗi/thành tích trong văn bản với DANH SÁCH
+4. KHÔNG ĐƯỢC GỘP CÁC DÒNG LẶP LẠI — MỖI LẦN XUẤT HIỆN LÀ 1 ENTRY RIÊNG (cực kỳ
+   quan trọng với GVNN): Nếu cùng một học sinh, trong cùng một Thứ + Tiết, được
+   ghi nhắc tới NHIỀU LẦN trong văn bản gốc — kể cả khi các dòng đó GIỐNG HỆT
+   NHAU về nội dung (VD: "Thứ 2: Tiết 1: Hoá: Thục Anh" xuất hiện 2 dòng liên
+   tiếp), hoặc có đánh số "lần 1"/"lần 2"/"lần 3", hoặc chỉ là tên bị viết lặp
+   lại — thì đó là NHIỀU vi phạm riêng biệt trong cùng 1 tiết, PHẢI trả về ĐÚNG
+   SỐ LƯỢNG entry JSON tương ứng với số lần xuất hiện (VD: xuất hiện 2 lần →
+   trả 2 entry JSON giống nhau cho học sinh đó, KHÔNG được gộp lại thành 1).
+   TUYỆT ĐỐI KHÔNG tự ý coi các dòng trùng lặp là lỗi đánh máy/lặp ý rồi bỏ bớt
+   — điểm trừ GVNN được tính luỹ tiến theo đúng số lần vi phạm trong tiết
+   (lần 1 -20, lần 2 -40, lần 3 -60...), nên đếm thiếu 1 dòng là tính sai điểm.
+   BULLET/DÒNG CON THỤT LỀ CŨNG LÀ ENTRY RIÊNG: Nếu dưới một dòng "Tiết N: Môn: Tên"
+   có thêm một hoặc nhiều dòng con thụt lề vào trong (bullet cấp 2, gạch đầu dòng
+   phụ, hoặc chỉ lùi vào so với dòng cha) — dù nội dung dòng con KHÁC với dòng cha
+   (VD: dòng cha "Tiết 1: Hóa: Thúc Anh", dòng con thụt lề "Hoài: Thúc Anh") — vẫn
+   PHẢI hiểu đây là một vi phạm GVNN RIÊNG BIỆT thuộc cùng học sinh + cùng Tiết đó,
+   KHÔNG được coi dòng con là ghi chú/chú thích bổ sung cho dòng cha rồi gộp bỏ.
+   Mỗi cấp bullet (cha lẫn con) đều sinh ra 1 entry JSON độc lập.
+5. ĐỐI CHIẾU QUY ĐỊNH CHUẨN: So khớp lỗi/thành tích trong văn bản với DANH SÁCH
    QUY ĐỊNH CHUẨN ở trên để tìm quy định gần nghĩa nhất → lấy đúng "tên" của quy
    định đó làm "matched_rule" và lấy "điểm" tương ứng làm "score" mặc định.
-5. ƯU TIÊN ĐIỂM GHI RÕ: Nếu người dùng có ghi rõ số điểm trong ngoặc (VD: "(-50)"),
+6. ƯU TIÊN ĐIỂM GHI RÕ: Nếu người dùng có ghi rõ số điểm trong ngoặc (VD: "(-50)"),
    LUÔN ưu tiên lấy đúng số điểm đó làm "score" thay vì điểm mặc định của quy định
-   đã khớp ở bước 4 (nhưng vẫn giữ "matched_rule" là tên quy định gần nhất).
-6. LOẠI ĐÁNH GIÁ: Lấy đúng "loai" (category) của quy định đã khớp ở bước 4 làm giá
+   đã khớp ở bước 5 (nhưng vẫn giữ "matched_rule" là tên quy định gần nhất).
+7. LOẠI ĐÁNH GIÁ: Lấy đúng "loai" (category) của quy định đã khớp ở bước 5 làm giá
    trị "category" của dòng đó. Nếu không khớp được quy định chuẩn nào, tự suy luận
    loại hợp lý nhất theo ngữ cảnh nội dung (mặc định NE_NEP nếu không rõ).
-7. MÔN HỌC: Nếu vi phạm/thành tích liên quan đến một môn học cụ thể (thường thuộc
+8. MÔN HỌC: Nếu vi phạm/thành tích liên quan đến một môn học cụ thể (thường thuộc
    loại HOC_TAP), nhận diện và chuẩn hóa sang tên môn học chính thức trong danh sách
    ở trên, ghi vào trường "subject". Nếu không liên quan đến môn học nào (ví dụ: vi
    phạm nề nếp chung, vắng chào cờ…) thì "subject" = null.
-8. FUZZY MATCHING TÊN: Khớp tên viết tắt, nickname, họ đơn trong văn bản với tên
+9. FUZZY MATCHING TÊN: Khớp tên viết tắt, nickname, họ đơn trong văn bản với tên
    đầy đủ trong DANH SÁCH HỌC SINH.
-9. UNKNOWN: Nếu không khớp được học sinh nào → student_id = "UNKNOWN",
+10. UNKNOWN: Nếu không khớp được học sinh nào → student_id = "UNKNOWN",
    student_name = tên xuất hiện y nguyên trong văn bản.
-10. XỬ LÝ LỖI TẬP THỂ:
+11. XỬ LÝ LỖI TẬP THỂ:
    - "Tổ N" / "Cả tổ N" → nhân bản lỗi/thưởng đó cho TẤT CẢ học sinh thuộc Tổ N
      trong danh sách phân tổ ở trên, mỗi học sinh một entry riêng.
    - "Cả lớp" / "Tất cả" / "Toàn lớp" → nhân bản cho TẤT CẢ học sinh trong danh sách.
    - Có cụm "mỗi người" / "mỗi em" → áp dụng điểm riêng cho từng cá nhân (KHÔNG
      nhân điểm lên theo số người).
-11. GIỚI HẠN PHẠM VI (bắt buộc): Chỉ trả kết quả cho học sinh CÓ TÊN trong danh
+12. GIỚI HẠN PHẠM VI (bắt buộc): Chỉ trả kết quả cho học sinh CÓ TÊN trong danh
    sách được cấp ở trên. Bỏ qua hoàn toàn tên học sinh KHÔNG thuộc danh sách này.
-12. OUTPUT: Chỉ trả về JSON thuần, KHÔNG có markdown, KHÔNG có backtick, KHÔNG
+13. OUTPUT: Chỉ trả về JSON thuần, KHÔNG có markdown, KHÔNG có backtick, KHÔNG
    giải thích gì thêm ngoài JSON. Trường "tiet" LUÔN phải xuất hiện ở mỗi phần tử —
    là số nguyên nếu đọc được, hoặc null nếu không đọc được (không được bỏ trường này).
 
@@ -571,6 +818,195 @@ MẪU KẾT QUẢ JSON TRẢ VỀ:
     );
   }
 
+  /**
+   * Gọi Gemini với đầu vào là ảnh (inline_data base64).
+   * Dùng cùng system prompt và waterfall model như _callGemini,
+   * nhưng contents chứa thêm phần image part.
+   */
+  async function _callGeminiWithImage(imgData) {
+    const usingOwnKey = !_isUsingDefaultKey();
+    const key = usingOwnKey ? _apiKey() : null;
+
+    // Xây dựng danh sách học sinh y hệt _callGemini
+    const allStudents = _students();
+    const user = _currentUser();
+    let targetStudents;
+    if (user.role === 'to_truong' && user.group) {
+      const grp = String(user.group);
+      targetStudents = allStudents.filter(s => {
+        const sg = String(s.group || s.to || s.nhom || s.to_nhom || '');
+        return sg === grp;
+      });
+      if (!targetStudents.length) targetStudents = allStudents;
+    } else {
+      targetStudents = allStudents;
+    }
+    const nameList = targetStudents.map(s => `${s.id}:::${s.name}`).join('\n');
+    const { description: groupDesc } = _buildGroupStructure(targetStudents);
+
+    let rulesRaw = [];
+    try { rulesRaw = await _sb().fetchRulesFromGas(); } catch { rulesRaw = []; }
+    const rulesDesc = _buildRulesCatalog(rulesRaw);
+    const subjectsList = SUBJECTS.join(', ');
+
+    // System prompt giống _callGemini, chỉ thay phần NHIỆM VỤ để nhận ảnh
+    const systemInstruction = `Bạn là trợ lý tự động phân tích và chấm điểm nề nếp cho lớp A3K64.
+
+═══════════════════════════════════════
+DANH SÁCH HỌC SINH ĐƯỢC PHÉP CHẤM (phân theo Tổ, định dạng ID:::Họ tên)
+═══════════════════════════════════════
+${groupDesc}
+
+═══════════════════════════════════════
+DANH SÁCH ĐẦY ĐỦ (để fuzzy-match tên viết tắt/nickname)
+═══════════════════════════════════════
+${nameList}
+
+═══════════════════════════════════════
+DANH SÁCH QUY ĐỊNH LỖI/THƯỞNG CHUẨN (SHEET VI_PHAM — định dạng id:::tên:::điểm:::loại)
+loai chỉ nhận 1 trong 3 giá trị: NE_NEP (nề nếp), HOC_TAP (học tập), PHONG_TRAO (phong trào).
+═══════════════════════════════════════
+${rulesDesc}
+
+═══════════════════════════════════════
+DANH SÁCH MÔN HỌC CHÍNH THỨC
+═══════════════════════════════════════
+${subjectsList}
+
+Quy đổi tên viết tắt/tên gọi tắt thường gặp sang tên chuẩn:
+- "sinh", "môn sinh", "Sinh" → "Sinh Học"
+- "lý", "môn lý", "LÝ", "vật lý" → "Vật Lí"
+- "văn", "ngữ văn" → "Ngữ Văn"
+- "sử", "lịch sử" → "Lịch Sử"
+- "hóa", "hoá", "môn hóa" → "Hoá Học"
+- "toán", "môn toán" → "Toán"
+- "tin", "tin học" → "Tin Học"
+- "anh", "tiếng anh", "e" → "Tiếng Anh"
+- "td", "thể dục" → "Thể Dục"
+- "qp", "quốc phòng" → "Quốc Phòng"
+- "gdđp", "địa phương" → "GDĐP"
+- "tnhn", "trải nghiệm" → "TNHN"
+- "chào cờ", "cc" → "Chào Cờ"
+- "shl", "sinh hoạt lớp" → "SHL"
+
+═══════════════════════════════════════
+NHIỆM VỤ
+═══════════════════════════════════════
+Đọc nội dung từ ẢNH được gửi kèm (có thể là ảnh chụp màn hình chat, ảnh chụp tờ giấy, bảng chấm điểm tay viết, v.v.) và bóc tách thành danh sách JSON điểm nề nếp. Áp dụng đúng các quy tắc sau:
+
+1. NHẬN DẠNG VĂN BẢN TỪ ẢNH: Đọc toàn bộ văn bản có trong ảnh, bao gồm chữ in, chữ viết tay, nội dung chat, bảng biểu.
+2. NGÀY: Đọc Thứ được nhắc tới ngay trước mỗi đoạn nội dung. Nếu một dòng không nhắc lại Thứ mới, dùng lại Thứ gần nhất đã đọc được ở phía trên.
+3. TIẾT: Đọc số Tiết được nhắc ngay sau Thứ. Nếu không tìm được Tiết nào áp dụng, đặt "tiet": null. Không tự suy đoán số Tiết.
+4. MẶC ĐỊNH GVNN: Nếu một dòng có định dạng "Thứ : Môn : Tên" mà KHÔNG ghi kèm lỗi cụ thể — LUÔN hiểu là vi phạm "Giáo Viên Nhắc Nhở" (GVNN). Đặt "matched_rule" = "Giáo Viên Nhắc Nhở", "category" = "NE_NEP".
+5. KHÔNG ĐƯỢC GỘP CÁC DÒNG LẶP LẠI — MỖI LẦN XUẤT HIỆN LÀ 1 ENTRY RIÊNG (cực kỳ quan trọng với GVNN): Nếu cùng một học sinh, trong cùng một Thứ + Tiết, xuất hiện NHIỀU dòng trong ảnh — kể cả khi các dòng đó GIỐNG HỆT NHAU (VD: 2 dòng viết tay liên tiếp đều là "Tiết 1: Hoá: Thục Anh"), hoặc có đánh số "lần 1"/"lần 2" — thì đó là NHIỀU vi phạm riêng biệt, PHẢI trả về ĐÚNG SỐ LƯỢNG entry JSON tương ứng với số lần xuất hiện trong ảnh (KHÔNG gộp các dòng trùng lặp thành 1 entry). Điểm trừ GVNN tính luỹ tiến theo đúng số lần vi phạm trong tiết (lần 1 -20, lần 2 -40, lần 3 -60...), nên bỏ sót 1 dòng là tính sai điểm.
+5b. BULLET/DÒNG CON THỤT LỀ TRONG ẢNH CŨNG LÀ ENTRY RIÊNG: Nếu trong ảnh, dưới một dòng "Tiết N: Môn: Tên" có thêm một hoặc nhiều dòng con được thụt lề/lùi vào so với dòng cha (bullet cấp 2, gạch đầu dòng phụ, hoặc chỉ căn lề vào trong hơn) — dù nội dung dòng con KHÁC với dòng cha (VD: dòng cha "Tiết 1: Hóa: Thúc Anh", dòng con thụt lề "Hoài: Thúc Anh") — vẫn PHẢI hiểu đây là một vi phạm GVNN RIÊNG BIỆT của cùng học sinh, cùng Thứ + Tiết đó. TUYỆT ĐỐI KHÔNG được coi dòng con thụt lề là ghi chú/chú thích/bổ sung của dòng cha rồi bỏ qua không tạo entry cho nó — mỗi cấp bullet (cả dòng cha lẫn dòng con) đều phải sinh ra 1 entry JSON độc lập.
+6. ĐỐI CHIẾU QUY ĐỊNH CHUẨN: So khớp lỗi/thành tích với DANH SÁCH QUY ĐỊNH CHUẨN để tìm quy định gần nghĩa nhất.
+7. ƯU TIÊN ĐIỂM GHI RÕ: Nếu người dùng ghi rõ số điểm trong ngoặc (VD: "(-50)"), LUÔN ưu tiên lấy đúng số điểm đó.
+8. LOẠI ĐÁNH GIÁ: Lấy đúng "loai" của quy định đã khớp. Nếu không khớp, tự suy luận loại hợp lý (mặc định NE_NEP).
+9. MÔN HỌC: Nhận diện môn học liên quan, chuẩn hóa sang tên chính thức. Nếu không liên quan môn học → "subject": null.
+10. FUZZY MATCHING TÊN: Khớp tên viết tắt, nickname với tên đầy đủ trong DANH SÁCH HỌC SINH.
+11. UNKNOWN: Nếu không khớp được học sinh nào → student_id = "UNKNOWN", student_name = tên trong ảnh.
+12. XỬ LÝ LỖI TẬP THỂ: "Tổ N" / "Cả tổ N" → nhân bản cho TẤT CẢ học sinh Tổ N. "Cả lớp" / "Tất cả" → nhân bản cho TẤT CẢ.
+13. GIỚI HẠN PHẠM VI: Chỉ trả kết quả cho học sinh CÓ TÊN trong danh sách được cấp.
+14. OUTPUT: Chỉ trả về JSON thuần, KHÔNG có markdown, KHÔNG có backtick, KHÔNG giải thích gì thêm ngoài JSON.
+
+MẪU KẾT QUẢ JSON TRẢ VỀ:
+[
+  {
+    "student_id": "vi-kim-na",
+    "student_name": "Vi Kim Na",
+    "day": "Thứ 3",
+    "tiet": 2,
+    "reason": "Không ghi bài môn Sinh",
+    "matched_rule": "Không ghi bài",
+    "category": "HOC_TAP",
+    "subject": "Sinh Học",
+    "score": -100
+  }
+]`;
+
+    const body = {
+      system_instruction: { parts: [{ text: systemInstruction }] },
+      contents: [{
+        parts: [
+          {
+            inline_data: {
+              mime_type: imgData.mimeType,
+              data: imgData.base64,
+            },
+          },
+          { text: 'Hãy đọc ảnh trên và trả về JSON danh sách điểm theo đúng định dạng đã mô tả.' },
+        ],
+      }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.1,
+        maxOutputTokens: 2048,
+      },
+    };
+
+    // Waterfall model — ưu tiên model vision (multimodal)
+    // Tất cả Gemini Flash/Pro đều hỗ trợ vision, dùng lại AI_MODEL_FALLBACKS
+    let lastError = null;
+    for (const model of AI_MODEL_FALLBACKS) {
+      try {
+        let data;
+        if (usingOwnKey) {
+          const endpoint = `${AI_BASE_URL}/${model}:generateContent?key=${encodeURIComponent(key)}`;
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) {
+            const errJson = await res.json().catch(() => ({}));
+            const errMsg  = errJson?.error?.message || `HTTP ${res.status}`;
+            const isQuota = res.status === 429 || /quota|rate.?limit|resource.?exhaust/i.test(errMsg);
+            const isGone  = res.status === 404 || /no longer available|not found|deprecated/i.test(errMsg);
+            if (isQuota || isGone) {
+              lastError = new Error(`[${model}] ${isGone ? 'model không còn tồn tại' : 'quota hết'}`);
+              console.warn(`[AI-Image] ${model} ${isGone ? 'không còn tồn tại' : 'bị quota'}, thử model tiếp theo…`);
+              continue;
+            }
+            throw new Error(`Gemini lỗi (${model}): ${errMsg}`);
+          }
+          data = await res.json();
+        } else {
+          try {
+            data = await _callGeminiViaProxy(model, body);
+          } catch (proxyErr) {
+            const errMsg  = proxyErr?.message || 'Lỗi proxy';
+            const isQuota = /quota|rate.?limit|resource.?exhaust|429/i.test(errMsg);
+            const isGone  = /no longer available|not found|deprecated|404/i.test(errMsg);
+            if (isQuota || isGone) {
+              lastError = new Error(`[${model}] ${isGone ? 'model không còn tồn tại' : 'quota hết'}`);
+              console.warn(`[AI-Image] ${model} ${isGone ? 'không còn tồn tại' : 'bị quota'}, thử model tiếp theo…`);
+              continue;
+            }
+            throw new Error(`Gemini lỗi (${model}): ${errMsg}`);
+          }
+        }
+
+        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+        try {
+          const parsed = JSON.parse(raw.trim());
+          if (!Array.isArray(parsed)) throw new Error('Không phải array');
+          console.info(`[AI-Image] Dùng model: ${model}`);
+          return parsed;
+        } catch {
+          throw new Error(`Gemini (${model}) trả về dữ liệu không hợp lệ. Thử lại hoặc dùng ảnh rõ hơn.`);
+        }
+      } catch (err) {
+        if (!err.message.startsWith(`[${model}] quota`)) throw err;
+        lastError = err;
+      }
+    }
+
+    throw new Error(
+      `Tất cả ${AI_MODEL_FALLBACKS.length} model đều hết quota. Vui lòng thử lại sau vài phút hoặc dùng API key khác.\n(${lastError?.message})`
+    );
+  }
+
   /* ────────────────────────────────────────────────────────
      OPEN / CLOSE
   ──────────────────────────────────────────────────────── */
@@ -581,6 +1017,8 @@ MẪU KẾT QUẢ JSON TRẢ VỀ:
     _results      = [];
     _rawText      = '';
     _errorMsg     = '';
+    _inputMode    = 'text';
+    _imageData    = null;
     _mobActiveTab = 'input'; // luôn bắt đầu từ tab nhập liệu
     _mount();
   }
@@ -591,10 +1029,38 @@ MẪU KẾT QUẢ JSON TRẢ VỀ:
     const root = _root();
     if (root) root.innerHTML = '';
     document.removeEventListener('keydown', _onKey);
+    document.removeEventListener('paste', _onPaste);
   }
 
   function _onKey(e) {
     if (e.key === 'Escape' && _open) _close();
+  }
+
+  /**
+   * Ctrl+V / Cmd+V dán ảnh trực tiếp (chụp màn hình, copy ảnh từ nơi khác…)
+   * vào modal — không cần lưu file ra ổ đĩa rồi mới chọn.
+   * Bỏ qua nếu clipboard không chứa ảnh (để không phá hành vi dán text
+   * bình thường khi đang gõ trong ô văn bản).
+   */
+  function _onPaste(e) {
+    if (!_open) return;
+    const items = e.clipboardData?.items;
+    if (!items || !items.length) return;
+    let imageFile = null;
+    for (const item of items) {
+      if (item.kind === 'file' && item.type?.startsWith('image/')) {
+        imageFile = item.getAsFile();
+        break;
+      }
+    }
+    if (!imageFile) return; // không có ảnh trong clipboard → giữ hành vi paste mặc định
+    e.preventDefault();
+    if (_inputMode !== 'image') _switchInputMode('image');
+    // File dán từ clipboard thường không có tên thật — đặt tên dễ nhận biết
+    const named = imageFile.name && imageFile.name !== 'image.png'
+      ? imageFile
+      : new File([imageFile], `paste_${Date.now()}.${(imageFile.type.split('/')[1] || 'png')}`, { type: imageFile.type });
+    _loadImageFile(named);
   }
 
   /* ────────────────────────────────────────────────────────
@@ -606,6 +1072,7 @@ MẪU KẾT QUẢ JSON TRẢ VỀ:
     root.innerHTML = _buildHTML();
     _bindEvents();
     document.addEventListener('keydown', _onKey);
+    document.addEventListener('paste', _onPaste);
     // Áp dụng trạng thái tab ngay sau khi render:
     // ai-right phải có mob-hidden lúc đầu (tab "input" đang active)
     _mobSwitchTab(_mobActiveTab);
@@ -628,7 +1095,7 @@ MẪU KẾT QUẢ JSON TRẢ VỀ:
         </div>
         <div>
           <div class="ai-header-title">Tự tính điểm <span class="ai-badge">AI</span></div>
-          <div class="ai-header-sub">Dán văn bản báo lỗi → Gemini tự bóc tách tên & điểm</div>
+          <div class="ai-header-sub">Dán văn bản hoặc chụp ảnh báo lỗi → Gemini tự bóc tách tên & điểm</div>
         </div>
       </div>
       <button type="button" class="ai-close-btn" id="ai-close-btn" title="Đóng (Esc)">
@@ -665,11 +1132,20 @@ MẪU KẾT QUẢ JSON TRẢ VỀ:
           </select>
         </div>
 
-        <div class="ai-section">
-          <label class="ai-section-label" for="ai-textarea">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            Văn bản báo lỗi / thưởng
-          </label>
+        <!-- Input mode switcher -->
+        <div class="ai-input-mode-bar">
+          <button type="button" class="ai-mode-tab${_inputMode === 'text' ? ' active' : ''}" id="ai-mode-tab-text" data-mode="text">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Văn bản
+          </button>
+          <button type="button" class="ai-mode-tab${_inputMode === 'image' ? ' active' : ''}" id="ai-mode-tab-image" data-mode="image">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            Hình ảnh
+          </button>
+        </div>
+
+        <!-- Panel: Văn bản -->
+        <div class="ai-section ai-input-panel-text${_inputMode !== 'text' ? ' ai-input-panel-hidden' : ''}">
           <textarea id="ai-textarea" class="ai-textarea"
             placeholder="Ví dụ:
 Tiến sử dụng điện thoại trừ 600
@@ -680,6 +1156,28 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
           <div class="ai-input-actions">
             <span class="ai-char-count" id="ai-char-count">${_rawText.length} ký tự</span>
             <button type="button" class="ai-clear-btn" id="ai-clear-textarea" title="Xoá nội dung">Xoá</button>
+          </div>
+        </div>
+
+        <!-- Panel: Hình ảnh -->
+        <div class="ai-section ai-input-panel-image${_inputMode !== 'image' ? ' ai-input-panel-hidden' : ''}">
+          <div class="ai-image-drop-zone" id="ai-image-drop-zone" tabindex="0" role="button" aria-label="Chọn hoặc kéo thả ảnh vào đây">
+            ${_imageData
+              ? `<div class="ai-image-preview-wrap">
+                   <img class="ai-image-preview" id="ai-image-preview-img" src="data:${_imageData.mimeType};base64,${_imageData.base64}" alt="Ảnh đã chọn"/>
+                   <div class="ai-image-preview-name">${_esc(_imageData.name)}</div>
+                 </div>`
+              : `<div class="ai-image-drop-placeholder">
+                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="38" height="38" opacity=".35"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                   <span>Kéo thả ảnh vào đây<br/>hoặc <strong>bấm để chọn file</strong><br/>hoặc dán bằng <strong>Ctrl+V</strong></span>
+                   <span class="ai-image-drop-hint">PNG, JPG, WEBP · tối đa 10 MB</span>
+                 </div>`
+            }
+          </div>
+          <input type="file" id="ai-image-file-input" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" aria-hidden="true"/>
+          <div class="ai-input-actions">
+            <span class="ai-char-count" id="ai-image-status">${_imageData ? _imageData.name : 'Chưa có ảnh'}</span>
+            <button type="button" class="ai-clear-btn" id="ai-clear-image" title="Xoá ảnh"${!_imageData ? ' disabled style="opacity:.4;cursor:not-allowed"' : ''}>Xoá</button>
           </div>
         </div>
 
@@ -849,6 +1347,7 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
     const rows = _results.map((r, i) => {
       const unmatched = r.student_id === 'UNKNOWN' || !r.student_id;
       const missingTiet = r.tiet === null || r.tiet === undefined || r.tiet === '';
+      const autoDup = !!r._autoDuplicated;
       const scoreClass = Number(r.score) >= 0 ? 'pos' : 'neg';
       const selectOpts = students.map(s =>
         `<option value="${_esc(s.id)}" ${s.id === r.student_id ? 'selected' : ''}>${_esc(s.name)}</option>`
@@ -867,7 +1366,7 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
       const contentValue = r.matched_rule || r.reason || '';
       const showSubReason = r.matched_rule && r.reason && r.reason !== r.matched_rule;
 
-      return `<tr class="ai-row${unmatched ? ' unmatched' : ''}${missingTiet ? ' missing-tiet' : ''}" data-idx="${i}">
+      return `<tr class="ai-row${unmatched ? ' unmatched' : ''}${missingTiet ? ' missing-tiet' : ''}${autoDup ? ' auto-dup' : ''}" data-idx="${i}">
         <td class="ai-td ai-td-day">
           <select class="ai-day-badge" data-idx="${i}" data-field="day" title="Sửa Thứ nếu AI đọc sai">${dayOpts}</select>
         </td>
@@ -875,22 +1374,17 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
           <select class="ai-tiet-badge${missingTiet ? ' missing' : ''}" data-idx="${i}" data-field="tiet" title="${missingTiet ? 'AI không đọc được Tiết — vui lòng chọn thủ công' : 'Sửa Tiết nếu AI đọc sai'}">${tietOpts}</select>
         </td>
         <td class="ai-td ai-td-student">
-          ${unmatched
-            ? `<div class="ai-unmatched-wrap">
-                <span class="ai-unmatched-badge" title="AI không khớp được tên này">?</span>
-                <select class="ai-student-select" data-idx="${i}" data-field="student_id">
-                  <option value="UNKNOWN">— Chọn học sinh —</option>
-                  ${selectOpts}
-                </select>
-               </div>`
-            : `<div class="ai-student-cell">
-                <span class="ai-student-avatar">${(students.find(s=>s.id===r.student_id)?.avatarInitial || r.student_name?.[0] || '?').toUpperCase()}</span>
-                <div>
-                  <div class="ai-student-name">${_esc(r.student_name)}</div>
-                  ${r.student_id !== 'UNKNOWN' ? `<div class="ai-student-id">ID: ${_esc(r.student_id)}</div>` : ''}
-                </div>
-               </div>`
-          }
+          <div class="ai-student-cell">
+            ${unmatched
+              ? `<span class="ai-unmatched-badge" title="AI không khớp được tên này">?</span>`
+              : `<span class="ai-student-avatar">${(students.find(s=>s.id===r.student_id)?.avatarInitial || r.student_name?.[0] || '?').toUpperCase()}</span>`
+            }
+            <select class="ai-student-select${unmatched ? '' : ' matched'}" data-idx="${i}" data-field="student_id"
+              title="AI đã khớp tên &quot;${_esc(r.student_name)}&quot; — bấm để sửa lại nếu khớp nhầm (VD: trùng tên với học sinh khác)">
+              <option value="UNKNOWN" ${unmatched ? 'selected' : ''}>— Chọn học sinh —</option>
+              ${selectOpts}
+            </select>
+          </div>
         </td>
         <td class="ai-td ai-td-category">
           <select class="ai-category-badge cat-${categoryCssKey(r.category)}" data-idx="${i}" data-field="category" title="Sửa loại nếu AI đọc sai">${categoryOpts}</select>
@@ -918,10 +1412,15 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
       </tr>`;
     }).join('');
 
-    const unmatchedCount = _results.filter(r => r.student_id === 'UNKNOWN').length;
+    const unmatchedCount  = _results.filter(r => r.student_id === 'UNKNOWN').length;
     const missingTietCount = _results.filter(r => r.tiet === null || r.tiet === undefined || r.tiet === '').length;
+    const autoDupCount    = _results.filter(r => r._autoDuplicated).length;
 
     return `
+      ${autoDupCount ? `<div class="ai-unmatched-warn" style="background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.35);color:#a5b4fc;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Phát hiện <strong>${autoDupCount} dòng GVNN</strong> bị AI gộp nhầm — đã tự động khôi phục. Kiểm tra lại số lần vi phạm trước khi áp dụng.
+      </div>` : ''}
       ${unmatchedCount ? `<div class="ai-unmatched-warn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         <strong>${unmatchedCount} dòng</strong> chưa khớp tên — hãy chọn thủ công trước khi áp dụng.
@@ -989,6 +1488,10 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
       }
     });
 
+    // Input mode switcher
+    root.querySelector('#ai-mode-tab-text')?.addEventListener('click', () => _switchInputMode('text'));
+    root.querySelector('#ai-mode-tab-image')?.addEventListener('click', () => _switchInputMode('image'));
+
     // Textarea
     const ta = root.querySelector('#ai-textarea');
     if (ta) {
@@ -1003,6 +1506,32 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
       if (ta) ta.value = '';
       const cnt = root.querySelector('#ai-char-count');
       if (cnt) cnt.textContent = '0 ký tự';
+    });
+
+    // Image upload — click vào drop zone
+    const dropZone = root.querySelector('#ai-image-drop-zone');
+    const fileInput = root.querySelector('#ai-image-file-input');
+    if (dropZone && fileInput) {
+      dropZone.addEventListener('click', () => fileInput.click());
+      dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+      // Drag & drop
+      dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+      dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+      dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const file = e.dataTransfer?.files?.[0];
+        if (file) _loadImageFile(file);
+      });
+      fileInput.addEventListener('change', () => {
+        const file = fileInput.files?.[0];
+        if (file) _loadImageFile(file);
+        fileInput.value = ''; // reset để chọn lại cùng file nếu cần
+      });
+    }
+    root.querySelector('#ai-clear-image')?.addEventListener('click', () => {
+      _imageData = null;
+      _refreshInputPanel();
     });
 
     // API key — save
@@ -1093,6 +1622,12 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
       const students = _students();
       const found = students.find(s => s.id === val);
       if (found) _results[idx].student_name = found.name;
+      // Đổi học sinh có thể làm thay đổi nhóm (ngày+tiết+học sinh) dùng để
+      // đếm "Lần N" của GVNN — tính lại để điểm/chữ luôn khớp đúng học sinh
+      // mới chọn (VD: dòng vừa đổi từ "Nguyễn Thành Đạt" sang "Nguyễn Huy
+      // Thành Đạt" phải tính lại xem đây là lần thứ mấy của CHÍNH học sinh
+      // "Nguyễn Huy Thành Đạt" trong tiết đó, không phải của người kia).
+      _results = _applyGvnnProgressiveScores(_results);
       _refreshPreview();
     }
     if (field === 'day') {
@@ -1132,6 +1667,86 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
   }
 
   /* ────────────────────────────────────────────────────────
+     IMAGE INPUT HELPERS
+  ──────────────────────────────────────────────────────── */
+
+  /** Chuyển chế độ nhập liệu text ↔ image, cập nhật DOM không re-render toàn bộ */
+  function _switchInputMode(mode) {
+    if (_inputMode === mode) return;
+    _inputMode = mode;
+    const root = _root();
+    if (!root) return;
+    // Cập nhật tab buttons
+    root.querySelector('#ai-mode-tab-text')?.classList.toggle('active', mode === 'text');
+    root.querySelector('#ai-mode-tab-image')?.classList.toggle('active', mode === 'image');
+    // Cập nhật panel hiển thị
+    root.querySelector('.ai-input-panel-text')?.classList.toggle('ai-input-panel-hidden', mode !== 'text');
+    root.querySelector('.ai-input-panel-image')?.classList.toggle('ai-input-panel-hidden', mode !== 'image');
+    // Focus textarea khi chuyển về text
+    if (mode === 'text') setTimeout(() => root.querySelector('#ai-textarea')?.focus(), 60);
+  }
+
+  /**
+   * Đọc File ảnh → base64, lưu vào _imageData, cập nhật UI.
+   * Chỉ chấp nhận PNG/JPG/WEBP/GIF, tối đa 10 MB.
+   */
+  function _loadImageFile(file) {
+    const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+    const MAX_SIZE_MB = 10;
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      _errorMsg = `Định dạng ảnh không hỗ trợ: ${file.type}. Chỉ chấp nhận PNG, JPG, WEBP, GIF.`;
+      _refreshAll();
+      return;
+    }
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      _errorMsg = `Ảnh quá lớn (${(file.size / 1024 / 1024).toFixed(1)} MB). Tối đa ${MAX_SIZE_MB} MB.`;
+      _refreshAll();
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      // e.target.result là "data:image/png;base64,xxxx"
+      const dataUrl = e.target.result;
+      const base64  = dataUrl.split(',')[1];
+      _imageData    = { base64, mimeType: file.type, name: file.name };
+      _errorMsg     = '';
+      _refreshInputPanel();
+    };
+    reader.onerror = () => {
+      _errorMsg = 'Không đọc được file ảnh. Thử lại với file khác.';
+      _refreshAll();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /** Refresh chỉ khu vực image panel (drop zone + status) mà không re-render modal */
+  function _refreshInputPanel() {
+    const root = _root();
+    if (!root) return;
+    const dropZone = root.querySelector('#ai-image-drop-zone');
+    const statusEl = root.querySelector('#ai-image-status');
+    const clearBtn = root.querySelector('#ai-clear-image');
+    if (dropZone) {
+      dropZone.innerHTML = _imageData
+        ? `<div class="ai-image-preview-wrap">
+             <img class="ai-image-preview" id="ai-image-preview-img" src="data:${_imageData.mimeType};base64,${_imageData.base64}" alt="Ảnh đã chọn"/>
+             <div class="ai-image-preview-name">${_esc(_imageData.name)}</div>
+           </div>`
+        : `<div class="ai-image-drop-placeholder">
+             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="38" height="38" opacity=".35"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+             <span>Kéo thả ảnh vào đây<br/>hoặc <strong>bấm để chọn file</strong><br/>hoặc dán bằng <strong>Ctrl+V</strong></span>
+             <span class="ai-image-drop-hint">PNG, JPG, WEBP · tối đa 10 MB</span>
+           </div>`;
+    }
+    if (statusEl) statusEl.textContent = _imageData ? _imageData.name : 'Chưa có ảnh';
+    if (clearBtn) {
+      clearBtn.disabled = !_imageData;
+      clearBtn.style.opacity = _imageData ? '' : '0.4';
+      clearBtn.style.cursor  = _imageData ? '' : 'not-allowed';
+    }
+  }
+
+  /* ────────────────────────────────────────────────────────
      RUN ANALYSIS
   ──────────────────────────────────────────────────────── */
   async function _runAnalysis() {
@@ -1142,14 +1757,25 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
       return;
     }
     const root = _root();
-    const ta = root?.querySelector('#ai-textarea');
-    const text = ta?.value?.trim() || _rawText.trim();
-    if (!text) {
-      _errorMsg = 'Vui lòng nhập văn bản trước khi phân tích.';
-      _refreshAll();
-      return;
+
+    // Validate theo mode
+    if (_inputMode === 'image') {
+      if (!_imageData) {
+        _errorMsg = 'Vui lòng chọn hoặc kéo thả một ảnh trước khi phân tích.';
+        _refreshAll();
+        return;
+      }
+    } else {
+      const ta = root?.querySelector('#ai-textarea');
+      const text = ta?.value?.trim() || _rawText.trim();
+      if (!text) {
+        _errorMsg = 'Vui lòng nhập văn bản trước khi phân tích.';
+        _refreshAll();
+        return;
+      }
+      _rawText = text;
     }
-    _rawText = text;
+
     _loading  = true;
     _errorMsg = '';
     _results  = [];
@@ -1157,7 +1783,9 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
     _refreshLoading();
 
     try {
-      const parsed = await _callGemini(text);
+      const parsed = _inputMode === 'image'
+        ? await _callGeminiWithImage(_imageData)
+        : await _callGemini(_rawText);
       _results = parsed.map(item => ({
         student_id:   item.student_id || 'UNKNOWN',
         student_name: item.student_name || '',
@@ -1169,6 +1797,17 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
         subject:      item.subject || null,
         score:        Number(item.score) || 0,
       }));
+      // Post-process: phát hiện và khôi phục các dòng GVNN bị Gemini gộp nhầm.
+      // Chỉ chạy với chế độ văn bản (có _rawText để đối chiếu);
+      // chế độ ảnh không có raw text nên bỏ qua.
+      if (_inputMode === 'text' && _rawText) {
+        _results = _fixGvnnMerge(_results, _rawText, _students());
+      }
+      // Tính lại "score" + "matched_rule" hiển thị cho các dòng GVNN theo
+      // cấp số cộng (lần 1 -20, lần 2 -40...) — áp dụng cho cả 2 chế độ
+      // văn bản/ảnh, chạy SAU _fixGvnnMerge để các dòng vừa được nhân bản
+      // bù thiếu cũng được tính đúng thứ tự.
+      _results = _applyGvnnProgressiveScores(_results);
       _errorMsg = '';
     } catch (err) {
       _errorMsg = err.message || 'Lỗi không xác định.';
@@ -1780,6 +2419,8 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
 .ai-row.unmatched:hover { background: rgba(249,115,22,.12); }
 .ai-row.missing-tiet { background: rgba(249,115,22,.06); }
 .ai-row.missing-tiet:hover { background: rgba(249,115,22,.12); }
+.ai-row.auto-dup { background: rgba(99,102,241,.07); }
+.ai-row.auto-dup:hover { background: rgba(99,102,241,.13); }
 
 .ai-td-day { text-align: center; }
 .ai-day-badge {
@@ -1855,6 +2496,14 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
   background: rgba(249,115,22,.07); color: var(--text);
   font-size: 13px; cursor: pointer; padding: 0 8px;
 }
+/* Dòng ĐÃ khớp tên (không phải UNKNOWN) — màu trung tính, không phải cam
+   cảnh báo, để không gây hiểu nhầm là lỗi. Vẫn có thể bấm để sửa nếu AI
+   khớp nhầm (VD: trùng tên với học sinh khác trong lớp). */
+.ai-student-select.matched {
+  border-color: rgba(148,163,184,.25);
+  background: transparent;
+}
+.ai-student-select.matched:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .ai-student-select:focus { outline: none; border-color: var(--accent); }
 
 .ai-reason-input {
@@ -2210,6 +2859,97 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
   .ai-footer { padding: 5px 10px; gap: 6px; }
   .ai-apply-btn { height: 32px; font-size: 12px; }
   .ai-cancel-btn { height: 32px; font-size: 12px; padding: 0 12px; }
+}
+
+/* ================================================================
+   INPUT MODE SWITCHER (Text / Image)
+   ================================================================ */
+.ai-input-mode-bar {
+  display: flex;
+  gap: 4px;
+  padding: 10px 16px 2px;
+  flex-shrink: 0;
+}
+.ai-mode-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 8px;
+  border: 1px solid rgba(148,163,184,.13);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12.5px; font-weight: 700;
+  cursor: pointer;
+  transition: all .14s ease;
+}
+.ai-mode-tab:hover { background: rgba(255,255,255,.05); color: var(--text-muted); }
+.ai-mode-tab.active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent);
+}
+
+/* Hidden input panel */
+.ai-input-panel-hidden { display: none !important; }
+
+/* ================================================================
+   IMAGE DROP ZONE
+   ================================================================ */
+.ai-input-panel-image { padding-top: 4px; }
+
+.ai-image-drop-zone {
+  margin: 0 16px;
+  min-height: 180px;
+  border: 2px dashed rgba(148,163,184,.2);
+  border-radius: 14px;
+  background: rgba(255,255,255,.02);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+  overflow: hidden;
+  outline: none;
+}
+.ai-image-drop-zone:hover,
+.ai-image-drop-zone:focus {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.ai-image-drop-zone.drag-over {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.ai-image-drop-placeholder {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 28px 24px; text-align: center;
+  color: var(--text-dim);
+  font-size: 13px; line-height: 1.6;
+  pointer-events: none;
+}
+.ai-image-drop-placeholder strong { color: var(--accent); font-weight: 700; }
+.ai-image-drop-hint {
+  font-size: 11px; color: rgba(148,163,184,.5); margin-top: 2px;
+}
+
+.ai-image-preview-wrap {
+  width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 12px;
+}
+.ai-image-preview {
+  max-width: 100%; max-height: 220px;
+  border-radius: 10px;
+  object-fit: contain;
+  box-shadow: 0 4px 20px rgba(0,0,0,.35);
+}
+.ai-image-preview-name {
+  font-size: 11.5px; color: var(--text-dim);
+  text-align: center; word-break: break-all; padding: 0 8px;
+}
+
+/* Mobile adjustments for image zone */
+@media (max-width: 700px), (orientation: landscape) and (max-height: 700px) {
+  .ai-image-drop-zone { min-height: 130px; margin: 0 12px; }
+  .ai-image-preview { max-height: 160px; }
+  .ai-input-mode-bar { padding: 8px 12px 2px; gap: 4px; }
+  .ai-mode-tab { padding: 5px 10px; font-size: 11.5px; }
 }
     `;
     document.head.appendChild(st);
