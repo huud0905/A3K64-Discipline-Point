@@ -910,9 +910,15 @@
    *  'addGvnn' (xem addGvnnEvent() trong scoreboard.js), có thể lệch nếu có
    *  người khác cũng vừa ghi GVNN cho học sinh này trong lúc modal đang mở. */
   function _gvnnCountFor(studentId, dayLabel, tiet) {
-    const periodKey = _gvnnPeriodKeyLocal(dayLabel, tiet);
+    // Backend (ok.js → gvnnPeriodKey) ghi note KHÔNG kèm tiền tố 'GVNN::',
+    // nên chấp nhận CẢ HAI dạng khi đối chiếu — nếu chỉ so với dạng có tiền
+    // tố thì các lần GVNN ĐÃ LƯU không được đếm và điểm dự kiến luôn hiện
+    // "lần 1 (-20)" dù thực tế server sẽ trừ -40/-60.
+    const periodKey    = _gvnnPeriodKeyLocal(dayLabel, tiet);
+    const periodKeyRaw = `${dayLabel}__${tiet}`;
     const savedCount = state.events.filter(e =>
-      e.studentId === studentId && e.week === state.week && e.note === periodKey
+      e.studentId === studentId && e.week === state.week &&
+      (e.note === periodKey || e.note === periodKeyRaw)
     ).length;
     const stagedCount = _draftEvents.filter(e =>
       e._gvnn && _isDraft(e.id) && e.studentId === studentId &&

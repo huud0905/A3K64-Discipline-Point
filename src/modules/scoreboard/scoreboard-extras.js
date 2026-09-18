@@ -437,6 +437,119 @@ function extraGetMembersForCurrentWeek() {
 })();
 
 /* ============================================================
+   1b) XUẤT EXCEL "THEO DÕI NGHỈ" — dùng lại toàn bộ helper của module
+       xuất Excel bảng điểm ở trên (ensureXLSX, extraDownloadBlob...).
+       Dữ liệu lấy từ buildAbsenceExportRows() (định nghĩa trong
+       scoreboard.js), lũy kế cả năm học nên KHÔNG cần chọn tuần —
+       bấm là xuất ngay.
+   ============================================================ */
+(function absenceExportModule() {
+  let busy = false;
+
+  function exportStamp() {
+    const now = new Date();
+    const vn = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+    const p = v => String(v).padStart(2, '0');
+    return `${vn.getFullYear()}${p(vn.getMonth()+1)}${p(vn.getDate())}_${p(vn.getHours())}${p(vn.getMinutes())}${p(vn.getSeconds())}`;
+  }
+
+  async function run() {
+    if (busy) return;
+    if (typeof buildAbsenceExportRows !== 'function') {
+      extraToast('Không xuất được', 'Thiếu dữ liệu theo dõi nghỉ (buildAbsenceExportRows).', 'error');
+      return;
+    }
+    busy = true;
+    extraSetLoading(true, 'Đang tạo file Excel theo dõi nghỉ...');
+    try {
+      const XLSX = await ensureXLSX();
+      const { rows, subjectCols } = buildAbsenceExportRows();
+
+      const FONT = { name: 'Times New Roman', sz: 10 };
+      const BORDER = {
+        top:    { style: 'thin', color: { rgb: '000000' } },
+        bottom: { style: 'thin', color: { rgb: '000000' } },
+        left:   { style: 'thin', color: { rgb: '000000' } },
+        right:  { style: 'thin', color: { rgb: '000000' } },
+      };
+      function cell(v, bold, hAlign, bgRgb) {
+        const s = {
+          font: Object.assign({}, FONT, bold ? { bold: true } : {}),
+          border: BORDER,
+          alignment: { horizontal: hAlign || 'center', vertical: 'center', wrapText: false },
+        };
+        if (bgRgb) s.fill = { fgColor: { rgb: bgRgb }, patternType: 'solid' };
+        return { v, t: typeof v === 'number' ? 'n' : 's', s };
+      }
+
+      // 6 cột cố định (STT, Họ tên, Tổ, TT có phép, TT không phép, TT trừ điểm)
+      // + 1 cột "buổi/điểm trừ" cho mỗi môn ôn thi + cột tổng trừ nghỉ ôn thi + tổng trừ.
+      const header = ['STT', 'Họ và tên', 'Tổ', 'Tập trung - Có phép', 'Tập trung - Không phép', 'Tập trung - Trừ điểm',
+        ...subjectCols.map(s => `${s} - Buổi (CP/KP)`), ...subjectCols.map(s => `${s} - Trừ điểm`),
+        'Ôn thi - Tổng trừ', 'Tổng điểm trừ nghỉ'];
+      const COLS = header.length;
+
+      const wsData = [];
+      wsData.push([cell(`THEO DÕI NGHỈ HỌC — LŨY KẾ CẢ NĂM HỌC (xuất lúc ${new Date().toLocaleString('vi-VN')})`, true, 'center')]);
+      for (let i = 1; i < COLS; i++) wsData[0].push({ v: '', t: 's', s: wsData[0][0].s });
+      wsData.push(header.map(h => cell(h, true, 'center', 'D9D9D9')));
+
+      rows.forEach(r => {
+        const row = [
+          cell(r.stt, false, 'center'),
+          cell(r.name, false, 'left'),
+          cell(r.group || '', false, 'center'),
+          cell(r.ttExcused, false, 'center'),
+          cell(r.ttUnexcused, false, 'center'),
+          cell(r.ttDeducted, false, 'center'),
+        ];
+        subjectCols.forEach(subj => {
+          const c = r.subjectCells[subj];
+          row.push(cell(c.count ? `${c.excused}/${c.unexcused}` : '—', false, 'center'));
+        });
+        subjectCols.forEach(subj => {
+          const c = r.subjectCells[subj];
+          row.push(cell(c.deducted || 0, false, 'center'));
+        });
+        row.push(cell(r.onThiDeducted, false, 'center'));
+        row.push(cell(r.totalDeducted, false, 'center'));
+        wsData.push(row);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      wsData.forEach((row, r) => {
+        row.forEach((cellObj, c) => {
+          const addr = XLSX.utils.encode_cell({ r, c });
+          if (!ws[addr]) ws[addr] = {};
+          ws[addr].s = cellObj.s;
+          if (typeof cellObj.v === 'number') ws[addr].t = 'n';
+        });
+      });
+      ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: COLS - 1 } }];
+      ws['!cols'] = [{ wch: 5 }, { wch: 26 }, { wch: 6 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
+        ...subjectCols.map(() => ({ wch: 16 })), ...subjectCols.map(() => ({ wch: 12 })),
+        { wch: 14 }, { wch: 14 }];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Theo doi nghi');
+      const fileName = `A3K64_TheoDoiNghi_${exportStamp()}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      extraToast('Đã xuất Excel', fileName, 'success');
+    } catch (err) {
+      extraToast('Không xuất được', err instanceof Error ? err.message : 'Lỗi không rõ.', 'error');
+    } finally {
+      busy = false;
+      extraSetLoading(false);
+    }
+  }
+
+  document.addEventListener('click', (event) => {
+    const btn = event.target?.closest?.('.toolbar-button.export-absence');
+    if (btn) { event.preventDefault(); event.stopPropagation(); run(); }
+  }, true);
+})();
+
+/* ============================================================
    2) CHỤP ẢNH — port gần như nguyên vẹn từ scoreboardScreenshotCapture.ts
       (module này vốn đã chạy 100% phía trình duyệt, chỉ thay
        nguồn dữ liệu GAS bằng state cục bộ)

@@ -550,10 +550,25 @@ svg     { display: inline-block; vertical-align: middle; }
 /* ============================================================
    CONTENT AREA & PANELS
    ============================================================ */
+.tt-heading-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+}
+.tt-heading-row .toolbar-button.export-absence {
+  flex-shrink: 0;
+}
+
 .scoreboard-content {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* overflow-x:hidden — chặn thanh cuộn ngang "thừa" xuất hiện tạm thời khi
+     các hàng học sinh đang lần lượt chạy hiệu ứng vào (a3RowIn dùng
+     translateX(-8px)); transform âm này được trình duyệt tính vào vùng
+     cuộn được, nên nếu để overflow-x mặc định (visible) sẽ thấy 1 thanh
+     cuộn ngang chớp lên lúc đang tải và tự mất khi tất cả học sinh đã
+     load xong (animation kết thúc, transform về 0). */
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
   overscroll-behavior-y: contain;

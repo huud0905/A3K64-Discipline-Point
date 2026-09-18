@@ -215,6 +215,31 @@
     return data;
   }
 
+  /* ────────────────────────────────────────────────────────
+     PHÂN LOẠI LỖI MODEL — quyết định BỎ QUA hay DỪNG HẲN
+     ────────────────────────────────────────────────────────
+     Nguyên tắc: có nhiều model dự phòng (AI_MODEL_FALLBACKS), nên BẤT KỲ
+     model nào lỗi cũng bỏ qua ngay để thử model kế tiếp:
+       • 429 / quota / rate limit        → hết lượt
+       • 503 / 500 / 502 / 504 / overload / high demand → Google quá tải
+       • 404 / model deprecated          → model đã bị gỡ
+       • trả về JSON hỏng / rỗng         → model "lú"
+     Chỉ DỪNG HẲN khi lỗi do cấu hình phía mình (API key sai, không có
+     quyền, chưa cấu hình GAS URL) — vì đổi model cũng không cứu được. */
+  const AI_FATAL_RE = /api[ _-]?key|api key not valid|permission|unauthorized|forbidden|billing|chưa cấu hình gas url/i;
+
+  /** Tạo Error chuẩn hoá cho 1 model, kèm cờ __aiFatal. */
+  function _aiModelError(model, status, message) {
+    const s   = Number(status) || 0;
+    const msg = String(message || 'lỗi không rõ');
+    const err = new Error(`[${model}] ${msg}${s ? ` (HTTP ${s})` : ''}`);
+    err.model      = model;
+    err.httpStatus = s;
+    err.__aiFatal  = s === 401 || s === 403 || AI_FATAL_RE.test(msg);
+    return err;
+  }
+
+
   /**
    * Lấy thông tin user hiện tại.
    * Ưu tiên: biến global userRole/userGroup (set bởi initScoreboard())
@@ -750,7 +775,10 @@ MẪU KẾT QUẢ JSON TRẢ VỀ:
       },
     };
 
-    // Waterfall: thử từng model cho đến khi thành công
+    // Waterfall: thử từng model cho đến khi thành công.
+    // Model nào lỗi (quota 429, quá tải 503/500/502/504, model bị gỡ 404,
+    // trả JSON hỏng…) thì BỎ QUA NGAY, nhảy sang model kế tiếp — xem
+    // _aiModelError(). Chỉ dừng hẳn khi lỗi do key/quyền, hoặc hết model.
     let lastError = null;
     for (const model of AI_MODEL_FALLBACKS) {
       try {
@@ -765,56 +793,44 @@ MẪU KẾT QUẢ JSON TRẢ VỀ:
           if (!res.ok) {
             const errJson = await res.json().catch(() => ({}));
             const errMsg  = errJson?.error?.message || `HTTP ${res.status}`;
-            const isQuota = res.status === 429 || /quota|rate.?limit|resource.?exhaust/i.test(errMsg);
-            const isGone  = res.status === 404 || /no longer available|not found|deprecated/i.test(errMsg);
-            if (isQuota || isGone) {
-              lastError = new Error(`[${model}] ${isGone ? 'model không còn tồn tại' : 'quota hết'}`);
-              console.warn(`[AI] ${model} ${isGone ? 'không còn tồn tại' : 'bị quota'}, thử model tiếp theo…`);
-              continue;
-            }
-            throw new Error(`Gemini lỗi (${model}): ${errMsg}`);
+            throw _aiModelError(model, res.status, errMsg);
           }
           data = await res.json();
         } else {
           try {
             data = await _callGeminiViaProxy(model, body);
           } catch (proxyErr) {
-            const errMsg  = proxyErr?.message || 'Lỗi proxy';
-            const isQuota = /quota|rate.?limit|resource.?exhaust|429/i.test(errMsg);
-            const isGone  = /no longer available|not found|deprecated|404/i.test(errMsg);
-            if (isQuota || isGone) {
-              lastError = new Error(`[${model}] ${isGone ? 'model không còn tồn tại' : 'quota hết'}`);
-              console.warn(`[AI] ${model} ${isGone ? 'không còn tồn tại' : 'bị quota'}, thử model tiếp theo…`);
-              continue;
-            }
-            throw new Error(`Gemini lỗi (${model}): ${errMsg}`);
+            throw _aiModelError(model, proxyErr?.httpStatus, proxyErr?.message || 'Lỗi proxy');
           }
         }
 
-        const raw  = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        let parsed;
         try {
-          const parsed = JSON.parse(raw.trim());
-          if (!Array.isArray(parsed)) throw new Error('Không phải array');
-          // Ghi nhớ model thành công để lần sau ưu tiên
-          console.info(`[AI] Dùng model: ${model}`);
-          return parsed;
+          parsed = JSON.parse((raw || '').trim());
         } catch {
-          throw new Error(`Gemini (${model}) trả về dữ liệu không hợp lệ. Thử lại hoặc làm ngắn văn bản.`);
+          throw _aiModelError(model, 0, 'trả về dữ liệu không phải JSON hợp lệ');
         }
+        if (!Array.isArray(parsed)) {
+          throw _aiModelError(model, 0, 'trả về dữ liệu không đúng định dạng (không phải danh sách)');
+        }
+
+        console.info(`[AI] Dùng model: ${model}`);
+        return parsed;
       } catch (err) {
-        // Nếu là lỗi quota đã được xử lý bên trong → continue đã được gọi
-        // Nếu là throw thủ công từ bên trong → re-throw
-        if (!err.message.startsWith(`[${model}] quota`)) throw err;
+        if (err?.__aiFatal) throw err;   // key sai / không có quyền → dừng hẳn
         lastError = err;
+        console.warn(`[AI] Bỏ qua ${model}: ${err?.message || err}`);
+        // → thử model kế tiếp
       }
     }
 
-    // Tất cả model đều hết quota
+    // Đã thử hết model mà không model nào chạy được
     throw new Error(
-      `Tất cả ${AI_MODEL_FALLBACKS.length} model đều hết quota. 
+      `Đã thử hết ${AI_MODEL_FALLBACKS.length} model nhưng model nào cũng lỗi (quá tải hoặc hết lượt).
 ` +
-      `Vui lòng thử lại sau vài phút hoặc dùng API key khác.
-(${lastError?.message})`
+      `Vui lòng thử lại sau vài phút hoặc dùng API key riêng.
+(${lastError?.message || 'không rõ lỗi'})`
     );
   }
 
@@ -945,8 +961,9 @@ MẪU KẾT QUẢ JSON TRẢ VỀ:
       },
     };
 
-    // Waterfall model — ưu tiên model vision (multimodal)
-    // Tất cả Gemini Flash/Pro đều hỗ trợ vision, dùng lại AI_MODEL_FALLBACKS
+    // Waterfall model — ưu tiên model vision (multimodal).
+    // Cùng quy tắc với _callGemini(): model nào lỗi thì bỏ qua ngay,
+    // thử model kế tiếp; chỉ dừng hẳn khi lỗi do key/quyền.
     let lastError = null;
     for (const model of AI_MODEL_FALLBACKS) {
       try {
@@ -961,49 +978,42 @@ MẪU KẾT QUẢ JSON TRẢ VỀ:
           if (!res.ok) {
             const errJson = await res.json().catch(() => ({}));
             const errMsg  = errJson?.error?.message || `HTTP ${res.status}`;
-            const isQuota = res.status === 429 || /quota|rate.?limit|resource.?exhaust/i.test(errMsg);
-            const isGone  = res.status === 404 || /no longer available|not found|deprecated/i.test(errMsg);
-            if (isQuota || isGone) {
-              lastError = new Error(`[${model}] ${isGone ? 'model không còn tồn tại' : 'quota hết'}`);
-              console.warn(`[AI-Image] ${model} ${isGone ? 'không còn tồn tại' : 'bị quota'}, thử model tiếp theo…`);
-              continue;
-            }
-            throw new Error(`Gemini lỗi (${model}): ${errMsg}`);
+            throw _aiModelError(model, res.status, errMsg);
           }
           data = await res.json();
         } else {
           try {
             data = await _callGeminiViaProxy(model, body);
           } catch (proxyErr) {
-            const errMsg  = proxyErr?.message || 'Lỗi proxy';
-            const isQuota = /quota|rate.?limit|resource.?exhaust|429/i.test(errMsg);
-            const isGone  = /no longer available|not found|deprecated|404/i.test(errMsg);
-            if (isQuota || isGone) {
-              lastError = new Error(`[${model}] ${isGone ? 'model không còn tồn tại' : 'quota hết'}`);
-              console.warn(`[AI-Image] ${model} ${isGone ? 'không còn tồn tại' : 'bị quota'}, thử model tiếp theo…`);
-              continue;
-            }
-            throw new Error(`Gemini lỗi (${model}): ${errMsg}`);
+            throw _aiModelError(model, proxyErr?.httpStatus, proxyErr?.message || 'Lỗi proxy');
           }
         }
 
-        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        let parsed;
         try {
-          const parsed = JSON.parse(raw.trim());
-          if (!Array.isArray(parsed)) throw new Error('Không phải array');
-          console.info(`[AI-Image] Dùng model: ${model}`);
-          return parsed;
+          parsed = JSON.parse((raw || '').trim());
         } catch {
-          throw new Error(`Gemini (${model}) trả về dữ liệu không hợp lệ. Thử lại hoặc dùng ảnh rõ hơn.`);
+          throw _aiModelError(model, 0, 'trả về dữ liệu không phải JSON hợp lệ');
         }
+        if (!Array.isArray(parsed)) {
+          throw _aiModelError(model, 0, 'trả về dữ liệu không đúng định dạng (không phải danh sách)');
+        }
+
+        console.info(`[AI-Image] Dùng model: ${model}`);
+        return parsed;
       } catch (err) {
-        if (!err.message.startsWith(`[${model}] quota`)) throw err;
+        if (err?.__aiFatal) throw err;
         lastError = err;
+        console.warn(`[AI-Image] Bỏ qua ${model}: ${err?.message || err}`);
       }
     }
 
     throw new Error(
-      `Tất cả ${AI_MODEL_FALLBACKS.length} model đều hết quota. Vui lòng thử lại sau vài phút hoặc dùng API key khác.\n(${lastError?.message})`
+      `Đã thử hết ${AI_MODEL_FALLBACKS.length} model nhưng model nào cũng lỗi (quá tải hoặc hết lượt).
+` +
+      `Vui lòng thử lại sau vài phút, dùng ảnh rõ hơn, hoặc dùng API key riêng.
+(${lastError?.message || 'không rõ lỗi'})`
     );
   }
 

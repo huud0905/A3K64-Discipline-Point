@@ -154,9 +154,12 @@
 
 /* ─── 4. TABLE ROW STAGGER ────────────────────────────────── */
 
+/* CHỈ fade — KHÔNG dùng translateY. .score-table-wrap có overflow-x:auto nên
+   overflow-y cũng thành auto; hàng cuối dịch xuống 8px sẽ làm wrap tạm thời
+   "cuộn được" → hiện thanh cuộn dọc thừa lúc đang tải rồi tự mất. */
 @keyframes a3FadeInUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .score-table tbody tr.a3-row-enter {
@@ -312,6 +315,7 @@ const a3AnimTooltip = (() => {
  */
 function a3AnimCountUp(el, target, duration = 700, fmt = (n) => n) {
   if (!el) return;
+  if (window.__a3AnimSuppress) { el.textContent = fmt(target); return; }
   const sign   = target >= 0 ? 1 : -1;
   const abs    = Math.abs(target);
   const start  = performance.now();
@@ -401,15 +405,26 @@ function a3AnimSkeletonTableRows(count = 8) {
 
 /** Track which render cycle we're on to cancel stale animations */
 let a3AnimRenderGen = 0;
+let a3AnimLastViewKey = null;
 
 function a3AnimAfterRender() {
   const gen = ++a3AnimRenderGen;
   // rAF so DOM has settled
   requestAnimationFrame(() => {
     if (gen !== a3AnimRenderGen) return;
-    a3AnimApplyRowStagger();
-    a3AnimApplyBarChart();
-    a3AnimApplyCountUp();
+    // Chỉ chạy hiệu ứng "vào" khi thực sự đổi màn hình (tab / tuần / nguồn dữ liệu).
+    // Render lại do lưu điểm, polling, mở/đóng panel... (cùng màn hình) thì KHÔNG
+    // fade/đếm số lại từ đầu — trước đây trông như cả trang bị reload.
+    const viewKey = [state.activeTab, state.week, state.dataSource].join('|');
+    window.__a3AnimSuppress = (viewKey === a3AnimLastViewKey);
+    a3AnimLastViewKey = viewKey;
+    try {
+      a3AnimApplyRowStagger();
+      a3AnimApplyBarChart();
+      a3AnimApplyCountUp();
+    } finally {
+      window.__a3AnimSuppress = false;
+    }
   });
 }
 
@@ -420,6 +435,7 @@ function a3AnimApplyRowStagger() {
   // Apply to every tbody row that hasn't been stamped yet
   document.querySelectorAll('.score-table tbody tr:not([data-a3-row-stamped])').forEach((tr, i) => {
     tr.setAttribute('data-a3-row-stamped', '1');
+    if (window.__a3AnimSuppress) return; // refresh nền: hiện luôn, không fade lại
     tr.style.setProperty('--row-index', String(i));
     tr.classList.add('a3-row-enter');
     // Clean up class after animation so re-renders don't re-trigger if node is reused

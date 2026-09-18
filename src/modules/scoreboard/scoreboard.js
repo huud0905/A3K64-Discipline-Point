@@ -75,7 +75,10 @@ const GVNN_TITLE = 'Giáo Viên Nhắc Nhở';
  * bỏ qua điểm cố định gắn sẵn trên rule đó.
  */
 function isGvnnTitle(title) {
-  return String(title || '').trim().startsWith(GVNN_TITLE);
+  // Dùng includes() thay vì startsWith(): title của bản ghi đã lưu nay có
+  // tiền tố Thứ/Tiết/[Loại] ở đầu (VD "Thứ 5: Tiết 3: [Nề nếp] Giáo Viên
+  // Nhắc Nhở - Lần 2 (-40)") nên startsWith() sẽ không nhận ra nữa.
+  return String(title || '').trim().includes(GVNN_TITLE);
 }
 
 /** Xếp loại kết quả theo tổng điểm — ngưỡng giữ nguyên như bản gốc. */
@@ -221,6 +224,52 @@ let pendingSaveGuard = null;
 let lastSaveSignature = null;
 let lastSaveAt = 0;
 let cachedRules = null;
+
+/* ------------------------------------------------------------------
+   TUẦN MẶC ĐỊNH = TUẦN MỚI NHẤT (không phải Tuần 1)
+   ------------------------------------------------------------------
+   state.week khởi tạo là 1 chỉ để có giá trị trước khi dữ liệu về. Ngay
+   khi applyRemoteData() nhận được danh sách tuần, tuần hiển thị sẽ được
+   đặt bằng pickLatestWeek() — trừ khi người dùng ĐÃ tự chọn tuần khác
+   (cờ weekPickedByUser), lúc đó tôn trọng lựa chọn của họ và không bị
+   polling (7s/lần) kéo ngược về tuần mới nhất. */
+let weekPickedByUser = false;
+
+/** Hôm nay theo giờ VN, dạng YYYY-MM-DD (dự phòng khi weekSettings
+ *  không kèm sẵn trường `today` do api.gs tính). */
+function todayKeyVN() {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+  } catch { return new Date().toISOString().slice(0, 10); }
+}
+
+/**
+ * Chọn tuần mặc định từ danh sách tuần hiện có. Ưu tiên theo thứ tự:
+ *   1. Tuần LỚN NHẤT đang trong thời gian chấm điểm (weekSettings.editable)
+ *   2. Tuần LỚN NHẤT đã bắt đầu (start_date <= hôm nay) — tránh nhảy vào
+ *      tuần tương lai đã được tạo trước nhưng chưa tới ngày
+ *   3. Tuần LỚN NHẤT trong danh sách
+ * VD: có tuần 1→10 thì trả về 10, không phải 1.
+ */
+function pickLatestWeek(weeks, weekSettings) {
+  const list = [...new Set((weeks || []).map(Number))]
+    .filter(w => Number.isFinite(w) && w > 0)
+    .sort((a, b) => a - b);
+  if (!list.length) return state.week || 1;
+
+  const byWeek = {};
+  (weekSettings || []).forEach(s => { byWeek[Number(s.week)] = s; });
+
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (byWeek[list[i]]?.editable) return list[i];
+  }
+  for (let i = list.length - 1; i >= 0; i--) {
+    const s = byWeek[list[i]];
+    const started = !s || !s.start || (s.today || todayKeyVN()) >= s.start;
+    if (started) return list[i];
+  }
+  return list[list.length - 1];
+}
 
 /* ============================================================
    5. HÀM THUẦN (PURE HELPERS)
@@ -513,6 +562,46 @@ function summarizeTTAbsences(students) {
       absTotalDeducted: deducted + onThiDeducted,
     };
   });
+}
+
+// Dữ liệu phẳng để xuất Excel "Theo dõi nghỉ" — dùng bởi scoreboard-extras.js
+// (module absenceExportModule). Trả về { rows, subjectCols } trong đó
+// subjectCols là danh sách các môn ôn thi đang xuất hiện ở BẤT KỲ học sinh
+// nào (hợp của 2 môn bắt buộc + các môn tự chọn từng em), để mỗi môn có
+// đúng 1 cột trong file Excel dù các em chọn tổ hợp khác nhau.
+function buildAbsenceExportRows() {
+  const summaries = summarizeTTAbsences(state.students)
+    .slice()
+    .sort((a, b) => (a.group ?? 0) - (b.group ?? 0) || String(a.name).localeCompare(String(b.name), 'vi'));
+
+  const subjectColsSet = new Set(ONTHI_FIXED_SUBJECTS);
+  summaries.forEach(s => Object.keys(s.onThiBySubject || {}).forEach(k => subjectColsSet.add(k)));
+  state.students.forEach(s => getOnThiSubjects(s.id).forEach(k => subjectColsSet.add(k)));
+  const subjectCols = Array.from(subjectColsSet);
+
+  const rows = summaries.map((s, i) => {
+    const subjectCells = {};
+    subjectCols.forEach(subj => {
+      const evs = (s.onThiBySubject || {})[subj] || [];
+      const excused = evs.filter(e => onThiIsExcused(e)).length;
+      const unexcused = evs.length - excused;
+      const deducted = evs.reduce((sum, e) => sum + (e.points || 0), 0);
+      subjectCells[subj] = { count: evs.length, excused, unexcused, deducted };
+    });
+    return {
+      stt: i + 1,
+      name: s.name,
+      group: s.group ?? 0,
+      ttExcused: s.ttExcusedCount || 0,
+      ttUnexcused: s.ttUnexcusedCount || 0,
+      ttDeducted: s.ttDeducted || 0,
+      subjectCells,
+      onThiDeducted: s.onThiDeducted || 0,
+      totalDeducted: s.absTotalDeducted || 0,
+    };
+  });
+
+  return { rows, subjectCols };
 }
 
 // Tạo + lưu 1 lần ghi nhận nghỉ tập trung mới cho học sinh `studentId` vào ngày `dateStr` (YYYY-MM-DD).
@@ -907,7 +996,14 @@ function applyRemoteData(remote, opts={}) {
   // từng gây hiện nhầm thông báo của học sinh khác không liên quan tới lượt
   // sửa vừa broadcast.
   seenSignatures = new Set(nextEvents.map(eventSignature));
-  const nw = nextWeeks.includes(state.week)?state.week:nextWeeks[0]||1;
+  // Trước đây: nextWeeks[0] → luôn rơi về Tuần 1 vì state.week khởi tạo là 1
+  // và Tuần 1 thì lúc nào cũng nằm trong danh sách. Giờ: nếu người dùng chưa
+  // tự chọn tuần thì bám theo tuần mới nhất; nếu đã chọn thì giữ nguyên
+  // (chỉ nhảy khi tuần đó biến mất khỏi danh sách).
+  const latestWeek = pickLatestWeek(nextWeeks, remote.weekSettings);
+  const nw = weekPickedByUser
+    ? (nextWeeks.includes(state.week) ? state.week : latestWeek)
+    : latestWeek;
   if (!remote.students.length && !opts.silent) {
     _notify('Không đọc được học sinh trong sheet TUẦN hiện tại.', 'warn');
   }
@@ -1813,7 +1909,10 @@ function buildAbsencePage(d) {
     <section class="score-panel">
       <div class="table-toolbar">
         <div class="section-heading-inner">
-          <strong>Theo dõi nghỉ học (lũy kế cả năm học)</strong>
+          <div class="tt-heading-row">
+            <strong>Theo dõi nghỉ học (lũy kế cả năm học)</strong>
+            <button type="button" class="toolbar-button export-absence" title="Xuất Excel danh sách nghỉ">${Icons.download}<span class="tb-label">Xuất Excel</span></button>
+          </div>
           <span class="score-permission-note">
             <b>Nghỉ tập trung:</b> 2 buổi đầu miễn, từ buổi 3 trừ 200 (có phép) / 400 (không phép).
             <b>Nghỉ ôn thi:</b> tính riêng từng môn — mỗi môn được nghỉ 1 buổi không trừ, từ buổi thứ 2 của môn đó trừ 100, 200, 300, 400... (cấp số cộng 100).
@@ -1997,6 +2096,21 @@ function __a3RestoreFocus(root, info) {
   }
 }
 
+// Những vùng UI nào thực sự cần dựng lại "shell" (sidebar/header/app-wrapper)?
+// Đổi tab, mở/đóng modal tạo tuần, đổi vai trò, mở/đóng filter mobile — có.
+// Còn lại (thêm/xoá điểm, thêm/xoá buổi nghỉ, gõ ô tìm kiếm...) chỉ cần thay
+// nội dung `.scoreboard-content` (và sidebar nếu số liệu đổi) — KHÔNG cần
+// huỷ + dựng lại toàn bộ `.scoreboard-app`, nên không còn cảm giác "reload
+// lại hết trang" mỗi lần ghi nhận 1 buổi nghỉ.
+let __a3PrevShellKey = null;
+function __a3ShellKey(d) {
+  return JSON.stringify([
+    d.role, d.isStudentOnly, d.canUseScoringTab,
+    state.activeTab, state.mobileFilterOpen, state.createWeekConfirmOpen,
+    state.dataSource,
+  ]);
+}
+
 function render() {
   if (window.__A3_DEBUG_RENDER__) {
     console.log(`%c🔥 SCOREBOARD RENDER @ ${new Date().toISOString().slice(11,23)}`, 'color:#ef4444;font-weight:800');
@@ -2010,9 +2124,31 @@ function render() {
   const createWeekOpenNow = !!state.createWeekConfirmOpen;
   const createWeekJustOpened = createWeekOpenNow && !__a3PrevCreateWeekOpen;
 
+  const shellKey = __a3ShellKey(d);
+  const needFullShell = shellFirstPaint || shellKey !== __a3PrevShellKey || !root.querySelector('.scoreboard-app');
+  __a3PrevShellKey = shellKey;
+
   const focusInfo = __a3CaptureFocus(root);
   const prevScrollEl = root.querySelector('.scoreboard-content');
   const prevScrollTop = prevScrollEl ? prevScrollEl.scrollTop : 0;
+
+  if (!needFullShell) {
+    // ── SOFT RENDER: chỉ thay phần nội dung, giữ nguyên toàn bộ shell ──
+    const contentEl = root.querySelector('.scoreboard-content');
+    const sidebarEl = root.querySelector('.scoreboard-left-tools');
+    if (contentEl) {
+      contentEl.innerHTML =
+        state.dataSource===DATA_SOURCE.LOADING?`<div style="padding:40px;text-align:center;color:var(--score-muted)">Đang tải dữ liệu, lần đầu có thể hơi chậm...</div>`:
+        state.activeTab==='overview'?buildOverviewPage(d):
+        state.activeTab==='absence'?buildAbsencePage(d):
+        d.canUseScoringTab?buildScoringPage(d):'';
+    }
+    if (sidebarEl) sidebarEl.outerHTML = buildSidebar(d);
+    __a3RestoreFocus(root, focusInfo);
+    const newScrollEl2 = root.querySelector('.scoreboard-content');
+    if (newScrollEl2 && prevScrollTop) newScrollEl2.scrollTop = prevScrollTop;
+    return;
+  }
 
   root.innerHTML = `
     <div class="scoreboard-app ${shellFirstPaint?'a3-enter':''} role-${d.role} ${d.isStudentOnly?'student-readonly-mode':''}">
@@ -2112,7 +2248,8 @@ function toggleTTRecordPanel(id) {
 
 function selectFilterOption(id,value) {
   document.getElementById(`fsm-${id}`)?.style && (document.getElementById(`fsm-${id}`).style.display='none');
-  if(id==='week') setState({week:Number(value)});
+  // Đánh dấu "người dùng tự chọn" để polling không kéo về tuần mới nhất nữa
+  if(id==='week') { weekPickedByUser = true; setState({week:Number(value)}); }
   else if(id==='viewMode') setState({viewMode:value});
   else if(id==='statusFilter') setState({statusFilter:value});
   else if(id==='sortMode') setState({sortMode:value});
@@ -2172,6 +2309,7 @@ async function createNewWeek() {
     } else {
       setState({weeks:[...new Set([...state.weeks,nextWeek])].sort((a,b)=>a-b)});
     }
+    weekPickedByUser = true;   // vừa tạo tuần mới → chủ động vào đúng tuần đó
     setState({week:nextWeek,activeTab:'scoring'});
   } catch (err) {
     console.error('[createNewWeek] Không tạo được tuần mới:', err);
@@ -2182,10 +2320,12 @@ async function createNewWeek() {
 
 function resetData() {
   pendingSaveGuard=null;
+  weekPickedByUser=false;
   SafeStorage.remove(localStorage, STORAGE_KEY);
   SafeStorage.remove(localStorage, WEEK_STORAGE_KEY);
   if(state.dataSource===DATA_SOURCE.GAS) { loadScoreboardData(true); return; }
-  setState({ students:mockStudents, events:mockScoreEvents, weeks:SCORE_WEEKS, week:1, weekSettings:[] });
+  setState({ students:mockStudents, events:mockScoreEvents, weeks:SCORE_WEEKS,
+             week:pickLatestWeek(SCORE_WEEKS, []), weekSettings:[] });
   seenSignatures=new Set(mockScoreEvents.map(eventSignature));
   liveStartedAt=Date.now();
 }

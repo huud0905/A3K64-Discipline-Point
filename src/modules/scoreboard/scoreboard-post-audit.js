@@ -434,7 +434,28 @@
     if (!res.ok) throw new Error(`Proxy lỗi: HTTP ${res.status}`);
     const wrapper = await res.json();
     if (!wrapper || !wrapper.ok) throw new Error((wrapper && wrapper.error) || 'Proxy trả về lỗi không xác định');
-    return wrapper.data;
+    // Worker trả ok:true nhưng data.ok:false khi Gemini lỗi (503 quá tải,
+    // 404 model bị gỡ…). Trước đây chỗ này trả thẳng wrapper.data nên hậu
+    // kiểm im lặng coi như "không có gì để sửa" — giờ ném lỗi kèm httpStatus
+    // để waterfall biết mà nhảy sang model kế tiếp.
+    const data = wrapper.data;
+    if (data && typeof data === 'object' && data.ok === false) {
+      const err = new Error(data.error || 'Gemini lỗi không xác định');
+      err.httpStatus = data.httpStatus || 0;
+      throw err;
+    }
+    return data;
+  }
+
+  /** Lỗi do cấu hình/khoá → dừng hẳn; còn lại (quota 429, quá tải 503/5xx,
+   *  model bị gỡ 404, JSON hỏng…) → bỏ qua model đó, thử model kế tiếp. */
+  const AUDIT_FATAL_RE = /api[ _-]?key|permission|unauthorized|forbidden|billing|chưa cấu hình gas url/i;
+  function _auditModelError(model, status, message) {
+    const s   = Number(status) || 0;
+    const msg = String(message || 'lỗi không rõ');
+    const err = new Error(`[${model}] ${msg}${s ? ` (HTTP ${s})` : ''}`);
+    err.__aiFatal = s === 401 || s === 403 || AUDIT_FATAL_RE.test(msg);
+    return err;
   }
 
   async function _callGemini(body) {
@@ -455,32 +476,29 @@
           if (!res.ok) {
             const errJson = await res.json().catch(() => ({}));
             const errMsg = errJson?.error?.message || `HTTP ${res.status}`;
-            if (res.status === 429 || /quota|rate.?limit|resource.?exhaust/i.test(errMsg)) {
-              lastError = new Error(`[${model}] quota hết`);
-              continue;
-            }
-            throw new Error(`Gemini lỗi (${model}): ${errMsg}`);
+            throw _auditModelError(model, res.status, errMsg);
           }
           data = await res.json();
         } else {
           try {
             data = await _callGeminiViaProxy(model, body);
           } catch (proxyErr) {
-            const errMsg = proxyErr?.message || 'Lỗi proxy';
-            if (/quota|rate.?limit|resource.?exhaust|429/i.test(errMsg)) {
-              lastError = new Error(`[${model}] quota hết`);
-              continue;
-            }
-            throw new Error(`Gemini lỗi (${model}): ${errMsg}`);
+            throw _auditModelError(model, proxyErr?.httpStatus, proxyErr?.message || 'Lỗi proxy');
           }
         }
-        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-        const parsed = JSON.parse(raw.trim());
-        if (!Array.isArray(parsed)) throw new Error('Không phải array');
+        const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        let parsed;
+        try {
+          parsed = JSON.parse((raw || '').trim());
+        } catch {
+          throw _auditModelError(model, 0, 'trả về dữ liệu không phải JSON hợp lệ');
+        }
+        if (!Array.isArray(parsed)) throw _auditModelError(model, 0, 'trả về dữ liệu không đúng định dạng');
         return parsed;
       } catch (err) {
-        if (!String(err.message || '').startsWith(`[${model}] quota`)) throw err;
+        if (err?.__aiFatal) throw err;
         lastError = err;
+        console.warn(`[Post-Audit] Bỏ qua ${model}: ${err?.message || err}`);
       }
     }
     throw lastError || new Error('Không gọi được model AI nào.');
