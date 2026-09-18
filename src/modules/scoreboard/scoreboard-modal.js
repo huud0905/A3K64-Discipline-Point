@@ -65,7 +65,20 @@
 
   function _weekEventsForStudent() {
     if (!_student) return [];
-    return _draftEvents.filter(e => e.studentId === _student.id && e.week === state.week && !isSheetTotalEvent(e));
+    // Loại trừ cả __SHEET_TOTAL__ lẫn các dòng "Nghỉ tập trung/Nghỉ ôn thi"
+    // (__TT_ABSENCE__ / __ONTHI_ABSENCE__) — các dòng này do luật riêng tự
+    // sinh (title/points tính theo số lần nghỉ luỹ kế), KHÔNG được để lẫn
+    // vào danh sách điểm có thể xoá ở modal này. Xoá nhầm ở đây làm sai
+    // chuỗi luỹ kế và không thể khôi phục đúng số lần đã nghỉ.
+    // Muốn xoá 1 lần nghỉ ghi nhầm → dùng nút xoá riêng ở tab "Nghỉ tập
+    // trung"/"Nghỉ ôn thi" (removeTTAbsence/removeOnThiAbsence).
+    return _draftEvents.filter(e =>
+      e.studentId === _student.id &&
+      e.week === state.week &&
+      !isSheetTotalEvent(e) &&
+      !isTTAbsenceEvent(e) &&
+      !isOnThiAbsenceEvent(e)
+    );
   }
   function _dayEvents(day) {
     return _weekEventsForStudent().filter(e => eventDay(e) === day);

@@ -448,7 +448,7 @@ svg     { display: inline-block; vertical-align: middle; }
 .tt-date-input {
   border: 1px solid var(--border); border-radius: 10px;
   background: var(--bg-mid); color: var(--text); font-size: 12px;
-  padding: 4px 6px; height: 28px;
+  padding: 4px 6px; height: 30px; width: 100%; box-sizing: border-box;
 }
 
 .tt-check-group { display: inline-flex; gap: 2px; }
@@ -2106,4 +2106,110 @@ svg     { display: inline-block; vertical-align: middle; }
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
   }
+}
+/* ============================================================
+   THEO DÕI NGHỈ — bảng gộp "Nghỉ tập trung" + "Nghỉ ôn thi"
+   ============================================================ */
+.abs-merged-table .abs-group-th {
+  text-align: center; font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+.abs-merged-table .abs-grp-tt  { background: color-mix(in srgb, #f59e0b 7%, transparent); }
+.abs-merged-table .abs-grp-ot  { background: color-mix(in srgb, #6366f1 8%, transparent); }
+.abs-merged-table thead th { vertical-align: middle; }
+.abs-th-lead { min-width: 150px; }
+
+/* Ô "chi tiết môn" */
+.ot-subject-list { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.ot-subject-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  background: color-mix(in srgb, #6366f1 14%, var(--bg-mid)); color: #4f46e5;
+  border: 1px solid #6366f133; white-space: nowrap;
+}
+.ot-subject-badge b { font-variant-numeric: tabular-nums; }
+.ot-subject-over {
+  background: color-mix(in srgb, #ef4444 14%, var(--bg-mid)); color: #dc2626; border-color: #ef444433;
+}
+.ot-subject-cell { min-width: 170px; }
+
+/* Cột ghi nhận: 1 nút gọn "Ghi nhận" mở ra popover chứa ngày + 2 hàng nút
+   (tập trung / ôn thi) — thay vì hiện sẵn, tránh làm dòng bảng bị "phình" cao. */
+.abs-actions-cell { position: relative; }
+.tt-record-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer;
+  background: var(--bg-mid); color: var(--text);
+  transition: transform var(--dur-fast) ease, box-shadow var(--dur-fast) ease, background var(--dur-fast) ease;
+}
+.tt-record-btn svg { width: 13px; height: 13px; }
+.tt-record-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,.2); background: var(--bg-tab-active); }
+
+.tt-record-panel {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+  display: flex; flex-direction: column; gap: 8px;
+  min-width: 260px; padding: 12px;
+  background: var(--bg-modal-header, var(--bg-mid)); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: 0 12px 30px rgba(0,0,0,.35);
+  animation: ttRecordPanelIn .12s ease-out;
+}
+@keyframes ttRecordPanelIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tt-record-field { display: flex; flex-direction: column; gap: 4px; }
+.tt-record-field > span {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim);
+}
+.abs-action-row { display: flex; align-items: center; gap: 6px; }
+.abs-action-tag {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-dim); min-width: 62px;
+}
+.ot-subject-select {
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-mid); color: var(--text); font-size: 12px;
+  padding: 4px 6px; height: 28px; flex: 1; min-width: 0;
+}
+
+@media (max-width: 860px) {
+  .tt-record-panel { right: auto; left: 0; min-width: 240px; }
+}
+
+/* Tổ hợp tự chọn — hiện gọn 1 dòng trong popover, bấm ✎ mới hiện 2 select để đổi */
+.ot-subject-config {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding-top: 6px; margin-top: 2px; border-top: 1px dashed var(--border);
+}
+.ot-subject-config-label { font-size: 11px; color: var(--text-dim); }
+.ot-subject-config-label b { color: var(--text); font-weight: 700; }
+.ot-subject-config-edit {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--bg-mid); color: var(--text-dim); cursor: pointer; flex-shrink: 0;
+  transition: color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+.ot-subject-config-edit svg { width: 12px; height: 12px; }
+.ot-subject-config-edit:hover { color: var(--text); border-color: var(--text-dim); }
+.ot-subject-editor { display: flex; gap: 6px; }
+.ot-subject-editor .ot-subject-select { flex: 1; min-width: 0; }
+
+/* Hàng chi tiết: 2 khối cạnh nhau */
+.abs-detail-wrap { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.3fr); gap: 16px; }
+.abs-detail-block { min-width: 0; }
+.abs-detail-title {
+  display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-dim); margin-bottom: 6px;
+}
+.ot-chip-list { flex-direction: column; align-items: flex-start; gap: 6px; }
+.ot-detail-subject { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ot-detail-subject-name {
+  font-size: 11px; font-weight: 700; color: var(--text); min-width: 74px;
+}
+.tt-chip-pts { font-weight: 700; font-variant-numeric: tabular-nums; opacity: .85; }
+
+@media (max-width: 860px) {
+  .abs-detail-wrap { grid-template-columns: minmax(0,1fr); }
+  .abs-action-tag { min-width: 54px; }
 }

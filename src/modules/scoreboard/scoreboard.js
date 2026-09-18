@@ -197,7 +197,7 @@ let state = {
   groupOrder: readGroupOrder(),
   mobileFilterOpen: false,
   ttExpanded: {},               // { [studentId]: true } — hàng nào đang mở chi tiết nghỉ tập trung
-  ttSort: { key: 'name', dir: 'asc' }, // sắp xếp riêng cho bảng "Nghỉ tập trung"
+  ttSort: { key: 'name', dir: 'asc' }, // sắp xếp riêng cho bảng "Theo dõi nghỉ"
 };
 
 /** Cấu hình do initScoreboard() truyền vào (vai trò, tổ, URL Apps Script). */
@@ -332,6 +332,148 @@ function formatTTDate(iso) {
   return d && m ? `${d}/${m}` : iso;
 }
 
+
+/* ------------------------------------------------------------------
+   NGHỈ BUỔI HỌC ÔN THI (buổi chiều, các môn thi tốt nghiệp)
+   Luật: tính RIÊNG TỪNG MÔN. Mỗi môn được nghỉ 1 buổi không trừ.
+   Từ buổi thứ 2 của môn đó: -100, -200, -300, -400... (cấp số cộng 100).
+   Vì tính riêng từng môn nên 1 học sinh có tổng 4 buổi "miễn" cho 4 môn.
+   ------------------------------------------------------------------ */
+const ONTHI_MARKER            = '__ONTHI_ABSENCE__';
+const ONTHI_FREE_PER_SUBJECT  = 1;    // số buổi đầu được miễn TRONG MỖI MÔN
+const ONTHI_STEP              = 100;  // bước cấp số cộng
+const ONTHI_UNEXCUSED_EXTRA   = 100;  // không phép = (có phép) + 100đ — theo xác nhận của GVCN
+const ONTHI_CATEGORY          = CATEGORY.STUDY; // đổi sang CATEGORY.DISCIPLINE nếu muốn xếp vào nề nếp
+
+const ONTHI_FIXED_SUBJECTS     = ['Toán', 'Ngữ Văn'];        // 2 môn thi bắt buộc, giống hệt mảng FIXED trong ok.js — không được chọn lại
+const ONTHI_DEFAULT_ELECTIVES  = ['Vật Lí', 'Hoá Học'];      // 2 môn tự chọn mặc định khi học sinh CHƯA được cấu hình tổ hợp riêng
+
+/**
+ * 2 môn tự chọn của TỪNG học sinh (lưu ở DB, cột students.onthi_subjects,
+ * đồng bộ cho mọi người xem — không còn theo từng máy/trình duyệt như trước).
+ * Học sinh nào chưa được cấu hình tổ hợp riêng thì tạm dùng mặc định.
+ */
+function readOnThiElectives(studentId) {
+  const student = state.students.find(x => x.id === studentId);
+  const raw = student?.onThiSubjects;
+  if (Array.isArray(raw)) {
+    const ok = raw.filter(s => subjects.includes(s) && !ONTHI_FIXED_SUBJECTS.includes(s)).slice(0, 2);
+    if (ok.length === 2) return ok;
+  }
+  return [...ONTHI_DEFAULT_ELECTIVES];
+}
+/** Danh sách 4 môn thi tốt nghiệp hiện hành CỦA 1 học sinh cụ thể. */
+function getOnThiSubjects(studentId) { return [...ONTHI_FIXED_SUBJECTS, ...readOnThiElectives(studentId)]; }
+
+/** Đổi 1 trong 2 môn tự chọn (slot 0 hoặc 1) của MỘT học sinh, lưu lên server. */
+async function setStudentOnThiSubjects(studentId, slot, subject) {
+  const student = state.students.find(x => x.id === studentId);
+  if (!student) return;
+  const cur = readOnThiElectives(studentId);
+  const other = cur[slot === 0 ? 1 : 0];
+  if (subject === other) { _notify('2 môn tự chọn không được trùng nhau.', 'error'); return; }
+  const next = [...cur];
+  next[Number(slot)] = subject;
+
+  // Cập nhật lạc quan trên giao diện trước, rồi mới lưu lên server.
+  setState({ students: state.students.map(x => x.id === studentId ? { ...x, onThiSubjects: next } : x) }, 'setStudentOnThiSubjects');
+
+  if (!gasUrl) {
+    _notify('Đang dùng dữ liệu cục bộ (chưa kết nối được máy chủ) — đổi tổ hợp CHƯA được lưu, sẽ mất khi tải lại trang.', 'warn');
+    return;
+  }
+  try {
+    const json = await fetchFromGas({ action: 'setStudentOnThiSubjects', studentId, subjects: JSON.stringify(next) });
+    if (!json || json.ok === false || json?.data?.ok === false) {
+      throw new Error(json?.data?.error || json?.error || 'Máy chủ từ chối lưu tổ hợp.');
+    }
+    _notify(`Đã đổi tổ hợp thi của ${student.name}: ${getOnThiSubjects(studentId).join(' · ')}.`, 'success');
+  } catch (err) {
+    console.warn('[setStudentOnThiSubjects] Lỗi:', err);
+    _notify('Không lưu được tổ hợp lên máy chủ: ' + (err.message || 'lỗi không rõ') + ' — thử lại sau.', 'error');
+  }
+}
+
+/** Đóng/mở ô sửa tổ hợp môn tự chọn của 1 học sinh trong popover "Ghi nhận". */
+function toggleOnThiSubjectEditor(id) {
+  const panel = document.getElementById(`ot-subject-editor-${id}`);
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+}
+
+/* note có dạng: __ONTHI_ABSENCE__:excused:YYYY-MM-DD:Tên môn */
+function isOnThiAbsenceEvent(ev) { return String(ev.note || '').includes(ONTHI_MARKER); }
+function parseOnThiNote(ev) {
+  const raw = String(ev.note || '');
+  const i = raw.indexOf(ONTHI_MARKER);
+  if (i < 0) return null;
+  const parts = raw.slice(i + ONTHI_MARKER.length + 1).split(':');
+  return {
+    excused: (parts[0] || 'excused') === 'excused',
+    date:    parts[1] || (ev.createdAt || '').slice(0, 10),
+    subject: parts.slice(2).join(':') || '?',
+  };
+}
+function onThiIsExcused(ev) { return parseOnThiNote(ev)?.excused !== false; }
+function onThiDate(ev)      { return parseOnThiNote(ev)?.date || (ev.createdAt || '').slice(0, 10); }
+function onThiSubject(ev)   { return parseOnThiNote(ev)?.subject || '?'; }
+
+/** Lịch sử nghỉ ôn thi của 1 học sinh (lọc theo môn nếu truyền `subject`), xếp theo ngày nghỉ. */
+function getStudentOnThiHistory(studentId, subject) {
+  return state.events
+    .filter(e => e.studentId === studentId && isOnThiAbsenceEvent(e))
+    .filter(e => !subject || onThiSubject(e) === subject)
+    .sort((a, b) => onThiDate(a).localeCompare(onThiDate(b)));
+}
+
+/**
+ * Điểm trừ cho lần nghỉ thứ `occurrenceIndex` (0-based) CỦA RIÊNG MÔN ĐÓ.
+ * lần 1 → 0 (miễn) | lần 2 → -100 | lần 3 → -200 | lần 4 → -300 ...
+ */
+function computeOnThiPoints(occurrenceIndex, excused) {
+  if (occurrenceIndex < ONTHI_FREE_PER_SUBJECT) return 0;
+  const steps = occurrenceIndex - ONTHI_FREE_PER_SUBJECT + 1;
+  return -(steps * ONTHI_STEP + (excused ? 0 : ONTHI_UNEXCUSED_EXTRA));
+}
+
+/** Gom lịch sử nghỉ ôn thi theo từng môn: { 'Toán': [ev, ev], 'Ngữ Văn': [ev] } */
+function groupOnThiBySubject(history) {
+  const map = {};
+  history.forEach(ev => { const s = onThiSubject(ev); (map[s] = map[s] || []).push(ev); });
+  return map;
+}
+
+/** Ghi nhận 1 buổi nghỉ ôn thi cho học sinh, môn `subject`. */
+async function addOnThiAbsence(studentId, excused, subject, dateStr) {
+  const student = state.students.find(s => s.id === studentId);
+  if (!student) return;
+  const subj = subject || document.getElementById(`onthi-subject-${studentId}`)?.value || '';
+  if (!subj) { _notify('Chưa chọn môn ôn thi.', 'error'); return; }
+  const chosenDate = dateStr
+    || document.getElementById(`tt-date-${studentId}`)?.value
+    || new Date().toISOString().slice(0, 10);
+
+  const occurrenceIndex = getStudentOnThiHistory(studentId, subj).length; // 0-based trong MÔN đó
+  const points = computeOnThiPoints(occurrenceIndex, excused);
+  const label  = excused ? 'có phép' : 'không phép';
+  const title  = `Nghỉ ôn thi ${subj} (${label}) ngày ${formatTTDate(chosenDate)} - lần ${occurrenceIndex + 1}`;
+  const note   = `${ONTHI_MARKER}:${excused ? 'excused' : 'unexcused'}:${chosenDate}:${subj}`;
+
+  const ev = makeDraftEvent({
+    studentId, week: state.week, title, points, note,
+    type: points >= 0 ? 'CONG' : 'TRU',
+    category: ONTHI_CATEGORY,
+    createdBy: 'Nghỉ ôn thi',
+    createdAt: new Date().toISOString(),
+  });
+  await saveScoreChanges({ additions: [ev], deletions: [] });
+}
+
+/** Xoá 1 lần ghi nhận nghỉ ôn thi (bấm nhầm). */
+async function removeOnThiAbsence(eventId) {
+  await saveScoreChanges({ additions: [], deletions: [eventId] });
+}
+
 // Lịch sử nghỉ tập trung của 1 học sinh, xuyên suốt TẤT CẢ các tuần, sắp theo NGÀY NGHỈ.
 function getStudentAbsenceHistory(studentId) {
   return state.events
@@ -352,7 +494,24 @@ function summarizeTTAbsences(students) {
     const excusedCount = history.filter(e => ttAbsenceIsExcused(e)).length;
     const unexcusedCount = history.length - excusedCount;
     const deducted = history.reduce((s,e) => s + (e.points||0), 0);
-    return { ...student, ttHistory: history, ttExcusedCount: excusedCount, ttUnexcusedCount: unexcusedCount, ttTotalCount: history.length, ttDeducted: deducted };
+
+    // --- Nghỉ ôn thi (tính riêng từng môn) ---
+    const onThi = getStudentOnThiHistory(student.id);
+    const onThiExcused = onThi.filter(e => onThiIsExcused(e)).length;
+    const onThiDeducted = onThi.reduce((s,e) => s + (e.points||0), 0);
+
+    return {
+      ...student,
+      ttHistory: history, ttExcusedCount: excusedCount, ttUnexcusedCount: unexcusedCount,
+      ttTotalCount: history.length, ttDeducted: deducted,
+      onThiHistory: onThi,
+      onThiBySubject: groupOnThiBySubject(onThi),
+      onThiExcusedCount: onThiExcused,
+      onThiUnexcusedCount: onThi.length - onThiExcused,
+      onThiTotalCount: onThi.length,
+      onThiDeducted,
+      absTotalDeducted: deducted + onThiDeducted,
+    };
   });
 }
 
@@ -422,6 +581,10 @@ function sortTTAbsences(list) {
     if (key === 'unexcused') return s.ttUnexcusedCount;
     if (key === 'total')     return s.ttTotalCount;
     if (key === 'deducted')  return s.ttDeducted;
+    if (key === 'ot-excused')   return s.onThiExcusedCount;
+    if (key === 'ot-unexcused') return s.onThiUnexcusedCount;
+    if (key === 'ot-total')     return s.onThiTotalCount;
+    if (key === 'all-deducted') return s.absTotalDeducted;
     return 0;
   };
   return [...list].sort((a,b) => {
@@ -875,7 +1038,15 @@ async function saveScoreChanges(changes) {
     id: `local-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
     createdAt: e.createdAt || new Date().toISOString(),
   }));
-  if (!optimistic.length && !deletionDescriptors.length) return;
+  if (!optimistic.length && !deletionDescriptors.length) {
+    // Trước đây hàm lặng lẽ thoát ở đây → bấm nút mà không có gì xảy ra, cũng
+    // không có thông báo nào. Hay gặp nhất: tổ trưởng thao tác trong tuần đã
+    // quá hạn chấm (lockedForLeader) hoặc thao tác với học sinh khác tổ.
+    if ((additions || []).length) {
+      _notify('Không lưu được: bạn không có quyền chấm cho học sinh này, hoặc tuần đang chọn đã quá hạn chấm điểm.', 'error');
+    }
+    return;
+  }
 
   const signature = buildSaveRequestSignature(allowed, deletionDescriptors);
   if (savingActive && signature === lastSaveSignature && (Date.now() - lastSaveAt) < SAVE_DEDUPE_WINDOW_MS) {
@@ -895,7 +1066,13 @@ async function saveScoreChanges(changes) {
     expiresAt: Date.now() + SAVE_GUARD_MS
   };
   setState({ events: nextEvents });
-  if (state.dataSource !== DATA_SOURCE.GAS) return;
+  if (state.dataSource !== DATA_SOURCE.GAS) {
+    // Đang chạy dữ liệu cục bộ/cache (chưa kết nối được máy chủ): thay đổi chỉ
+    // hiện trên màn hình rồi mất khi tải lại. Phải nói rõ, đừng để người dùng
+    // tưởng đã lưu thành công.
+    _notify('Đang dùng dữ liệu cục bộ (chưa kết nối được máy chủ) — thay đổi CHƯA được lưu, sẽ mất khi tải lại trang.', 'warn');
+    return;
+  }
 
   savingActive = true;
   markActivity();
@@ -919,6 +1096,14 @@ async function saveScoreChanges(changes) {
 
     if (json?.ok === false) {
       throw new Error(json.error || 'Máy chủ từ chối lưu điểm (không rõ lý do).');
+    }
+    // Worker gói lỗi nghiệp vụ THÀNH 2 LỚP: ok({ ok:false, error }) trả về
+    // { ok:true, data:{ ok:false, error } }. Nếu chỉ kiểm tra json.ok thì lỗi
+    // bị nuốt hoàn toàn: client coi như lưu thành công, rồi applyRemoteData()
+    // nhận payload rỗng (không có students/events) → bảng "không cập nhật"
+    // mà không hề có thông báo lỗi nào.
+    if (json?.data && json.data.ok === false) {
+      throw new Error(json.data.error || 'Máy chủ từ chối lưu điểm (không rõ lý do).');
     }
     if (!json?.data) {
       throw new Error('Không nhận được xác nhận đã lưu từ máy chủ — có thể chưa ghi được vào Google Sheets.');
@@ -1485,44 +1670,94 @@ function buildScoringPage(d) {
    BUILD ABSENCE PAGE (Nghỉ tập trung — lũy kế cả năm)
    ============================================================ */
 function buildAbsencePage(d) {
-  const canEdit = d.hasFullAccess || d.isGroupLeader;
-  const todayStr = new Date().toISOString().slice(0,10);
-  const sortInfo = state.ttSort || { key:'name', dir:'asc' };
+  const canEdit   = d.hasFullAccess || d.isGroupLeader;
+  const todayStr  = new Date().toISOString().slice(0,10);
+  const sortInfo  = state.ttSort || { key:'name', dir:'asc' };
+  const colCount   = canEdit ? 9 : 8;
 
   function sortArrow(key) {
     if (sortInfo.key !== key) return '';
     return sortInfo.dir === 'asc' ? ' ▲' : ' ▼';
   }
-  function sortTh(key, label) {
-    return `<th class="tt-sortable-th ${sortInfo.key===key?'tt-th-active':''}" onclick="setTTSort('${key}')">${label}${sortArrow(key)}</th>`;
+  function sortTh(key, label, extraClass='', rowspan=1) {
+    return `<th ${rowspan>1?`rowspan="${rowspan}"`:''} class="tt-sortable-th ${extraClass} ${sortInfo.key===key?'tt-th-active':''}" onclick="setTTSort('${key}')">${label}${sortArrow(key)}</th>`;
   }
 
   function checkGroup(count, kind) {
-    // kind: 'excused' | 'unexcused' — dấu tích xanh lặp lại theo số lần, thay vì hiện số
+    // dấu tích lặp lại theo số lần, thay vì hiện số
     if (!count) return '<span class="tt-empty-dash">—</span>';
     const cls = kind === 'excused' ? 'tt-check-excused' : 'tt-check-unexcused';
     return `<span class="tt-check-group">${Array.from({length:count}).map(()=>`<span class="tt-check-icon ${cls}">${Icons.check}</span>`).join('')}</span>`;
   }
 
+  // Ô "theo môn": mỗi môn 1 badge kèm số buổi đã nghỉ của riêng môn đó.
+  function subjectBadges(s) {
+    const otSubjects = getOnThiSubjects(s.id);
+    const map = s.onThiBySubject || {};
+    const keys = [...new Set([...otSubjects, ...Object.keys(map)])].filter(k => (map[k]||[]).length);
+    if (!keys.length) return '<span class="tt-empty-dash">—</span>';
+    return `<span class="ot-subject-list">${keys.map(k => {
+      const n = map[k].length;
+      const over = n > ONTHI_FREE_PER_SUBJECT;
+      return `<span class="ot-subject-badge ${over?'ot-subject-over':''}" title="${k}: ${n} buổi (miễn ${ONTHI_FREE_PER_SUBJECT} buổi đầu)">${k} <b>×${n}</b></span>`;
+    }).join('')}</span>`;
+  }
+
   // Hàng chi tiết LUÔN được render trong DOM (kể cả khi đang đóng) — trạng thái
-  // đóng/mở chỉ là CSS (.tt-detail-open), để toggleTTExpand() có thể bật/tắt
-  // bằng cách toggle class trực tiếp trên đúng dòng, không cần render() lại
-  // toàn trang mỗi lần bấm tên.
+  // đóng/mở chỉ là CSS (.tt-detail-open), để toggleTTExpand() toggle class trực tiếp
+  // trên đúng dòng, không cần render() lại toàn trang mỗi lần bấm tên.
   function buildDetailRow(s, isOpen) {
-    const chips = s.ttHistory.length
+    const ttChips = s.ttHistory.length
       ? s.ttHistory.map(ev => `
         <span class="tt-chip ${ttAbsenceIsExcused(ev)?'tt-chip-excused':'tt-chip-unexcused'}">
           <span class="tt-chip-date">${formatTTDate(ttAbsenceDate(ev))}</span>
           <span class="tt-chip-label">${ttAbsenceIsExcused(ev)?'Có phép':'Không phép'}</span>
+          ${ev.points ? `<span class="tt-chip-pts">${formatScore(ev.points)}</span>` : ''}
           ${canEdit?`<button type="button" class="tt-chip-del" onclick="removeTTAbsence('${ev.id}')" title="Xoá lần ghi nhận này (bấm nhầm)">${Icons.x||'&times;'}</button>`:''}
         </span>`).join('')
-      : `<span class="tt-empty-dash">Chưa có lần nghỉ nào</span>`;
-    return `<tr class="tt-detail-row${isOpen?' tt-detail-open':''}" id="tt-detail-${s.id}"><td colspan="${canEdit?7:6}"><div class="tt-chip-list">${chips}</div></td></tr>`;
+      : `<span class="tt-empty-dash">Chưa có buổi nghỉ tập trung nào</span>`;
+
+    const map = s.onThiBySubject || {};
+    const otSubjects = getOnThiSubjects(s.id);
+    const subjKeys = Object.keys(map).sort((a,b)=>otSubjects.indexOf(a)-otSubjects.indexOf(b));
+    const otBlocks = subjKeys.length
+      ? subjKeys.map(subj => `
+        <div class="ot-detail-subject">
+          <span class="ot-detail-subject-name">${subj}</span>
+          ${map[subj].map((ev, idx) => `
+            <span class="tt-chip ${onThiIsExcused(ev)?'tt-chip-excused':'tt-chip-unexcused'}">
+              <span class="tt-chip-date">${formatTTDate(onThiDate(ev))}</span>
+              <span class="tt-chip-label">lần ${idx+1} · ${onThiIsExcused(ev)?'CP':'KP'}</span>
+              <span class="tt-chip-pts">${ev.points ? formatScore(ev.points) : 'miễn'}</span>
+              ${canEdit?`<button type="button" class="tt-chip-del" onclick="removeOnThiAbsence('${ev.id}')" title="Xoá lần ghi nhận này (bấm nhầm)">${Icons.x||'&times;'}</button>`:''}
+            </span>`).join('')}
+        </div>`).join('')
+      : `<span class="tt-empty-dash">Chưa có buổi nghỉ ôn thi nào</span>`;
+
+    return `<tr class="tt-detail-row${isOpen?' tt-detail-open':''}" id="tt-detail-${s.id}">
+      <td colspan="${colCount}">
+        <div class="abs-detail-wrap">
+          <div class="abs-detail-block">
+            <span class="abs-detail-title">Nghỉ tập trung</span>
+            <div class="tt-chip-list">${ttChips}</div>
+          </div>
+          <div class="abs-detail-block">
+            <span class="abs-detail-title">Nghỉ ôn thi (theo từng môn)</span>
+            <div class="tt-chip-list ot-chip-list">${otBlocks}</div>
+          </div>
+        </div>
+      </td></tr>`;
   }
 
+  const electiveOptions = (studentId, slot) => subjects
+    .filter(sub => !ONTHI_FIXED_SUBJECTS.includes(sub))
+    .map(sub => `<option value="${sub}" ${readOnThiElectives(studentId)[slot]===sub?'selected':''}>${sub}</option>`).join('');
+
   const rows = d.ttAbsenceSummaries.map(s => {
-    const over = s.ttTotalCount > TT_FREE_QUOTA;
+    const otOver = Object.values(s.onThiBySubject||{}).some(list => list.length > ONTHI_FREE_PER_SUBJECT);
+    const over   = s.ttTotalCount > TT_FREE_QUOTA || otOver;
     const isOpen = !!state.ttExpanded[s.id];
+    const totalDeducted = s.absTotalDeducted ?? (s.ttDeducted + (s.onThiDeducted||0));
     return `
     <tr class="${over?'tt-row-over':''}">
       <td>
@@ -1532,35 +1767,79 @@ function buildAbsencePage(d) {
         </button>
       </td>
       <td>Tổ ${s.group}</td>
-      <td class="tt-count-cell">${checkGroup(s.ttExcusedCount,'excused')}</td>
-      <td class="tt-count-cell">${checkGroup(s.ttUnexcusedCount,'unexcused')}</td>
-      <td class="tt-count-cell tt-total-cell">${s.ttTotalCount} / ${TT_FREE_QUOTA} miễn</td>
-      <td class="${s.ttDeducted<0?'score-negative':''}">${s.ttDeducted<0?formatScore(s.ttDeducted):'—'}</td>
-      ${canEdit?`<td class="tt-actions-cell">
-        <input type="date" class="tt-date-input" id="tt-date-${s.id}" value="${todayStr}" max="${todayStr}" title="Ngày nghỉ">
-        <button type="button" class="tt-add-btn tt-add-excused" onclick="addTTAbsence('${s.id}',true)" title="Ghi nhận 1 buổi nghỉ tập trung có phép">+ Có phép</button>
-        <button type="button" class="tt-add-btn tt-add-unexcused" onclick="addTTAbsence('${s.id}',false)" title="Ghi nhận 1 buổi nghỉ tập trung không phép">+ Không phép</button>
+      <td class="tt-count-cell abs-grp-tt">${checkGroup(s.ttExcusedCount,'excused')}</td>
+      <td class="tt-count-cell abs-grp-tt">${checkGroup(s.ttUnexcusedCount,'unexcused')}</td>
+      <td class="tt-count-cell abs-grp-ot">${checkGroup(s.onThiExcusedCount,'excused')}</td>
+      <td class="tt-count-cell abs-grp-ot">${checkGroup(s.onThiUnexcusedCount,'unexcused')}</td>
+      <td class="tt-count-cell abs-grp-ot ot-subject-cell">${subjectBadges(s)}</td>
+      <td class="${totalDeducted<0?'score-negative':''}">${totalDeducted<0?formatScore(totalDeducted):'—'}</td>
+      ${canEdit?`<td class="tt-actions-cell abs-actions-cell">
+        <button type="button" class="tt-record-btn" id="tt-record-btn-${s.id}" onclick="toggleTTRecordPanel('${s.id}')" title="Ghi nhận buổi nghỉ mới">
+          ${Icons.plus}<span>Ghi nhận</span>
+        </button>
+        <div class="tt-record-panel" id="tt-record-panel-${s.id}" style="display:none">
+          <label class="tt-record-field">
+            <span>Ngày nghỉ</span>
+            <input type="date" class="tt-date-input" id="tt-date-${s.id}" value="${todayStr}" max="${todayStr}" title="Ngày nghỉ (dùng chung cho cả 2 loại)">
+          </label>
+          <div class="abs-action-row">
+            <span class="abs-action-tag">Tập trung</span>
+            <button type="button" class="tt-add-btn tt-add-excused" onclick="addTTAbsence('${s.id}',true)" title="Ghi nhận 1 buổi nghỉ tập trung có phép">+ CP</button>
+            <button type="button" class="tt-add-btn tt-add-unexcused" onclick="addTTAbsence('${s.id}',false)" title="Ghi nhận 1 buổi nghỉ tập trung không phép">+ KP</button>
+          </div>
+          <div class="abs-action-row">
+            <span class="abs-action-tag">Ôn thi</span>
+            <select class="ot-subject-select" id="onthi-subject-${s.id}" title="Chọn môn ôn thi">
+              ${getOnThiSubjects(s.id).map(sub => `<option value="${sub}">${sub}</option>`).join('')}
+            </select>
+            <button type="button" class="tt-add-btn tt-add-excused" onclick="addOnThiAbsence('${s.id}',true)" title="Ghi nhận 1 buổi nghỉ ôn thi có phép">+ CP</button>
+            <button type="button" class="tt-add-btn tt-add-unexcused" onclick="addOnThiAbsence('${s.id}',false)" title="Ghi nhận 1 buổi nghỉ ôn thi không phép">+ KP</button>
+          </div>
+          <div class="ot-subject-config">
+            <span class="ot-subject-config-label">Tổ hợp tự chọn: <b>${readOnThiElectives(s.id).join(' · ')}</b></span>
+            <button type="button" class="ot-subject-config-edit" onclick="toggleOnThiSubjectEditor('${s.id}')" title="Đổi tổ hợp môn tự chọn của ${s.name}">${Icons.pencil}</button>
+          </div>
+          <div class="ot-subject-editor" id="ot-subject-editor-${s.id}" style="display:none">
+            <select class="ot-subject-select" onchange="setStudentOnThiSubjects('${s.id}',0,this.value)" title="Môn tự chọn 1">${electiveOptions(s.id,0)}</select>
+            <select class="ot-subject-select" onchange="setStudentOnThiSubjects('${s.id}',1,this.value)" title="Môn tự chọn 2">${electiveOptions(s.id,1)}</select>
+          </div>
+        </div>
       </td>`:''}
     </tr>${buildDetailRow(s, isOpen)}`;
   }).join('');
+
 
   return `<div class="score-page">
     <section class="score-panel">
       <div class="table-toolbar">
         <div class="section-heading-inner">
-          <strong>Nghỉ tập trung (lũy kế cả năm học)</strong>
-          <span class="score-permission-note">2 buổi đầu miễn phí. Từ buổi thứ 3: có phép trừ 200, không phép trừ 400. Bấm tên học sinh để xem/xoá từng lần. Bấm tiêu đề cột để sắp xếp.</span>
+          <strong>Theo dõi nghỉ học (lũy kế cả năm học)</strong>
+          <span class="score-permission-note">
+            <b>Nghỉ tập trung:</b> 2 buổi đầu miễn, từ buổi 3 trừ 200 (có phép) / 400 (không phép).
+            <b>Nghỉ ôn thi:</b> tính riêng từng môn — mỗi môn được nghỉ 1 buổi không trừ, từ buổi thứ 2 của môn đó trừ 100, 200, 300, 400... (cấp số cộng 100).
+            Mỗi học sinh có tổ hợp 2 môn tự chọn riêng — bấm ✎ trong ô "Ghi nhận" của từng bạn để đổi.
+            Bấm tên học sinh để xem/xoá từng lần. Bấm tiêu đề cột để sắp xếp.
+          </span>
         </div>
       </div>
       <div class="score-table-wrap">
-        <table class="score-table tt-absence-table">
+        <table class="score-table tt-absence-table abs-merged-table">
           <thead>
+            <tr class="abs-group-head">
+              ${sortTh('name','Học sinh','abs-th-lead',2)}
+              ${sortTh('group','Tổ','',2)}
+              <th colspan="2" class="abs-group-th abs-grp-tt">Nghỉ tập trung</th>
+              <th colspan="3" class="abs-group-th abs-grp-ot">Nghỉ ôn thi (theo môn)</th>
+              ${sortTh('all-deducted','Điểm đã trừ','',2)}
+              ${canEdit?'<th rowspan="2" class="abs-th-plain">Ghi nhận (chọn ngày nghỉ)</th>':''}
+            </tr>
             <tr>
-              ${sortTh('name','Học sinh')}${sortTh('group','Tổ')}${sortTh('excused','Có phép')}${sortTh('unexcused','Không phép')}
-              ${sortTh('total','Tổng / Miễn')}${sortTh('deducted','Điểm đã trừ')}${canEdit?'<th>Ghi nhận (chọn ngày nghỉ)</th>':''}
+              ${sortTh('excused','Có phép','abs-grp-tt')}${sortTh('unexcused','Không phép','abs-grp-tt')}
+              ${sortTh('ot-excused','Có phép','abs-grp-ot')}${sortTh('ot-unexcused','Không phép','abs-grp-ot')}
+              ${sortTh('ot-total','Chi tiết môn','abs-grp-ot')}
             </tr>
           </thead>
-          <tbody>${rows || `<tr><td colspan="${canEdit?7:6}" style="text-align:center;color:var(--score-muted)">Không có học sinh phù hợp bộ lọc</td></tr>`}</tbody>
+          <tbody>${rows || `<tr><td colspan="${colCount}" style="text-align:center;color:var(--score-muted)">Không có học sinh phù hợp bộ lọc</td></tr>`}</tbody>
         </table>
       </div>
     </section>
@@ -1755,7 +2034,7 @@ function render() {
             <button type="button" class="${state.activeTab==='scoring'?'active':''}"
               onclick="${d.canUseScoringTab?`setTab('scoring')`:'null'}"
               ${!d.canUseScoringTab?'disabled':''}>Bảng chấm</button>
-            <button type="button" class="${state.activeTab==='absence'?'active':''}" onclick="setTab('absence')">Nghỉ tập trung</button>
+            <button type="button" class="${state.activeTab==='absence'?'active':''}" onclick="setTab('absence')">Theo dõi nghỉ</button>
           </nav>
         </header>
         <!-- Toolbar -->
@@ -1821,6 +2100,16 @@ function toggleFilterSelect(id) {
   menu.style.display = menu.style.display==='none'?'block':'none';
 }
 
+// Popover "Ghi nhận" ở bảng Theo dõi nghỉ — gọn 1 nút, bấm mới mở ra ngày +
+// các nút CP/KP, thay vì hiện sẵn choán hết chiều cao dòng.
+function toggleTTRecordPanel(id) {
+  const panel = document.getElementById(`tt-record-panel-${id}`);
+  if (!panel) return;
+  const willOpen = panel.style.display === 'none';
+  document.querySelectorAll('.tt-record-panel').forEach(p => { p.style.display = 'none'; });
+  if (willOpen) panel.style.display = 'flex';
+}
+
 function selectFilterOption(id,value) {
   document.getElementById(`fsm-${id}`)?.style && (document.getElementById(`fsm-${id}`).style.display='none');
   if(id==='week') setState({week:Number(value)});
@@ -1850,10 +2139,14 @@ document.addEventListener('click',e=>{
   if(!e.target.closest('.filter-select')) {
     document.querySelectorAll('.filter-select-menu').forEach(m=>m.style.display='none');
   }
+  if(!e.target.closest('.abs-actions-cell')) {
+    document.querySelectorAll('.tt-record-panel').forEach(p=>p.style.display='none');
+  }
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape') {
     document.querySelectorAll('.filter-select-menu').forEach(m=>m.style.display='none');
+    document.querySelectorAll('.tt-record-panel').forEach(p=>p.style.display='none');
     if(state.editingStudentId) closeModal();
     if(state.mobileFilterOpen) closeMobileFilter();
   }

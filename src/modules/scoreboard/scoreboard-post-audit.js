@@ -389,8 +389,16 @@
     }
   }
 
+  /* Các dòng "Nghỉ tập trung" / "Nghỉ ôn thi" được sinh tự động theo luật riêng
+     (tiêu đề + điểm đã được tính sẵn theo số lần nghỉ). Nếu để AI hậu kiểm sửa
+     tiêu đề/điểm của chúng thì chuỗi luỹ kế sẽ sai → loại khỏi phạm vi rà soát. */
+  function _isAbsenceMarkedEvent(e) {
+    const n = String(e?.note || '');
+    return n.includes('__TT_ABSENCE__') || n.includes('__ONTHI_ABSENCE__');
+  }
+
   async function _enqueue(events) {
-    const fresh = events.filter(e => e?.id && !isSheetTotalEvent(e) && !_checked.has(e.id) && !_pendingClaim.has(e.id));
+    const fresh = events.filter(e => e?.id && !isSheetTotalEvent(e) && !_isAbsenceMarkedEvent(e) && !_checked.has(e.id) && !_pendingClaim.has(e.id));
     if (!fresh.length) return;
 
     fresh.forEach(e => _pendingClaim.add(e.id));
@@ -1356,7 +1364,7 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
   function _allScannableEvents() {
     try {
       return (state.events || []).filter(e =>
-        e && e.id && !isSheetTotalEvent(e) && !String(e.id).startsWith('draft-') && _canEditStudentId(e.studentId, e.week)
+        e && e.id && !isSheetTotalEvent(e) && !_isAbsenceMarkedEvent(e) && !String(e.id).startsWith('draft-') && _canEditStudentId(e.studentId, e.week)
       );
     } catch { return []; }
   }
