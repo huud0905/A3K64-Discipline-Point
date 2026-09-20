@@ -96,6 +96,7 @@
   let _historyLoaded   = false;   // đã tải ít nhất 1 lần trong phiên
   let _historyFilter   = { week: '', studentId: '' }; // bộ lọc hiện tại
   let _initialScanDone   = false;
+  let _lastScanCount     = 0;     // số mục lần quét gần nhất thực sự đưa vào hàng đợi
   let _forceNextScan     = false; // lần quét kế tiếp: bỏ qua cache + bỏ qua "claim" server
   let _initialScanTries  = 0;
   const INITIAL_SCAN_MAX_TRIES = 120; // ~60s (poll mỗi 500ms) rồi thôi chờ
@@ -128,6 +129,55 @@
   }
   function _dismissKey(studentId, week, title, points) {
     return [studentId, week, title, points].join('|');
+  }
+
+  /* ----------------------------------------------------------
+     Danh sách "Bỏ qua" lưu trên DATABASE (GAS) — dùng chung mọi máy/mọi
+     người quản trị, không mất khi xoá dữ liệu trình duyệt. localStorage
+     vẫn giữ làm bản đệm: server lỗi / chưa có action → vẫn chạy như cũ.
+  ---------------------------------------------------------- */
+  function _addDismissed(keys) {
+    const list = (Array.isArray(keys) ? keys : [keys]).filter(Boolean);
+    if (!list.length) return;
+    list.forEach(k => _dismissed.add(k));
+    _saveSet(DISMISSED_KEY, _dismissed);
+    _pushDismissedRemote(list);
+  }
+  function _pushDismissedRemote(keys) {
+    try {
+      const u = _currentUser();
+      for (let i = 0; i < keys.length; i += 200) {   // server nhận tối đa 500 khoá/lần
+        _gasPost('addAuditDismissed', { keys: keys.slice(i, i + 200), actor: u.role }).catch(err =>
+          console.warn('[A3PostSaveAudit] Chưa lưu được danh sách Bỏ qua lên server:', err?.message || err));
+      }
+    } catch { /* không có GAS URL → chỉ lưu cục bộ */ }
+  }
+  async function _loadDismissedRemote() {
+    try {
+      const json = await Promise.race([
+        _gasPost('getAuditDismissed', {}),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000)),
+      ]);
+      const keys = json?.data?.keys ?? json?.data;
+      if (!Array.isArray(keys)) return false;
+      // Máy này có khoá "Bỏ qua" mà server chưa có (bấm trước khi có tính năng
+      // này) → đẩy bù lên server để các máy khác cũng thấy.
+      const remote = new Set(keys);
+      const missing = [..._dismissed].filter(k => !remote.has(k));
+      keys.forEach(k => _dismissed.add(k));
+      _saveSet(DISMISSED_KEY, _dismissed);
+      if (missing.length) _pushDismissedRemote(missing);
+      return true;
+    } catch (err) {
+      console.warn('[A3PostSaveAudit] Không tải được danh sách Bỏ qua từ server, dùng bản cục bộ:', err?.message || err);
+      return false;
+    }
+  }
+
+  /** Mục người dùng đã bấm "Bỏ qua" → không đưa lại vào hàng đợi quét
+   *  (kể cả khi quét lại toàn bộ) — đỡ tốn quota AI và không nhắc lại. */
+  function _isDismissedEvent(e) {
+    try { return _dismissed.has(_dismissKey(e.studentId, e.week, e.title, e.points)); } catch { return false; }
   }
 
   function _currentUser() {
@@ -421,7 +471,7 @@
     // sẽ từ chối → trước đây nút "Quét AI" xoá cache xong vẫn không quét được gì).
     if (force) {
       const inQueue = new Set(_queue.map(e => e.id));
-      const forced = events.filter(e => e?.id && !isSheetTotalEvent(e) && !_isAbsenceMarkedEvent(e) && !inQueue.has(e.id));
+      const forced = events.filter(e => e?.id && !isSheetTotalEvent(e) && !_isAbsenceMarkedEvent(e) && !inQueue.has(e.id) && !_isDismissedEvent(e));
       if (!forced.length) return;
       forced.forEach(e => _checked.add(e.id));
       _saveSet(CHECKED_KEY, _checked);
@@ -431,7 +481,7 @@
       return;
     }
 
-    const fresh = events.filter(e => e?.id && !isSheetTotalEvent(e) && !_isAbsenceMarkedEvent(e) && !_checked.has(e.id) && !_pendingClaim.has(e.id));
+    const fresh = events.filter(e => e?.id && !isSheetTotalEvent(e) && !_isAbsenceMarkedEvent(e) && !_checked.has(e.id) && !_pendingClaim.has(e.id) && !_isDismissedEvent(e));
     if (!fresh.length) return;
 
     fresh.forEach(e => _pendingClaim.add(e.id));
@@ -1037,8 +1087,7 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
       // Coi mục vừa khôi phục là "đã bỏ qua" để AI không lập tức báo lại
       // đúng gợi ý vừa bị người dùng từ chối bằng cách hoàn tác, đồng thời
       // đánh dấu dòng mới khôi phục là "đã kiểm tra" (không cần quét lại).
-      _dismissed.add(_dismissKey(h.studentId, h.week, h.oldTitle, restorePoints));
-      _saveSet(DISMISSED_KEY, _dismissed);
+      _addDismissed(_dismissKey(h.studentId, h.week, h.oldTitle, restorePoints));
       try {
         const restored = (state.events || []).find(e => !beforeIds.has(e.id)
           && e.studentId === h.studentId && e.week === h.week && normTitleForMatch(e.title) === normTitleForMatch(h.oldTitle) && e.points === restorePoints);
@@ -1061,14 +1110,13 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
 
   function _dismissFix(sugId) {
     const s = _suggestions.find(x => x.id === sugId);
-    if (s) { _dismissed.add(_dismissKey(s.studentId, s.week, s.oldTitle, s.points)); _saveSet(DISMISSED_KEY, _dismissed); }
+    if (s) _addDismissed(_dismissKey(s.studentId, s.week, s.oldTitle, s.originalPoints ?? s.points));
     _suggestions = _suggestions.filter(x => x.id !== sugId);
     _renderBadge();
   }
 
   function _dismissAll() {
-    _suggestions.forEach(s => _dismissed.add(_dismissKey(s.studentId, s.week, s.oldTitle, s.points)));
-    _saveSet(DISMISSED_KEY, _dismissed);
+    _addDismissed(_suggestions.map(s => _dismissKey(s.studentId, s.week, s.oldTitle, s.originalPoints ?? s.points)));
     _suggestions = [];
     _panelOpen = false;
     _renderBadge();
@@ -1475,7 +1523,8 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
       } catch { /* localStorage lỗi → bỏ qua, quét theo cache như thường */ }
     }
 
-    const target = force ? all : all.filter(e => !_checked.has(e.id));
+    const target = (force ? all : all.filter(e => !_checked.has(e.id))).filter(e => !_isDismissedEvent(e));
+    _lastScanCount = target.length;
     console.log(`[A3PostSaveAudit] scan: tổng=${all.length}, sẽ quét=${target.length}, force=${force}, đã checked=${_checked.size}`);
     if (!target.length) return;
     if (typeof _notify === 'function' && target.length > 3) {
@@ -1542,26 +1591,31 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'toolbar-button ai-scan';
-        btn.title = 'Quét điểm bằng AI';
+        btn.title = 'Quét các mục chưa kiểm tra bằng AI (giữ Shift: quét lại toàn bộ)';
         btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
           <circle cx="11" cy="11" r="8"/>
           <line x1="21" y1="21" x2="16.65" y2="16.65"/>
           <path d="M11 8v3l2 2"/>
         </svg><span class="tb-label">Quét AI</span>`;
 
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
           if (btn.classList.contains('scanning')) return;
           btn.classList.add('scanning');
           btn.querySelector('.tb-label').textContent = 'Đang quét…';
 
-          // Buộc quét lại TOÀN BỘ (bỏ cache + bỏ claim server)
-          _checked.clear();
-          _saveSet(CHECKED_KEY, _checked);
-          _forceNextScan = true;
+          // Mặc định CHỈ quét mục chưa từng quét (mục đã quét / đã Bỏ qua thì
+          // giữ nguyên, không quét lại). Giữ Shift khi bấm = quét lại toàn bộ
+          // (vẫn bỏ qua các mục đã bấm "Bỏ qua").
+          if (e && e.shiftKey) {
+            _checked.clear();
+            _saveSet(CHECKED_KEY, _checked);
+            _forceNextScan = true;
+          }
           _initialScanDone = false;
           _initialScanTries = 0;
 
-          _waitForDataAndScan();
+          // Lấy danh sách "Bỏ qua" mới nhất từ server (máy khác có thể vừa bỏ qua)
+          _loadDismissedRemote().finally(_waitForDataAndScan);
 
           // Sau khi queue chạy xong thì phục hồi nút (tối đa 30s chờ)
           const MAX_WAIT = 15 * 60 * 1000; // quét nhiều lô, giãn cách ~5s/lô
@@ -1576,6 +1630,10 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
               btn.querySelector('.tb-label').textContent = 'Quét AI';
               if (done && typeof _notify === 'function') {
                 const sugN = _suggestions.length;
+                if (_lastScanCount === 0) {
+                  _notify('Không có mục mới cần quét — mục đã quét hoặc đã bỏ qua sẽ không quét lại.', 'info');
+                  return;
+                }
                 _notify(
                   sugN > 0
                     ? `AI tìm thấy ${sugN} mục có thể sai — xem badge góc phải.`
@@ -1598,7 +1656,7 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
 
   function _boot() {
     _installHook();
-    _waitForDataAndScan();
+    _loadDismissedRemote().finally(_waitForDataAndScan);
     _watchModal();
     _patchToolbarScanBtn();
   }
