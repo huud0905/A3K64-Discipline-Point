@@ -42,6 +42,8 @@
   let _mobTab = 'score';     // 'score'|'history' — tab đang chọn trên mobile (<=767px)
   let _subject = null;       // môn học đang chọn (null = subjects[0])
   let _category = null;      // CATEGORY.* đang chọn
+  let _spCategory = null;    // loại của mục "Lỗi / Thưởng đặc biệt" (mặc định Nề nếp)
+  let _spSubject = null;     // môn của mục đặc biệt (chỉ dùng khi loại = Học tập)
   let _bulkScope = 'single'; // 'single'|'group'|'selected'
   let _bulkSelected = [];    // id[] học sinh được chọn bulk
   let _bulkNote = '';
@@ -58,6 +60,8 @@
   ---------------------------------------------------------- */
   function _sub() { return _subject || subjects[0]; }
   function _cat() { return _category || CATEGORY.STUDY; }
+  function _spCat() { return _spCategory || CATEGORY.DISCIPLINE; }
+  function _spSub() { return _spSubject || subjects[0]; }
   function _ruleKey(r) { return `${r.title}::${r.points}::${r.category}`; }
   function _esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
   function _isDraft(id) { return String(id).startsWith('draft-'); }
@@ -126,6 +130,8 @@
     _mobTab = 'score';
     _subject = subjects[0];
     _category = CATEGORY.STUDY;
+    _spCategory = CATEGORY.DISCIPLINE;
+    _spSubject = subjects[0];
     _bulkScope = 'single';
     _bulkSelected = [studentId];
     _bulkNote = '';
@@ -242,12 +248,12 @@
           <div class="v2-rule-search-wrap">
             <!-- Subject + category -->
             <div class="v2-subject-row">
-              <select class="v2-select" id="v2-subject">${subjects.map(s => `<option value="${_esc(s)}"${s === _sub() ? ' selected' : ''}>${_esc(s)}</option>`).join('')}</select>
               <select class="v2-select" id="v2-category">
                 <option value="HOC_TAP"${_cat() === CATEGORY.STUDY ? ' selected' : ''}>Học tập</option>
                 <option value="NE_NEP"${_cat() === CATEGORY.DISCIPLINE ? ' selected' : ''}>Nề nếp</option>
                 <option value="PHONG_TRAO"${_cat() === CATEGORY.MOVEMENT ? ' selected' : ''}>Phong trào</option>
               </select>
+              <select class="v2-select" id="v2-subject"${_cat() === CATEGORY.STUDY ? '' : ' style="display:none"'}>${subjects.map(s => `<option value="${_esc(s)}"${s === _sub() ? ' selected' : ''}>${_esc(s)}</option>`).join('')}</select>
               <div class="v2-count-wrap">
                 <span>×</span>
                 <input type="number" class="v2-count-input" id="v2-count" min="1" step="1" value="${_violationCount}" title="Số lần vi phạm"/>
@@ -275,6 +281,14 @@
         <!-- Special / custom -->
         <div class="v2-section v2-special-section">
           <label class="v2-section-label">Lỗi / Thưởng đặc biệt</label>
+          <div class="v2-subject-row v2-special-rule-row">
+            <select class="v2-select" id="v2-special-category" title="Loại chấm điểm">
+              <option value="HOC_TAP"${_spCat() === CATEGORY.STUDY ? ' selected' : ''}>Học tập</option>
+              <option value="NE_NEP"${_spCat() === CATEGORY.DISCIPLINE ? ' selected' : ''}>Nề nếp</option>
+              <option value="PHONG_TRAO"${_spCat() === CATEGORY.MOVEMENT ? ' selected' : ''}>Phong trào</option>
+            </select>
+            <select class="v2-select" id="v2-special-subject"${_spCat() === CATEGORY.STUDY ? '' : ' style="display:none"'}>${subjects.map(s => `<option value="${_esc(s)}"${s === _spSub() ? ' selected' : ''}>${_esc(s)}</option>`).join('')}</select>
+          </div>
           <div class="v2-special-row">
             <input type="text" class="v2-special-title" id="v2-special-title" placeholder="Tên lỗi hoặc thưởng…"/>
             <input type="text" class="v2-special-pts" id="v2-special-pts" inputmode="numeric" placeholder="±điểm"/>
@@ -488,7 +502,16 @@
 
     // Subject / Category selects
     root.querySelector('#v2-subject')?.addEventListener('change', e => { _subject = e.target.value; });
-    root.querySelector('#v2-category')?.addEventListener('change', e => { _category = e.target.value; });
+    root.querySelector('#v2-category')?.addEventListener('change', e => {
+      _category = e.target.value;
+      _syncSubjectVisibility();
+    });
+    // Mục Lỗi / Thưởng đặc biệt có quy tắc chấm RIÊNG (mặc định Nề nếp)
+    root.querySelector('#v2-special-subject')?.addEventListener('change', e => { _spSubject = e.target.value; });
+    root.querySelector('#v2-special-category')?.addEventListener('change', e => {
+      _spCategory = e.target.value;
+      _syncSubjectVisibility();
+    });
 
     // Count input
     root.querySelector('#v2-count')?.addEventListener('change', e => {
@@ -832,6 +855,17 @@
   /* ----------------------------------------------------------
      ACTIONS
   ---------------------------------------------------------- */
+  /** Môn học chỉ có nghĩa khi loại = Học tập → ẩn ở Nề nếp / Phong trào.
+   *  Áp dụng cho cả form nội quy (trên) và mục Lỗi / Thưởng đặc biệt. */
+  function _syncSubjectVisibility() {
+    const root = _getRoot();
+    if (!root) return;
+    const topSub = root.querySelector('#v2-subject');
+    if (topSub) topSub.style.display = _cat() === CATEGORY.STUDY ? '' : 'none';
+    const spSub = root.querySelector('#v2-special-subject');
+    if (spSub) spSub.style.display = _spCat() === CATEGORY.STUDY ? '' : 'none';
+  }
+
   function _chooseRule(rule) {
     _subject = rule.category === CATEGORY.STUDY ? (_sub()) : _sub();
     _category = rule.category;
@@ -841,6 +875,7 @@
     if (inp) inp.value = rule.title;
     const catSel = root?.querySelector('#v2-category');
     if (catSel) catSel.value = rule.category;
+    _syncSubjectVisibility();
     root?.querySelector('#v2-add-btn')?.removeAttribute('disabled');
     _patchSearchClear();
   }
@@ -869,12 +904,14 @@
     if (!points) return;
 
     const cat = payload.category || _cat();
-    const subj = _sub();
+    const subj = payload.subject || _sub();
 
     const targetIds = _getTargetIds();
     const newDrafts = targetIds.map(studentId => makeDraftEvent({
       studentId, week: state.week,
-      title: formatSavedTitle(activeDay, cat, subj, title, points),
+      // Nhiều lần (×N): ghi rõ "×N" vào nội dung để người đọc biết điểm là
+      // tổng của N lần (VD "Phát biểu ×4 (+20)"), không bị hiểu nhầm là 1 lần.
+      title: formatSavedTitle(activeDay, cat, subj, count > 1 ? `${title} ×${count}` : title, points),
       points, type: points >= 0 ? 'CONG' : 'TRU',
       category: cat, note: _bulkNote.trim() || undefined,
       createdBy: 'Web', createdAt: newEventDateForDay(activeDay),
@@ -1112,7 +1149,7 @@
     const title = root?.querySelector('#v2-special-title')?.value?.trim();
     const pts = Number(root?.querySelector('#v2-special-pts')?.value);
     if (!title || !isFinite(pts) || pts === 0) return;
-    _stageScore({ title, points: pts, category: _cat() });
+    _stageScore({ title, points: pts, category: _spCat(), subject: _spSub() });
     const titleInput = root?.querySelector('#v2-special-title');
     const ptsInput = root?.querySelector('#v2-special-pts');
     if (titleInput) titleInput.value = '';
@@ -1494,6 +1531,9 @@
 .v2-subject-row {
   display: flex; gap: 7px; align-items: center; flex-wrap: wrap;
 }
+
+.v2-special-rule-row { margin-bottom: 7px; }
+.v2-special-rule-row .v2-select { flex: 1; min-width: 0; }
 
 .v2-select {
   height: 36px; padding: 0 10px;

@@ -49,6 +49,11 @@
   const DEBOUNCE_MS    = 4000;
   const RETRY_BUSY_MS  = 1500;
   const MAX_BATCH      = 25;           // tối đa 1 lượt gọi AI / lần
+  const BATCH_GAP_MS   = 5000;         // giãn cách giữa các lô khi quét nhiều (~12 lượt/phút, dưới hạn 15 RPM)
+  // Đổi SCAN_VERSION khi thay đổi cách AI kiểm tra → mỗi trình duyệt quản trị
+  // sẽ tự quét lại TOÀN BỘ điểm cũ đúng 1 lần theo tiêu chí mới.
+  const SCAN_VERSION_KEY = 'a3k64-audit-scanver';
+  const SCAN_VERSION     = '2-category-semantic';
   const AI_KEY_STORE   = 'a3k64-gemini-key';        // dùng chung key với scoreboard-ai.js
   const AI_BASE_URL    = 'https://generativelanguage.googleapis.com/v1beta/models';
   const AI_MODELS      = [
@@ -67,7 +72,7 @@
   ];
   const DISMISSED_KEY  = 'a3k64-audit-dismissed-v1';
   const CHECKED_KEY    = 'a3k64-audit-checked-v1';
-  const MAX_STORE_ITEMS = 500;
+  const MAX_STORE_ITEMS = 5000; // đủ chứa toàn bộ dòng điểm của cả lớp (trước đây 500 → mục cũ bị quên và quét lại mãi)
   const MAX_HISTORY_ITEMS = 30; // số mục "AI đã sửa" giữ lại để có thể Hoàn tác
   const HISTORY_LOAD_LIMIT = 200; // số bản ghi tối đa tải từ server khi mở panel lịch sử
 
@@ -91,6 +96,7 @@
   let _historyLoaded   = false;   // đã tải ít nhất 1 lần trong phiên
   let _historyFilter   = { week: '', studentId: '' }; // bộ lọc hiện tại
   let _initialScanDone   = false;
+  let _forceNextScan     = false; // lần quét kế tiếp: bỏ qua cache + bỏ qua "claim" server
   let _initialScanTries  = 0;
   const INITIAL_SCAN_MAX_TRIES = 120; // ~60s (poll mỗi 500ms) rồi thôi chờ
 
@@ -206,7 +212,10 @@
      gì và nội dung gốc là gì.
   ---------------------------------------------------------- */
   function parseEventTitle(rawTitle) {
-    let t = String(rawTitle || '').replace(/^(Thứ\s*[2-7]|Chủ nhật):\s*/i, '').trim();
+    let t = String(rawTitle || '').replace(/^(Thứ\s*[2-7]|Chủ nhật|CN):\s*/i, '').trim();
+    let tiet = null;
+    const tietMatch = t.match(/^Tiết\s*(\d+):\s*/i); // title Học tập có "Tiết N:"
+    if (tietMatch) { tiet = parseInt(tietMatch[1], 10); t = t.slice(tietMatch[0].length).trim(); }
 
     let category = 'HOC_TAP';
     const catMatch = t.match(/^\[([^\]]+)\]/);
@@ -228,7 +237,15 @@
     const ptsMatch = t.match(/\(([+-]?\d+)\)\s*$/);
     if (ptsMatch) t = t.slice(0, t.lastIndexOf(ptsMatch[0])).trim();
 
-    return { category, subject, contentTitle: t };
+    // "Phát biểu ×4 (+20)": điểm lưu là TỔNG của 4 lần → tách số lần ra
+    let count = 1;
+    const cntMatch = t.match(/\s*×\s*(\d+)\s*$/);
+    if (cntMatch) {
+      count = Math.max(1, parseInt(cntMatch[1], 10));
+      t = t.slice(0, t.length - cntMatch[0].length).trim();
+    }
+
+    return { category, subject, contentTitle: t, tiet, count };
   }
 
   /* ----------------------------------------------------------
@@ -397,7 +414,23 @@
     return n.includes('__TT_ABSENCE__') || n.includes('__ONTHI_ABSENCE__');
   }
 
-  async function _enqueue(events) {
+  async function _enqueue(events, opts) {
+    const force = !!(opts && opts.force);
+    // force = quét lại các dòng ĐÃ từng được kiểm tra: bỏ qua cache cục bộ
+    // VÀ bỏ qua "claim" trên server (id đã bị claim từ lần quét cũ nên server
+    // sẽ từ chối → trước đây nút "Quét AI" xoá cache xong vẫn không quét được gì).
+    if (force) {
+      const inQueue = new Set(_queue.map(e => e.id));
+      const forced = events.filter(e => e?.id && !isSheetTotalEvent(e) && !_isAbsenceMarkedEvent(e) && !inQueue.has(e.id));
+      if (!forced.length) return;
+      forced.forEach(e => _checked.add(e.id));
+      _saveSet(CHECKED_KEY, _checked);
+      _queue.push(...forced);
+      clearTimeout(_timer);
+      _timer = setTimeout(_runAudit, DEBOUNCE_MS);
+      return;
+    }
+
     const fresh = events.filter(e => e?.id && !isSheetTotalEvent(e) && !_isAbsenceMarkedEvent(e) && !_checked.has(e.id) && !_pendingClaim.has(e.id));
     if (!fresh.length) return;
 
@@ -521,7 +554,9 @@
   function _buildItemsBlock(parsedList) {
     return parsedList.map((it, i) => {
       const p = it.parsed;
-      return `${i}:::${_categoryLabelForPrompt(p.category, p.subject)}:::${p.contentTitle}:::${it.ev.points >= 0 ? '+' : ''}${it.ev.points}`;
+      // Mục ×N: điểm lưu là tổng N lần → đưa cho AI điểm của 1 LẦN để so với quy định
+      const unit = it.ev.points / (p.count || 1);
+      return `${i}:::${_categoryLabelForPrompt(p.category, p.subject)}:::${p.contentTitle}:::${unit >= 0 ? '+' : ''}${unit}`;
     }).join('\n');
   }
 
@@ -562,6 +597,24 @@ index:::loại đang gán:::nội dung:::điểm). Rà soát TỪNG mục theo 2
    CHỈ báo lỗi khi CHẮC CHẮN khớp đúng 1 quy định cụ thể — không suy đoán khi
    mơ hồ hoặc nội dung không nằm trong danh sách quy định chuẩn.
 
+1b. SAI LOẠI THEO Ý NGHĨA — mục TỰ DO (issue = \"category\"):
+   Với mục KHÔNG khớp quy định chuẩn nào (người dùng gõ tay, ví dụ ở ô
+   \"Lỗi / Thưởng đặc biệt\"), hãy tự phán đoán loại đúng theo ý nghĩa nội dung:
+   - NE_NEP (nề nếp): kỷ luật, trật tự, đi học muộn, vệ sinh, trực nhật,
+     \"làm lớp\" (gây ồn/mất trật tự), đồng phục, sử dụng điện thoại, việc
+     làm tốt/xấu cho tập thể...
+   - HOC_TAP (học tập): gắn TRỰC TIẾP với việc học một môn cụ thể — ghi bài,
+     thuộc bài, làm bài tập, phát biểu xây dựng bài, điểm kiểm tra...
+   - PHONG_TRAO (phong trào): hoạt động tập thể/thi đua — văn nghệ, thể thao,
+     đoàn đội, cuộc thi, hội diễn...
+   Nếu loại đang gán RÕ RÀNG không hợp với nội dung (ví dụ \"[Học tập] làm lớp\"
+   → đúng phải là Nề nếp) → issue = \"category\", đặt \"suggested_category\" đúng,
+   \"matched_rule_index\" = null, \"suggested_title\" giữ nguyên nội dung gốc,
+   \"reason\" giải thích ngắn gọn. KHÔNG đổi điểm. Chỉ đề xuất chuyển sang
+   HOC_TAP khi nội dung nêu rõ hoặc ngụ ý MỘT MÔN CỤ THỂ (điền
+   \"suggested_subject\" đúng theo danh sách môn chính thức); nếu không rõ môn
+   thì KHÔNG báo lỗi. Không báo khi mơ hồ (nội dung có thể hợp lý với loại đang gán).
+
 2. VIẾT TẮT (issue = "abbr"):
    CHỈ áp dụng cho các mục KHÔNG khớp quy định chuẩn nào ở trên (nội dung tự
    do người dùng gõ tay). Nếu nội dung dùng chữ viết tắt không trang trọng
@@ -579,6 +632,8 @@ index:::loại đang gán:::nội dung:::điểm). Rà soát TỪNG mục theo 2
    tự đúng của quy định đã khớp để server lấy điểm chuẩn. "suggested_title"
    giữ nguyên nội dung gốc. Chỉ báo lỗi khi CHẮC CHẮN khớp đúng 1 quy định
    CỤ THỂ và điểm lệch rõ ràng — không báo nếu chỉ nghi ngờ mơ hồ.
+   (Điểm trong danh sách mục cần rà soát đã là điểm của 1 LẦN — mục lặp nhiều
+   lần \"×N\" đã được chia sẵn, đừng coi điểm gộp là sai.)
 
 Nếu 1 mục vừa sai loại (mục 1) vừa có viết tắt (mục 2): báo issue = "category"
 và vẫn điền "suggested_title" đã sửa viết tắt trong cùng lúc, kèm
@@ -624,10 +679,14 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
     if (!_queue.length) return;
     if (!_canUseAudit()) { _queue = []; return; }
 
-    const batch = _dedupeById(_queue.splice(0, _queue.length)).slice(0, MAX_BATCH);
+    // Lấy tối đa MAX_BATCH mục; phần còn lại GIỮ trong hàng đợi cho lô sau
+    // (trước đây phần dư bị splice rồi vứt mất nhưng vẫn bị đánh dấu "đã kiểm
+    // tra" → quét toàn bộ chỉ xử lý được 25 mục đầu).
+    const deduped = _dedupeById(_queue);
+    const batch = deduped.slice(0, MAX_BATCH);
+    _queue = deduped.slice(MAX_BATCH);
     if (!batch.length) return;
-    // Còn dư (quá MAX_BATCH) → giữ lại đợt sau
-    if (_queue.length) { clearTimeout(_timer); _timer = setTimeout(_runAudit, RETRY_BUSY_MS); }
+    if (_queue.length) { clearTimeout(_timer); _timer = setTimeout(_runAudit, BATCH_GAP_MS); }
 
     // Lưu ý: batch đã được đánh dấu "đã kiểm tra" (_checked) + "đã claim"
     // (server) ngay từ lúc _enqueue(), không lặp lại ở đây nữa.
@@ -738,11 +797,15 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
       const sameSubj = suggestedCategory === 'HOC_TAP' ? (suggestedSubject === p.subject) : true;
       const categoryChanged = !sameCat || !sameSubj;
 
-      const suggestedPoints = categoryChanged
-        ? _resolveCorrectPoints(rules, suggestedCategory, suggestedContentTitle, ev.points, Number.isInteger(r.matched_rule_index) ? r.matched_rule_index : null)
+      // Mục ×N: điểm lưu là TỔNG N lần → tính trên điểm 1 lần rồi nhân lại
+      const count = p.count > 1 ? p.count : 1;
+      const unitPts = ev.points / count;
+      const resolvedUnit = categoryChanged
+        ? _resolveCorrectPoints(rules, suggestedCategory, suggestedContentTitle, unitPts, Number.isInteger(r.matched_rule_index) ? r.matched_rule_index : null)
         : (r.issue === 'points' && Number.isInteger(r.matched_rule_index)
-            ? _resolveCorrectPoints(rules, suggestedCategory, suggestedContentTitle, ev.points, r.matched_rule_index)
-            : ev.points);
+            ? _resolveCorrectPoints(rules, suggestedCategory, suggestedContentTitle, unitPts, r.matched_rule_index)
+            : unitPts);
+      const suggestedPoints = Number((resolvedUnit * count).toFixed(4));
 
       const sameTitle  = normalizeStrSafe(suggestedContentTitle) === normalizeStrSafe(p.contentTitle);
       const samePoints = suggestedPoints === ev.points;
@@ -753,8 +816,14 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
       if (day === null || day === undefined) return;
 
       let newTitle;
-      try { newTitle = formatSavedTitle(day, suggestedCategory, suggestedSubject || (subjectsList[0] || ''), suggestedContentTitle, suggestedPoints); }
+      try { newTitle = formatSavedTitle(day, suggestedCategory, suggestedSubject || (subjectsList[0] || ''), count > 1 ? `${suggestedContentTitle} ×${count}` : suggestedContentTitle, suggestedPoints); }
       catch { return; }
+      // formatSavedTitle() không biết Tiết — chỉ Học tập mới có Tiết, nên giữ
+      // lại Tiết cũ nếu loại mới vẫn là Học tập; chuyển sang Nề nếp/Phong trào
+      // thì bỏ Tiết (đúng quy tắc: loại đó không có tiết).
+      if (suggestedCategory === 'HOC_TAP' && Number.isFinite(p.tiet)) {
+        newTitle = newTitle.replace(/^([^:]+):\s*/, `$1: Tiết ${p.tiet}: `);
+      }
 
       out.push({
         id: ev.id,
@@ -1393,13 +1462,26 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
       return;
     }
     const all = _allScannableEvents();
-    const unchecked = all.filter(e => !_checked.has(e.id));
-    console.log(`[A3PostSaveAudit] scan: tổng=${all.length}, chưa kiểm tra=${unchecked.length}, đã checked=${_checked.size}`);
-    if (!unchecked.length) return;
-    if (typeof _notify === 'function' && unchecked.length > 3) {
-      _notify(`AI đang quét lại ${unchecked.length} mục điểm cũ ở nền…`, 'info');
+
+    // Bản kiểm tra đã đổi (SCAN_VERSION mới) → quét lại TOÀN BỘ điểm cũ 1 lần.
+    let force = _forceNextScan;
+    _forceNextScan = false;
+    if (!force) {
+      try {
+        if (localStorage.getItem(SCAN_VERSION_KEY) !== SCAN_VERSION) {
+          force = true;
+          localStorage.setItem(SCAN_VERSION_KEY, SCAN_VERSION);
+        }
+      } catch { /* localStorage lỗi → bỏ qua, quét theo cache như thường */ }
     }
-    _enqueue(unchecked);
+
+    const target = force ? all : all.filter(e => !_checked.has(e.id));
+    console.log(`[A3PostSaveAudit] scan: tổng=${all.length}, sẽ quét=${target.length}, force=${force}, đã checked=${_checked.size}`);
+    if (!target.length) return;
+    if (typeof _notify === 'function' && target.length > 3) {
+      _notify(`AI đang quét ${force ? 'lại toàn bộ ' : ''}${target.length} mục điểm ở nền…`, 'info');
+    }
+    _enqueue(target, { force });
   }
 
   function _waitForDataAndScan() {
@@ -1472,21 +1554,17 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
           btn.classList.add('scanning');
           btn.querySelector('.tb-label').textContent = 'Đang quét…';
 
-          // Xoá cache checked để buộc scan lại toàn bộ
+          // Buộc quét lại TOÀN BỘ (bỏ cache + bỏ claim server)
           _checked.clear();
           _saveSet(CHECKED_KEY, _checked);
+          _forceNextScan = true;
           _initialScanDone = false;
           _initialScanTries = 0;
-
-          if (typeof _notify === 'function') {
-            const total = _allScannableEvents().length;
-            _notify(`AI đang quét ${total} mục điểm…`, 'info');
-          }
 
           _waitForDataAndScan();
 
           // Sau khi queue chạy xong thì phục hồi nút (tối đa 30s chờ)
-          const MAX_WAIT = 30000;
+          const MAX_WAIT = 15 * 60 * 1000; // quét nhiều lô, giãn cách ~5s/lô
           const POLL_MS = 800;
           let elapsed = 0;
           const poll = setInterval(() => {
@@ -1553,6 +1631,7 @@ sót mục nào, không thêm chữ nào ngoài JSON, đúng định dạng:
     forceRescan: () => {
       _checked.clear();
       _saveSet(CHECKED_KEY, _checked);
+      _forceNextScan = true;
       _initialScanDone = false;
       _initialScanTries = 0;
       _waitForDataAndScan();

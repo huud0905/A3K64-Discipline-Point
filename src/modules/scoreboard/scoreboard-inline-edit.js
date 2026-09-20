@@ -73,7 +73,8 @@
      Parse title ngược lại từ formatSavedTitle()
   ---------------------------------------------------------- */
   function parseEventTitle(rawTitle) {
-    let t = String(rawTitle || '').replace(/^(Thứ\s*[2-7]|Chủ nhật):\s*/i, '').trim();
+    let t = String(rawTitle || '').replace(/^(Thứ\s*[2-7]|Chủ nhật|CN):\s*/i, '').trim();
+    t = t.replace(/^Tiết\s*\d+:\s*/i, '').trim(); // title cũ còn "Tiết N:"
 
     let category = 'HOC_TAP';
     const catMatch = t.match(/^\[([^\]]+)\]/);
@@ -99,7 +100,15 @@
       t = t.slice(0, t.lastIndexOf(ptsMatch[0])).trim();
     }
 
-    return { category, subject, contentTitle: t, points };
+    // "Phát biểu ×4" → nội dung "Phát biểu", số lần 4 (điểm trong title là TỔNG)
+    let count = 1;
+    const cntMatch = t.match(/\s*×\s*(\d+)\s*$/);
+    if (cntMatch) {
+      count = Math.max(1, parseInt(cntMatch[1], 10));
+      t = t.slice(0, t.length - cntMatch[0].length).trim();
+    }
+
+    return { category, subject, contentTitle: t, points, count };
   }
 
   function normalizeStrSafe(s) {
@@ -185,6 +194,9 @@
      Điền form bên trái sau khi click (KHÔNG xoá dòng cũ ở đây)
   ---------------------------------------------------------- */
   function fillForm(root, parsed, matchedRule) {
+    // Khôi phục ô "×N" (điểm lưu là tổng N lần; form nhân lại khi bấm Sửa)
+    const cntInp = root.querySelector('#v2-count');
+    if (cntInp) { cntInp.value = String(parsed.count || 1); cntInp.dispatchEvent(new Event('change')); }
     const catSel = root.querySelector('#v2-category');
     if (catSel) {
       catSel.value = parsed.category;
@@ -216,7 +228,15 @@
     } else {
       if (searchInp) { searchInp.value = ''; searchInp.dispatchEvent(new Event('input')); }
       if (titleInp) titleInp.value = parsed.contentTitle;
-      if (ptsInp)   ptsInp.value   = String(parsed.points ?? '');
+      if (ptsInp)   ptsInp.value   = parsed.points == null ? '' : String(parsed.points / (parsed.count || 1));
+      const spCat = root.querySelector('#v2-special-category');
+      if (spCat) { spCat.value = parsed.category; spCat.dispatchEvent(new Event('change')); }
+      if (parsed.category === 'HOC_TAP' && parsed.subject) {
+        const spSub = root.querySelector('#v2-special-subject');
+        const f = spSub && Array.from(spSub.options).find(o => o.value === parsed.subject
+          || normalizeStrSafe(o.value) === normalizeStrSafe(parsed.subject));
+        if (f) { spSub.value = f.value; spSub.dispatchEvent(new Event('change')); }
+      }
       setTimeout(() => titleInp?.focus(), 30);
       flashEl(root.querySelector('.v2-special-section'));
     }

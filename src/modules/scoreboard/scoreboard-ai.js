@@ -1356,7 +1356,7 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
     const students = _students();
     const rows = _results.map((r, i) => {
       const unmatched = r.student_id === 'UNKNOWN' || !r.student_id;
-      const missingTiet = r.tiet === null || r.tiet === undefined || r.tiet === '';
+      const missingTiet = _isMissingTiet(r);
       const autoDup = !!r._autoDuplicated;
       const scoreClass = Number(r.score) >= 0 ? 'pos' : 'neg';
       const selectOpts = students.map(s =>
@@ -1423,7 +1423,7 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
     }).join('');
 
     const unmatchedCount  = _results.filter(r => r.student_id === 'UNKNOWN').length;
-    const missingTietCount = _results.filter(r => r.tiet === null || r.tiet === undefined || r.tiet === '').length;
+    const missingTietCount = _results.filter(_isMissingTiet).length;
     const autoDupCount    = _results.filter(r => r._autoDuplicated).length;
 
     return `
@@ -1855,18 +1855,30 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
   /* ────────────────────────────────────────────────────────
      BUILD EVENT TITLE — cú pháp output chuẩn
   ──────────────────────────────────────────────────────── */
+  /** Tiết bắt buộc với dòng Học tập và GVNN (Nề nếp/Phong trào không có tiết). */
+  function _isMissingTiet(r) {
+    const noTiet = r.tiet === null || r.tiet === undefined || r.tiet === '';
+    if (!noTiet) return false;
+    const fallback = _root()?.querySelector('#ai-category-input')?.value || 'NE_NEP';
+    if ((r.category || fallback) === 'HOC_TAP') return true;
+    const isG = _sb().isGvnnTitle || (t => String(t || '').trim() === (_sb().GVNN_TITLE || 'Giáo Viên Nhắc Nhở'));
+    return !!isG(r.matched_rule);
+  }
+
   /**
    * Tạo chuỗi title lưu vào database theo cú pháp chuẩn:
-   *   Có môn:    Thứ N: Tiết N: [Loại]: [Môn] Nội dung (±pts)
-   *   Không môn: Thứ N: Tiết N: [Loại] Nội dung (±pts)
+   *   Học tập:             Thứ N: Tiết N: [Học tập]: [Môn] Nội dung (±pts)
+   *   Nề nếp / Phong trào: Thứ N: [Loại] Nội dung (±pts)   (KHÔNG có Tiết/Môn)
    *
-   * Không có prefix [Tự tính]. Tiết luôn có mặt vì _applyResults() đã
-   * chặn không cho áp dụng khi còn dòng thiếu Tiết (xem _runAnalysis /
-   * _applyResults) — tiet truyền vào đây không bao giờ là null.
+   * Chỉ Học tập mới gắn Tiết + Môn; Nề nếp và Phong trào không thuộc tiết
+   * học nào nên ghi Tiết chỉ là dữ liệu dư thừa. (GVNN là ngoại lệ — do
+   * server ghi qua addGvnnEvent, vẫn theo tiết.)
    */
   function _buildEventTitle(day, tiet, category, subject, content, pts) {
     const dayStr = day === 0 ? 'CN' : `Thứ ${day}`;
-    const tietStr = Number.isFinite(Number(tiet)) ? `: Tiết ${Number(tiet)}` : '';
+    const isStudy = String(category || '').toUpperCase() === 'HOC_TAP';
+    if (!isStudy) subject = null;
+    const tietStr = isStudy && Number.isFinite(Number(tiet)) ? `: Tiết ${Number(tiet)}` : '';
     const catLabel = _categoryLabel(category);
     const scoreStr = pts > 0 ? `(+${pts})` : `(${pts})`;
     if (subject) {
@@ -1900,9 +1912,9 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
     }
     // Validate: không cho apply nếu còn dòng thiếu Tiết — theo yêu cầu AI KHÔNG
     // được tự đoán số Tiết, người dùng phải tự chọn thủ công trước khi áp dụng.
-    const missingTiets = _results.filter(r => r.tiet === null || r.tiet === undefined || r.tiet === '');
+    const missingTiets = _results.filter(_isMissingTiet);
     if (missingTiets.length) {
-      _errorMsg = `Còn ${missingTiets.length} dòng chưa xác định Tiết. Hãy chọn Tiết thủ công trước khi áp dụng.`;
+      _errorMsg = `Còn ${missingTiets.length} dòng (Học tập/GVNN) chưa xác định Tiết. Hãy chọn Tiết thủ công trước khi áp dụng.`;
       _refreshAll();
       return;
     }
@@ -1925,14 +1937,14 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
       const additions = normalRows.map(r => {
         const pts      = Number(r.score) || 0;
         const rowDay   = Number.isFinite(Number(r.day)) ? Number(r.day) : 2;
-        const rowTiet  = Number.isFinite(Number(r.tiet)) ? Number(r.tiet) : null; // đã bị chặn null ở validate phía trên
         const category = r.category || fallbackCategory;
+        const rowTiet  = category === 'HOC_TAP' && Number.isFinite(Number(r.tiet)) ? Number(r.tiet) : null;
         const content  = r.matched_rule || r.reason || 'Ghi chú AI';
         const subject  = r.subject || null;
 
         // Cấu trúc title chuẩn (KHÔNG có prefix [Tự tính]):
-        //   Có môn: Thứ N: Tiết N: [Loại]: [Môn] Nội dung (điểm)
-        //   Không môn: Thứ N: Tiết N: [Loại] Nội dung (điểm)
+        //   Học tập: Thứ N: Tiết N: [Học tập]: [Môn] Nội dung (điểm)
+        //   Nề nếp / Phong trào: Thứ N: [Loại] Nội dung (điểm)
         const title    = _buildEventTitle(rowDay, rowTiet, category, subject, content, pts);
 
         return {
@@ -1942,11 +1954,8 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
           points:     pts,
           type:       pts >= 0 ? 'CONG' : 'TRU',
           category,
-          // dayLabel/tiet giữ nguyên dạng tách riêng (không chỉ gộp vào title)
-          // để backend có thể dùng cho các logic theo-tiết trong tương lai
-          // (VD: đếm số lần vi phạm trong cùng 1 tiết) mà không cần parse lại title.
           dayLabel:   rowDay === 0 ? 'CN' : `Thứ ${rowDay}`,
-          tiet:       rowTiet,
+          ...(rowTiet !== null ? { tiet: rowTiet } : {}),
           note:       'AI Auto-Parsing',
           createdBy:  'AI',
           createdAt:  (_sb().newEventDateForDay || (()=>new Date().toISOString()))(rowDay),
