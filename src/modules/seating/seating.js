@@ -8,18 +8,13 @@ const SEAT_STORAGE_KEY     = 'a3k64-seating-map-v1';
 const SEAT_DB_KEY          = 'a3k64-seating-sheet-local-db-v1';
 const SEAT_CURRENT_KEY     = 'a3k64-seating-sheet-current-id-v1';
 const SEAT_PUBLISH_PREFIX  = 'a3k64-seating-publish-lite-v1:';
+const SEAT_LOCKED_KEY      = 'a3k64-seating-locked-students-v1';
 
 /* ---------- Dữ liệu mặc định — lưới trống (chờ tải từ backend) ---------- */
 const SEAT_DEFAULT = {
   left:  Array.from({ length: 7 }, () => ['', '', '', '']),
   right: Array.from({ length: 7 }, () => ['', '', '', '']),
 };
-
-/* Danh sách học sinh duy nhất, sort theo tiếng Việt */
-const SEAT_STUDENTS = Array.from(new Set(
-  SEAT_DEFAULT.left.flat().concat(SEAT_DEFAULT.right.flat())
-    .map(n => n.trim()).filter(Boolean)
-)).sort((a, b) => a.localeCompare(b, 'vi'));
 
 /* ---------- Cấu hình phòng (cửa sổ / cửa / nhãn hàng trước) ----------
  * Khác lớp khác phòng thì vị trí cửa sổ, cửa, hoặc tên nhãn (BÀN GV/BẢNG/
@@ -137,6 +132,13 @@ function seatFullName(shortName) {
   const s = String(shortName || '').trim();
   return SEAT_FULL_NAME[s] || s;
 }
+
+/* Danh sách học sinh duy nhất, sort theo tiếng Việt — lấy từ danh sách lớp
+ * (SEAT_FULL_NAME) chứ KHÔNG lấy từ SEAT_DEFAULT (lưới trống mặc định, chờ
+ * tải dữ liệu thật từ backend). Trước đây lấy nhầm từ SEAT_DEFAULT nên danh
+ * sách này luôn rỗng — kéo học sinh ra khỏi ghế để "bỏ xếp chỗ" bị mất tên
+ * luôn vì sidebar không còn nơi nào để hiện lại tên đó. */
+const SEAT_STUDENTS = Object.keys(SEAT_FULL_NAME).sort((a, b) => a.localeCompare(b, 'vi'));
 
 /* ---------- Pure helpers ---------- */
 function seatNorm(v) {
@@ -276,6 +278,19 @@ function saveSheet(sheets, id, title, seats, room) {
   writeDb(items);
   localStorage.setItem(SEAT_CURRENT_KEY, item.id);
   return { items, item };
+}
+/* ---------- Khoá chỗ ngồi từng học sinh ----------
+ * Học sinh đã "ok chỗ" thì khoá lại — nút Random sẽ bỏ qua, kéo-thả cũng
+ * chặn luôn (không tự dưng bị đẩy đi khi người khác chỉnh sửa). Lưu local
+ * theo tên học sinh (không phụ thuộc sơ đồ nào), không cần đồng bộ backend. */
+function loadLockedStudents() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(SEAT_LOCKED_KEY) || '[]');
+    return new Set(Array.isArray(arr) ? arr.filter(Boolean) : []);
+  } catch { return new Set(); }
+}
+function saveLockedStudents(set) {
+  try { localStorage.setItem(SEAT_LOCKED_KEY, JSON.stringify(Array.from(set))); } catch { /* ignore */ }
 }
 function publishKey(id) { return `${SEAT_PUBLISH_PREFIX}${id}`; }
 function readPublish(id) {
@@ -468,7 +483,7 @@ let roomConfig     = normalizeRoom(sheets.find(i => i.id === currentId)?.layout?
 let query          = '';
 let editMode       = false;
 let selectOpen     = false;
-let modal          = null;   // null | 'create' | 'publish' | 'manage'
+let modal          = null;   // null | 'create' | 'publish' | 'manage' | 'sheets'
 let modalOpening   = false;  // true trong lượt render() đầu tiên sau openModal() — kích hoạt fade-in
 let dragPayload    = null;   // { type, name, pos? }
 let dragFrontIndex = null;   // index đang kéo trong hàng BÀN GV/BẢNG/CỬA
@@ -479,6 +494,16 @@ let sidebarCollapsed = false; // true khi người dùng ẩn sidebar
 // phụ, hành động chính) vào 1 drawer thu gọn sau nút "Công cụ" để board
 // có nhiều chỗ hơn trên màn hẹp — xem @media(max-width:600px) seating.css
 let mobileToolsOpen = false;
+let lockedStudents  = loadLockedStudents(); // Set<string> — tên học sinh đã khoá chỗ
+
+/* ---------- Tự động lưu ----------
+ * Mọi thay đổi (kéo-thả, random, reset, đổi cửa/cửa sổ...) không cần bấm
+ * "Lưu sơ đồ" nữa — tự lưu ngầm sau một nhịp ngắn (debounce) để gộp nhiều
+ * thao tác liên tiếp lại thành 1 lần lưu, tránh spam request lên Sheet. */
+const SEAT_AUTOSAVE_DELAY_MS = 900;
+let isDirty       = false;  // có thay đổi chưa được lưu (kể cả đang trong lúc debounce)
+let isSavingNow   = false;
+let autosaveTimer = null;
 
 /* User from desktop session */
 const ACCENT_COLORS = { blue:'#2563eb', violet:'#7c3aed', pink:'#db2777', green:'#059669', amber:'#d97706', red:'#dc2626' };
@@ -501,6 +526,47 @@ document.documentElement.style.setProperty('--desktop-accent', readAccent());
 
 /* ---------- Thông báo (sidebar) ---------- */
 /* showToast → A3Notify (notify.js). Giữ tên hàm để không đổi các call site */
+/* Đánh dấu vừa có thay đổi, hẹn giờ tự lưu (debounce). Gọi sau mọi thao tác
+ * sửa sơ đồ (kéo-thả ghế, random, reset, đổi cửa/cửa sổ/hàng đầu lớp...). */
+function markDirty() {
+  isDirty = true;
+  updateSaveStatus();
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(runAutosave, SEAT_AUTOSAVE_DELAY_MS);
+}
+async function runAutosave() {
+  if (!canEditSeating() || !isDirty) return;
+  await handleSaveSheet(true); // silent — không hiện toast, chỉ đổi trạng thái nút Lưu
+}
+function saveStatusLabel() {
+  if (isSavingNow) return 'Đang lưu...';
+  if (isDirty)     return 'Chưa lưu xong...';
+  return 'Đã lưu';
+}
+/* Cập nhật riêng nút Lưu (không render() lại toàn bộ) để không mất focus
+ * ô tìm kiếm hay làm gián đoạn thao tác đang dở của người dùng. */
+function updateSaveStatus() {
+  const btn = document.getElementById('btn-save');
+  if (btn) btn.innerHTML = `${seatIcon('save', 18)} ${saveStatusLabel()}`;
+}
+
+/* Cảnh báo khi đóng/tải lại trang mà vẫn còn thay đổi chưa lưu xong (ví dụ
+ * vừa sửa xong, tự lưu chưa kịp chạy hết debounce hoặc mạng đang chậm).
+ * Với các cửa sổ desktop tự chế (không phải tab trình duyệt thật) do shell
+ * bên ngoài quản lý nút "X", hãy gọi window.a3k64SeatingConfirmClose()
+ * trước khi đóng để hỏi người dùng có muốn chờ lưu xong hay đóng luôn. */
+window.addEventListener('beforeunload', (e) => {
+  if (isDirty) { e.preventDefault(); e.returnValue = ''; }
+});
+window.a3k64SeatingConfirmClose = function () {
+  if (!isDirty) return true; // đã lưu xong — đóng thoải mái
+  const wantClose = window.confirm(
+    'Sơ đồ vừa sửa đang được tự lưu — chưa xong. Bấm OK để đóng luôn (có thể mất vài thay đổi mới nhất), Huỷ để ở lại chờ lưu xong.'
+  );
+  if (!wantClose) { handleSaveSheet(true); return false; } // ở lại, đẩy lưu ngay cho nhanh xong
+  return true; // đồng ý đóng dù chưa chắc lưu kịp
+};
+
 function showToast(msg, type) {
   if (window.A3Notify) {
     window.A3Notify.show(msg, { type: type || 'info' });
@@ -565,7 +631,8 @@ function render() {
             `).join('')}
           </div>
         </div>
-        ${editable ? `<button id="btn-manage" class="seat-icon-btn" title="Quản lý sơ đồ">${seatIcon('settings', 18)}</button>` : ''}
+        ${editable ? `<button id="btn-manage-sheets" class="seat-icon-btn" title="Quản lý sơ đồ (đổi tên / sao chép / xoá)">${seatIcon('layers', 18)}</button>` : ''}
+        ${editable ? `<button id="btn-manage" class="seat-icon-btn" title="Quản lý công bố">${seatIcon('settings', 18)}</button>` : ''}
       </div>
 
       <!-- (b) Cụm công cụ thao tác -->
@@ -582,6 +649,7 @@ function render() {
       <!-- (c) Cụm tiện ích phụ — icon-only, có tooltip qua title -->
       <div class="seat-group seat-icon-group">
         ${editable ? `<button id="btn-random" class="seat-icon-btn" title="Sắp xếp ngẫu nhiên"${editMode ? '' : ' disabled'}>${seatIcon('shuffle', 18)}</button>` : ''}
+        ${editable ? `<button id="btn-swap-side" class="seat-icon-btn" title="Đổi bên toàn bộ (trái ↔ phải, giữ nguyên khoảng cách tới lối đi)"${editMode ? '' : ' disabled'}>${seatIcon('arrowLeftRight', 18)}</button>` : ''}
         ${editable ? `<button id="btn-reset" class="seat-icon-btn" title="Khôi phục vị trí ban đầu"${editMode ? '' : ' disabled'}>${seatIcon('rotateCcw', 18)}</button>` : ''}
         <button id="btn-print" class="seat-icon-btn" title="Xuất file hoặc in A4">${seatIcon('printer', 18)}</button>
       </div>
@@ -590,7 +658,7 @@ function render() {
       <div class="seat-group seat-group-actions">
         ${editable ? `<button id="btn-create" class="seat-btn-ghost">${seatIcon('plus', 18)} Tạo mới</button>` : ''}
         ${editable ? `<button id="btn-publish" class="seat-btn-badge${publishConfig.status === 'published' ? ' is-on' : publishConfig.status === 'preview' ? ' is-preview' : ''}">${seatIcon('globe', 18)} Công bố${publishConfig.status === 'published' ? ' ✓' : publishConfig.status === 'preview' ? ' 👁' : ''}</button>` : ''}
-        ${editable ? `<button id="btn-save" class="seat-btn-save">${seatIcon('save', 18)} Lưu sơ đồ</button>` : ''}
+        ${editable ? `<button id="btn-save" class="seat-btn-save" title="Sơ đồ tự lưu sau mỗi thay đổi — bấm để lưu ngay">${seatIcon('save', 18)} ${saveStatusLabel()}</button>` : ''}
       </div>
     </div>
   </div>
@@ -699,12 +767,17 @@ const SEAT_ICON_PATHS = {
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
   pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
   unlock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+  lockClosed: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   shuffle: '<path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22"/><path d="M2 6h1.972a4 4 0 0 1 3.6 2.2"/><path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45"/>',
+  arrowLeftRight: '<path d="m16 3 4 4-4 4"/><path d="M4 7h16"/><path d="m8 21-4-4 4-4"/><path d="M20 17H4"/>',
   rotateCcw: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
   printer: '<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/>',
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
   globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
   save: '<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
+  layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  trash2: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
 };
 function seatIcon(name, size = 18) {
   const body = SEAT_ICON_PATHS[name] || '';
@@ -738,18 +811,25 @@ function renderSide(side, q) {
             seatNorm(name) === seatNorm(userName) ||
             seatNorm(seatFullName(name)) === seatNorm(userName)
           ));
+          const isLocked = Boolean(name && lockedStudents.has(name));
+          const editableHere = canEditSeating() && editMode;
           const cls = [
             'seat-cell',
             name ? '' : 'empty',
             hit ? 'highlight' : '',
             isSelf ? 'self-seat' : '',
+            isLocked ? 'locked' : '',
           ].filter(Boolean).join(' ');
           const fullName = name ? seatFullName(name) : '';
           return `<div class="${cls}"
-            draggable="${canEditSeating() && editMode}"
-            data-side="${side}" data-row="${rowIdx}" data-seat="${seatIdx}"
-            ${fullName ? `title="${escH(fullName)}"` : ''}>
+            draggable="${editableHere && !isLocked}"
+            data-side="${side}" data-row="${rowIdx}" data-seat="${seatIdx}">
             ${isSelf ? '<span class="seat-you-badge">Bạn</span>' : ''}
+            ${editableHere && name ? `<button type="button" class="seat-lock-btn${isLocked ? ' is-locked' : ''}"
+              data-lock-toggle="${escH(name)}" draggable="false"
+              title="${isLocked ? 'Bỏ khoá chỗ ngồi' : 'Khoá chỗ ngồi (giữ nguyên khi random)'}">
+              ${seatIcon(isLocked ? 'lockClosed' : 'unlock', 12)}
+            </button>` : ''}
             <span class="seat-short-name">${escH(name || 'Trống')}</span>
             ${fullName && fullName !== name ? `<span class="seat-full-name">${escH(fullName)}</span>` : ''}
           </div>`;
@@ -863,6 +943,36 @@ function renderModal(currentTitle, publishConfig) {
           <button class="seat-mini-btn" id="modal-room-save">Lưu nhãn</button>
         </div>
         <div class="seat-modal-actions">
+          <button id="modal-cancel">Đóng</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  if (modal === 'sheets') {
+    return `<div class="seat-modal-backdrop" id="modal-backdrop">
+      <div class="seat-modal seat-modal-sheets">
+        <div>
+          <h3>Quản lý sơ đồ</h3>
+          <p>Đổi tên, sao chép hoặc xoá các sơ đồ đã tạo cho lớp.</p>
+        </div>
+        <div class="seat-sheets-list">
+          ${sheets.map(item => `
+            <div class="seat-sheets-row" data-sheet-row="${escH(item.id)}">
+              <div class="seat-sheets-row-info">
+                <input type="text" class="seat-sheets-rename-input" data-rename-id="${escH(item.id)}"
+                  value="${escH(item.title || '')}" maxlength="60" />
+                ${item.id === currentId ? '<span class="seat-badge-current">Đang mở</span>' : ''}
+              </div>
+              <div class="seat-sheets-row-actions">
+                <button type="button" class="seat-mini-btn" data-open-id="${escH(item.id)}" title="Mở sơ đồ này"${item.id === currentId ? ' disabled' : ''}>${seatIcon('layoutGrid', 15)}</button>
+                <button type="button" class="seat-mini-btn" data-dup-id="${escH(item.id)}" title="Sao chép">${seatIcon('copy', 15)}</button>
+                <button type="button" class="seat-mini-btn danger" data-del-id="${escH(item.id)}" title="Xoá"${sheets.length <= 1 ? ' disabled' : ''}>${seatIcon('trash2', 15)}</button>
+              </div>
+            </div>`).join('')}
+        </div>
+        <div class="seat-modal-actions">
+          <button id="modal-sheets-add">${seatIcon('plus', 16)} Tạo sơ đồ mới</button>
           <button id="modal-cancel">Đóng</button>
         </div>
       </div>
@@ -1085,11 +1195,13 @@ function bindEvents() {
   /* toolbar */
   on('btn-publish',  () => openModal('publish'));
   on('btn-manage',   () => openModal('manage'));
-  on('btn-save',     handleSaveSheet);
+  on('btn-manage-sheets', () => openModal('sheets'));
+  on('btn-save',     () => handleSaveSheet(false));
   on('btn-create',   () => openModal('create'));
   on('btn-edit',     () => { editMode = !editMode; render(); });
   on('btn-reset',    handleReset);
   on('btn-random',   handleRandom);
+  on('btn-swap-side', handleSwapSide);
   on('btn-print',    () => showPrintModal());
 
   /* search — patch-only để tránh mất focus sau mỗi ký tự */
@@ -1149,6 +1261,16 @@ function bindEvents() {
   /* close dropdown on outside click */
   document.addEventListener('click', closeSelect, { once: true });
 
+  /* nút khoá/mở khoá chỗ ngồi từng học sinh */
+  document.querySelectorAll('[data-lock-toggle]').forEach(btn => {
+    btn.addEventListener('mousedown', e => e.stopPropagation());
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleToggleLock(btn.dataset.lockToggle);
+    });
+  });
+
   /* drag-and-drop — student cards (chỉ khi editMode) */
   if (editMode) {
   document.querySelectorAll('[data-student]').forEach(card => {
@@ -1156,6 +1278,30 @@ function bindEvents() {
       dragPayload = { type: 'student', name: card.dataset.student };
     });
   });
+  }
+
+  /* Kéo học sinh TỪ ghế ra lại danh sách "Danh sách học sinh" → bỏ chỗ ngồi
+     (trả về chưa xếp). Gắn drop-zone lên cả khung sidebar lẫn danh sách bên
+     trong, vì .seat-student-list có thể trống (không có gì để nhận sự kiện
+     nếu chỉ gắn lên chính nó lúc danh sách rỗng). */
+  if (editMode) {
+    const unassignZones = [
+      document.querySelector('.seat-student-list'),
+      document.querySelector('.seat-students'),
+    ].filter(Boolean);
+    unassignZones.forEach(zone => {
+      zone.addEventListener('dragover', e => {
+        if (!dragPayload || dragPayload.type !== 'seat') return;
+        e.preventDefault();
+        zone.classList.add('drag-over');
+      });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+      zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        handleUnassignDrop();
+      });
+    });
   }
 
   /* ── Mobile touch: cuộn + long-press xem tên đầy đủ ─────────────────────
@@ -1330,6 +1476,28 @@ function bindEvents() {
       closeModal();
     });
   }
+
+  if (modal === 'sheets') {
+    // Đổi tên — lưu khi rời khỏi ô nhập (blur) hoặc bấm Enter, không cần nút riêng.
+    document.querySelectorAll('.seat-sheets-rename-input').forEach(inp => {
+      const commit = () => doRenameSheet(inp.dataset.renameId, inp.value);
+      inp.addEventListener('blur', commit);
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+    });
+    document.querySelectorAll('[data-open-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const item = sheets.find(i => i.id === btn.dataset.openId);
+        if (item) { closeModal(); applySheet(item); }
+      });
+    });
+    document.querySelectorAll('[data-dup-id]').forEach(btn => {
+      btn.addEventListener('click', () => doDuplicateSheet(btn.dataset.dupId));
+    });
+    document.querySelectorAll('[data-del-id]').forEach(btn => {
+      btn.addEventListener('click', () => doDeleteSheet(btn.dataset.delId));
+    });
+    on('modal-sheets-add', () => openModal('create'));
+  }
 }
 
 async function setPublishStatus(status, previewStudents) {
@@ -1390,7 +1558,7 @@ function closeModal() {
 function closeSelect() { if (selectOpen) { selectOpen = false; render(); } }
 
 /* ---------- Handlers ---------- */
-function commitSeatState(next) { seatState = next; saveSeatState(next); render(); }
+function commitSeatState(next) { seatState = next; saveSeatState(next); markDirty(); render(); }
 
 async function applySheet(item) {
   if (!item) return;
@@ -1455,28 +1623,40 @@ async function handleSaveRoomConfig() {
   showToast('Đã lưu cấu hình phòng (cục bộ — chưa kết nối Google Sheets).', 'success');
 }
 
-async function handleSaveSheet() {
-  if (!canEditSeating()) { showToast('Bạn không có quyền sửa sơ đồ.', 'error'); return; }
+/** Lưu sơ đồ. silent=true dùng cho tự động lưu ngầm (không hiện toast, không
+ * render() lại toàn bộ để tránh mất focus/giật màn hình giữa lúc đang thao tác);
+ * silent=false (mặc định, khi bấm nút "Lưu" thủ công) hiện đầy đủ thông báo. */
+async function handleSaveSheet(silent) {
+  if (!canEditSeating()) { if (!silent) showToast('Bạn không có quyền sửa sơ đồ.', 'error'); return; }
+  clearTimeout(autosaveTimer);
   const title = sheets.find(i => i.id === currentId)?.title || 'Sơ đồ hiện tại';
+  isSavingNow = true;
+  updateSaveStatus();
 
   if (dataSource === 'gas') {
-    showToast('Đang lưu lên Google Sheets...', 'info');
+    if (!silent) showToast('Đang lưu lên Google Sheets...', 'info');
     const { chart, error: saveErr } = await gasSaveChart(currentId, title, seatState, roomConfig);
-    if (!chart) { showToast(saveErr || 'Lưu thất bại — kiểm tra kết nối rồi thử lại.', 'error'); return; }
+    if (!chart) {
+      isSavingNow = false; isDirty = true; updateSaveStatus();
+      showToast(saveErr || (silent ? 'Tự động lưu thất bại — kiểm tra kết nối.' : 'Lưu thất bại — kiểm tra kết nối rồi thử lại.'), 'error');
+      return;
+    }
     currentId = chart.id;
     saveSeatState(seatState);
     localStorage.setItem(SEAT_CURRENT_KEY, chart.id);
     persistLayoutToDb(currentId, seatState, roomConfig, { title });
     sheets = await gasListCharts();
-    render();
-    showToast('Đã lưu sơ đồ lên Google Sheets.', 'success');
+    isDirty = false; isSavingNow = false;
+    if (silent) updateSaveStatus(); else render();
+    if (!silent) showToast('Đã lưu sơ đồ lên Google Sheets.', 'success');
     return;
   }
 
   const { items, item } = saveSheet(sheets, currentId, title, seatState, roomConfig);
   sheets = items; currentId = item.id;
-  render();
-  showToast('Đã lưu sơ đồ (cục bộ — chưa kết nối Google Sheets).', 'success');
+  isDirty = false; isSavingNow = false;
+  if (silent) updateSaveStatus(); else render();
+  if (!silent) showToast('Đã lưu sơ đồ (cục bộ — chưa kết nối Google Sheets).', 'success');
 }
 
 async function doCreateSheet() {
@@ -1502,6 +1682,125 @@ async function doCreateSheet() {
   sheets = items;
   await applySheet(item);
   showToast('Đã tạo sơ đồ mới.', 'success');
+}
+
+/* ---------- Quản lý sơ đồ: đổi tên / sao chép / xoá ---------- */
+
+/** Lấy seats+room đầy đủ của 1 sheet trong danh sách — nếu chưa có sẵn
+ * (chế độ gas, sheet đó chưa từng được mở) thì gọi API lấy về. */
+async function ensureSheetLayout(item) {
+  let seats = item.layout?.seats, room = item.layout?.room;
+  if (!seats && dataSource === 'gas') {
+    const res = await gasGetChart(item.id);
+    seats = res.chart?.layout?.seats || null;
+    room  = res.chart?.layout?.room  || null;
+  }
+  if (!seats) return null;
+  return { seats: { left: normalizeRows(seats.left), right: normalizeRows(seats.right) }, room: normalizeRoom(room) };
+}
+
+async function doRenameSheet(id, rawTitle) {
+  if (!canEditSeating()) return;
+  const item = sheets.find(i => i.id === id);
+  if (!item) return;
+  const title = (rawTitle || '').trim();
+  if (!title || title === item.title) { render(); return; } // trống hoặc không đổi gì — khôi phục hiển thị cũ
+
+  if (dataSource === 'gas') {
+    const layout = await ensureSheetLayout(item);
+    if (!layout) { showToast('Không đọc được sơ đồ để đổi tên.', 'error'); render(); return; }
+    showToast('Đang đổi tên...', 'info');
+    const { chart, error } = await gasSaveChart(id, title, layout.seats, layout.room);
+    if (!chart) { showToast(error || 'Đổi tên thất bại.', 'error'); render(); return; }
+    sheets = await gasListCharts();
+    render();
+    showToast('Đã đổi tên sơ đồ.', 'success');
+    return;
+  }
+
+  item.title = title;
+  item.updatedAt = new Date().toISOString();
+  writeDb(sheets);
+  render();
+  showToast('Đã đổi tên sơ đồ.', 'success');
+}
+
+async function doDuplicateSheet(id) {
+  if (!canEditSeating()) return;
+  const item = sheets.find(i => i.id === id);
+  if (!item) return;
+  const newTitle = `${item.title || 'Sơ đồ'} (Copy)`;
+  const layout = await ensureSheetLayout(item);
+  if (!layout) { showToast('Không đọc được sơ đồ để sao chép.', 'error'); return; }
+
+  if (dataSource === 'gas') {
+    showToast('Đang sao chép sơ đồ...', 'info');
+    const { chart, error } = await gasSaveChart('', newTitle, layout.seats, layout.room);
+    if (!chart) { showToast(error || 'Sao chép thất bại.', 'error'); return; }
+    persistLayoutToDb(chart.id, layout.seats, layout.room, { title: newTitle });
+    sheets = await gasListCharts();
+    render();
+    showToast('Đã sao chép sơ đồ.', 'success');
+    return;
+  }
+
+  // saveSheet() tự đánh dấu sheet mới là "active" — không muốn tự chuyển
+  // sang sơ đồ vừa sao chép, chỉ thêm vào danh sách rồi giữ nguyên sheet
+  // đang mở.
+  const { items } = saveSheet(sheets, null, newTitle, layout.seats, layout.room);
+  items.forEach(i => { i.active = i.id === currentId; });
+  writeDb(items);
+  localStorage.setItem(SEAT_CURRENT_KEY, currentId);
+  sheets = items;
+  render();
+  showToast('Đã sao chép sơ đồ.', 'success');
+}
+
+async function doDeleteSheet(id) {
+  if (!canEditSeating()) return;
+  if (sheets.length <= 1) { showToast('Phải còn ít nhất 1 sơ đồ.', 'warn'); return; }
+  const item = sheets.find(i => i.id === id);
+  if (!item) return;
+  if (!window.confirm(`Xoá sơ đồ "${item.title || 'Sơ đồ'}"? Không thể hoàn tác.`)) return;
+
+  if (dataSource === 'gas') {
+    showToast('Đang xoá sơ đồ...', 'info');
+    // Cần backend (api.gs) hỗ trợ action "deleteSeatingChart" — nếu backend
+    // chưa có action này, thao tác sẽ báo lỗi thay vì âm thầm không làm gì.
+    const json = await postToGas('deleteSeatingChart', { id, role: userRole || '', actor: { name: userName, role: userRole } });
+    const data = gasData(json);
+    const ok = json && json.ok !== false && !data.error;
+    if (!ok) {
+      showToast((data && data.error) || 'Xoá thất bại — có thể backend chưa hỗ trợ xoá sơ đồ.', 'error');
+      return;
+    }
+    sheets = await gasListCharts();
+    if (id === currentId) {
+      const next = sheets.find(i => i.active) || sheets[0];
+      if (next) await applySheet(next);
+    }
+    render();
+    showToast('Đã xoá sơ đồ.', 'success');
+    return;
+  }
+
+  const items = sheets.filter(i => i.id !== id);
+  if (id === currentId) {
+    const next = items.find(i => i.active) || items[0];
+    if (next) {
+      next.active = true;
+      currentId = next.id;
+      localStorage.setItem(SEAT_CURRENT_KEY, next.id);
+      seatState = { left: normalizeRows(next.layout?.seats?.left), right: normalizeRows(next.layout?.seats?.right) };
+      saveSeatState(seatState);
+      roomConfig = normalizeRoom(next.layout?.room);
+      publishConfig = readPublish(currentId);
+    }
+  }
+  writeDb(items);
+  sheets = items;
+  render();
+  showToast('Đã xoá sơ đồ.', 'success');
 }
 
 /* ---------- Kéo tự do cửa sổ/cửa bằng chuột ---------- */
@@ -1552,8 +1851,9 @@ function onRoomMoveEnd() {
   }
   roomConfig = normalizeRoom(next);
   roomDrag = null;
+  markDirty();
   render();
-  showToast('Đã đổi vị trí — bấm "Lưu sơ đồ" để lưu lại.', 'info');
+  showToast('Đã đổi vị trí — đang tự lưu.', 'info');
 }
 
 function startRoomResize(e, handle) {
@@ -1595,8 +1895,9 @@ function onRoomResizeEnd() {
     roomConfig = normalizeRoom(next);
   }
   roomResize = null;
+  markDirty();
   render();
-  showToast('Đã đổi kích thước — bấm "Lưu sơ đồ" để lưu lại.', 'info');
+  showToast('Đã đổi kích thước — đang tự lưu.', 'info');
 }
 
 function handleFrontDrop(targetIdx) {
@@ -1612,14 +1913,17 @@ function handleFrontDrop(targetIdx) {
   else if (doorIdx === 2) next.door.side = 'right';
   roomConfig = normalizeRoom(next);
   dragFrontIndex = null;
+  markDirty();
   render();
-  showToast('Đã đổi vị trí — bấm "Lưu sơ đồ" để lưu lại.', 'info');
+  showToast('Đã đổi vị trí — đang tự lưu.', 'info');
 }
 
 function handleReset() {
   if (!canEditSeating()) return;
   if (!editMode) { showToast('Bấm "Bật sửa" trước khi khôi phục sơ đồ.', 'warn'); return; }
   if (!window.confirm('Xoá toàn bộ chỗ ngồi, trả về lưới trống?')) return;
+  lockedStudents.clear();
+  saveLockedStudents(lockedStudents);
   commitSeatState(cloneState(SEAT_DEFAULT));
 }
 
@@ -1627,16 +1931,23 @@ function handleRandom() {
   if (!canEditSeating()) return;
   if (!editMode) { showToast('Bấm "Bật sửa" trước khi random chỗ ngồi.', 'warn'); return; }
   const positions = [], names = [];
+  let lockedCount = 0;
   for (const side of ['left', 'right']) {
     seatState[side].forEach((row, rowIdx) =>
       row.forEach((name, seatIdx) => {
         if (!name) return;
+        // Học sinh đã khoá chỗ (đã "ok" chỗ ngồi) — giữ nguyên, không đưa
+        // vào danh sách xáo trộn, chỉ random những người còn lại.
+        if (lockedStudents.has(name)) { lockedCount++; return; }
         positions.push({ side, row: rowIdx, seat: seatIdx });
         names.push(name);
       })
     );
   }
-  if (names.length < 2) { showToast('Không đủ học sinh để random.', 'warn'); return; }
+  if (names.length < 2) {
+    showToast(lockedCount > 0 ? 'Còn quá ít học sinh chưa khoá để random.' : 'Không đủ học sinh để random.', 'warn');
+    return;
+  }
   const shuffled = names.slice();
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -1645,11 +1956,100 @@ function handleRandom() {
   let next = cloneState(seatState);
   positions.forEach((pos, i) => { next = withSeatSet(next, pos, shuffled[i]); });
   commitSeatState(next);
-  showToast('Đã random chỗ ngồi cục bộ. Bấm Lưu sơ đồ để lưu lại.', 'success');
+  showToast(
+    lockedCount > 0
+      ? `Đã random ${names.length} học sinh (giữ nguyên ${lockedCount} chỗ đã khoá). Đang tự lưu.`
+      : 'Đã random chỗ ngồi. Đang tự lưu.',
+    'success',
+  );
+}
+
+/* Đổi bên toàn bộ chỗ ngồi — lấy "lối đi" làm trục đối xứng.
+ * Với mỗi hàng, ghế ở khoảng cách d tính từ lối đi bên trái (cột 3-d, vì
+ * cột 3 là cột sát lối đi nhất) được hoán đổi với ghế cùng khoảng cách d
+ * bên phải (cột d, vì cột 0 bên phải sát lối đi nhất) — nên sau khi đổi,
+ * khoảng cách từ chỗ mới đến lối đi luôn bằng khoảng cách từ chỗ cũ đến
+ * lối đi. Cặp nào có 1 trong 2 chỗ đã khoá thì giữ nguyên cả cặp, không đổi. */
+function handleSwapSide() {
+  if (!canEditSeating()) return;
+  if (!editMode) { showToast('Bấm "Bật sửa" trước khi đổi bên.', 'warn'); return; }
+  if (!window.confirm('Đổi bên toàn bộ chỗ ngồi (trái ↔ phải)? Khoảng cách từ mỗi chỗ đến lối đi sẽ được giữ nguyên. Các chỗ đã khoá sẽ không bị đổi.')) return;
+
+  let next = cloneState(seatState);
+  let swappedPairs = 0, skippedLocked = 0;
+
+  for (let row = 0; row < seatState.left.length; row++) {
+    for (let d = 0; d < 4; d++) {
+      const leftPos  = { side: 'left',  row, seat: 3 - d };
+      const rightPos = { side: 'right', row, seat: d };
+      const leftName  = seatAt(seatState, leftPos);
+      const rightName = seatAt(seatState, rightPos);
+      if ((leftName && lockedStudents.has(leftName)) || (rightName && lockedStudents.has(rightName))) {
+        if (leftName || rightName) skippedLocked++;
+        continue; // có chỗ đã khoá trong cặp — giữ nguyên, không đổi
+      }
+      if (leftName === rightName) continue; // cả hai cùng trống (hoặc trùng) — không cần đổi
+      next = withSeatSet(next, leftPos, rightName);
+      next = withSeatSet(next, rightPos, leftName);
+      swappedPairs++;
+    }
+  }
+
+  if (swappedPairs === 0) {
+    showToast(
+      skippedLocked > 0
+        ? 'Các cặp chỗ đối xứng còn lại đều có chỗ đã khoá — không có gì để đổi bên.'
+        : 'Không có chỗ ngồi nào cần đổi bên.',
+      'warn',
+    );
+    return;
+  }
+
+  commitSeatState(next);
+  showToast(
+    skippedLocked > 0
+      ? `Đã đổi bên ${swappedPairs} cặp chỗ (giữ nguyên ${skippedLocked} cặp có chỗ đã khoá). Đang tự lưu.`
+      : `Đã đổi bên ${swappedPairs} cặp chỗ. Đang tự lưu.`,
+    'success',
+  );
+}
+
+function handleToggleLock(name) {
+  if (!canEditSeating() || !editMode || !name) return;
+  if (lockedStudents.has(name)) lockedStudents.delete(name);
+  else lockedStudents.add(name);
+  saveLockedStudents(lockedStudents);
+  render();
+}
+
+/* Kéo học sinh từ 1 ghế ra khu "Danh sách học sinh" → trả về chưa xếp chỗ. */
+function handleUnassignDrop() {
+  if (!canEditSeating() || !dragPayload) { dragPayload = null; return; }
+  if (dragPayload.type !== 'seat') { dragPayload = null; return; } // đã ở sidebar rồi thì thôi
+  if (lockedStudents.has(dragPayload.name)) {
+    showToast(`"${dragPayload.name}" đang khoá chỗ — bỏ khoá trước khi bỏ ra khỏi ghế.`, 'warn');
+    dragPayload = null;
+    return;
+  }
+  commitSeatState(withSeatSet(seatState, dragPayload.pos, ''));
+  dragPayload = null;
 }
 
 function handleDrop(target) {
   if (!canEditSeating() || !dragPayload || !dragPayload.name) return;
+  // Chặn đổi chỗ nếu học sinh đang kéo, hoặc học sinh đang ngồi ở ô đích,
+  // đã được khoá — phải bỏ khoá trước mới di chuyển được.
+  const targetName = seatAt(seatState, target);
+  if (targetName && lockedStudents.has(targetName)) {
+    showToast(`"${targetName}" đang khoá chỗ — bỏ khoá trước khi đổi.`, 'warn');
+    dragPayload = null;
+    return;
+  }
+  if (dragPayload.type === 'seat' && lockedStudents.has(dragPayload.name)) {
+    showToast(`"${dragPayload.name}" đang khoá chỗ — bỏ khoá trước khi đổi.`, 'warn');
+    dragPayload = null;
+    return;
+  }
   commitSeatState(withSeatMove(seatState, dragPayload, target));
   dragPayload = null;
 }

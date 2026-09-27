@@ -733,8 +733,26 @@ thành danh sách JSON. Áp dụng đúng các quy tắc sau:
    - "Cả lớp" / "Tất cả" / "Toàn lớp" → nhân bản cho TẤT CẢ học sinh trong danh sách.
    - Có cụm "mỗi người" / "mỗi em" → áp dụng điểm riêng cho từng cá nhân (KHÔNG
      nhân điểm lên theo số người).
-12. GIỚI HẠN PHẠM VI (bắt buộc): Chỉ trả kết quả cho học sinh CÓ TÊN trong danh
-   sách được cấp ở trên. Bỏ qua hoàn toàn tên học sinh KHÔNG thuộc danh sách này.
+12. GIỚI HẠN PHẠM VI: Với MỌI dòng có tên người kèm nội dung vi phạm/thành tích,
+   PHẢI tạo 1 entry JSON tương ứng — TUYỆT ĐỐI KHÔNG được lặng lẽ bỏ hẳn dòng đó
+   ra khỏi kết quả chỉ vì không chắc chắn khớp ai. Cụ thể:
+   - Nếu tên fuzzy-match được với một học sinh trong DANH SÁCH HỌC SINH ở trên
+     (kể cả không chắc chắn 100%, kể cả chỉ khớp một phần tên/nickname) → dùng
+     student_id/tên chuẩn của học sinh đó.
+   - Chỉ khi tên KHÔNG gợi ý được BẤT KỲ ai trong danh sách mới áp dụng quy tắc
+     10 (UNKNOWN) — nhưng vẫn PHẢI trả entry đó ra, không được xoá bỏ.
+   - Việc "giới hạn phạm vi" chỉ áp dụng ở bước sau (lọc hiển thị/áp dụng điểm),
+     KHÔNG áp dụng ở bước bóc tách JSON này.
+12b. AN TOÀN KHI GẶP DÒNG RÁC/KHÔNG RÕ NGHĨA (bắt buộc, quan trọng nhất): Văn bản
+   đầu vào có thể lẫn những dòng KHÔNG phải dữ liệu vi phạm/thành tích thật sự —
+   ví dụ ghi chú của người dùng, câu vô nghĩa, câu không có Thứ/Tiết/Tên/Lỗi nào
+   cả (VD: "bị lỗi khi nhập vào"), hoặc thứ tự Thứ bị đảo lộn/nhảy cóc. Với MỌI
+   dòng như vậy: CHỈ bỏ qua RIÊNG dòng đó, KHÔNG được vì một vài dòng khó hiểu
+   mà huỷ bỏ/trả rỗng cho TOÀN BỘ kết quả. Luôn cố gắng trả về TẤT CẢ các entry
+   mà bạn phân tích được chắc chắn, dù văn bản có xen lẫn vài dòng không rõ nghĩa.
+   Chỉ trả mảng rỗng "[]" khi TOÀN BỘ văn bản không chứa bất kỳ dữ liệu nào có
+   thể diễn giải được — tuyệt đối không dùng mảng rỗng như một cách "từ chối an
+   toàn" khi thực ra có ít nhất một vài dòng đọc được rõ ràng.
 13. OUTPUT: Chỉ trả về JSON thuần, KHÔNG có markdown, KHÔNG có backtick, KHÔNG
    giải thích gì thêm ngoài JSON. Trường "tiet" LUÔN phải xuất hiện ở mỗi phần tử —
    là số nguyên nếu đọc được, hoặc null nếu không đọc được (không được bỏ trường này).
@@ -816,6 +834,7 @@ MẪU KẾT QUẢ JSON TRẢ VỀ:
         }
 
         console.info(`[AI] Dùng model: ${model}`);
+        if (!parsed.length) console.warn('[AI] Model trả về mảng RỖNG cho input:', text);
         return parsed;
       } catch (err) {
         if (err?.__aiFatal) throw err;   // key sai / không có quyền → dừng hẳn
@@ -923,7 +942,15 @@ NHIỆM VỤ
 10. FUZZY MATCHING TÊN: Khớp tên viết tắt, nickname với tên đầy đủ trong DANH SÁCH HỌC SINH.
 11. UNKNOWN: Nếu không khớp được học sinh nào → student_id = "UNKNOWN", student_name = tên trong ảnh.
 12. XỬ LÝ LỖI TẬP THỂ: "Tổ N" / "Cả tổ N" → nhân bản cho TẤT CẢ học sinh Tổ N. "Cả lớp" / "Tất cả" → nhân bản cho TẤT CẢ.
-13. GIỚI HẠN PHẠM VI: Chỉ trả kết quả cho học sinh CÓ TÊN trong danh sách được cấp.
+13. GIỚI HẠN PHẠM VI: Với MỌI người/tên xuất hiện trong ảnh kèm nội dung vi phạm/thành
+    tích, PHẢI tạo 1 entry JSON — KHÔNG được lặng lẽ bỏ hẳn khỏi kết quả chỉ vì không
+    chắc chắn khớp ai. Nếu tên fuzzy-match được (dù không chắc 100%) → dùng học sinh đó;
+    chỉ khi KHÔNG gợi ý được ai mới dùng UNKNOWN (quy tắc 11), nhưng vẫn phải trả ra.
+13b. AN TOÀN KHI GẶP CHỮ/DÒNG RÁC TRONG ẢNH (bắt buộc, quan trọng nhất): Nếu trong ảnh
+    có chữ/dòng không đọc rõ, không rõ nghĩa, hoặc không khớp bất kỳ pattern Thứ/Tiết/
+    Tên/Lỗi nào — CHỈ bỏ qua RIÊNG phần đó, KHÔNG được vì vậy mà huỷ/trả rỗng cho TOÀN
+    BỘ kết quả. Luôn trả về tất cả entry đọc được rõ ràng, dù ảnh có lẫn vài chỗ mờ/khó
+    đọc. Chỉ trả mảng rỗng "[]" khi TOÀN BỘ ảnh không có bất kỳ dữ liệu nào đọc được.
 14. OUTPUT: Chỉ trả về JSON thuần, KHÔNG có markdown, KHÔNG có backtick, KHÔNG giải thích gì thêm ngoài JSON.
 
 MẪU KẾT QUẢ JSON TRẢ VỀ:
@@ -1001,6 +1028,7 @@ MẪU KẾT QUẢ JSON TRẢ VỀ:
         }
 
         console.info(`[AI-Image] Dùng model: ${model}`);
+        if (!parsed.length) console.warn('[AI-Image] Model trả về mảng RỖNG.');
         return parsed;
       } catch (err) {
         if (err?.__aiFatal) throw err;
@@ -1642,9 +1670,23 @@ Cả tổ 3 vắng chào cờ trừ 100 mỗi người"
     }
     if (field === 'day') {
       _results[idx].day = Number(el.value);
+      // Đổi Thứ cũng làm thay đổi nhóm (ngày+tiết+học sinh) dùng để đếm
+      // "Lần N" của GVNN — PHẢI tính lại ngay, nếu không preview sẽ hiển
+      // thị sai (vẫn "Lần 1 -20") trong khi thực tế dòng này vừa gộp
+      // trùng Thứ+Tiết với dòng khác, và server sẽ escalate điểm thật
+      // theo đúng tuple mới → gây lệch nghiêm trọng giữa preview và điểm
+      // thật khi áp dụng (đã xảy ra thực tế, xem báo cáo lỗi liên quan).
+      _results = _applyGvnnProgressiveScores(_results);
+      _refreshPreview();
     }
     if (field === 'tiet') {
       _results[idx].tiet = el.value === '' ? null : Number(el.value);
+      // Tương tự trên: Tiết là 1 phần khoá nhóm GVNN — bắt buộc tính lại
+      // để bảng xem trước phản ánh ĐÚNG việc dòng này có bị gộp/escalate
+      // với dòng khác của cùng học sinh hay không, TRƯỚC khi người dùng
+      // bấm Xác nhận áp dụng (server tính điểm thật dựa trên đúng tuple
+      // này nên preview phải khớp, không được để lệch).
+      _results = _applyGvnnProgressiveScores(_results);
       _refreshPreview(); // cập nhật lại cảnh báo "thiếu Tiết" + highlight hàng
     }
     if (field === 'category') {

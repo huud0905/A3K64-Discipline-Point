@@ -248,6 +248,14 @@ html, body { height:100%; margin:0; padding:0; overflow:hidden; background:var(-
 .seat-students-head strong { display:block; font-size:14px; font-weight:700; line-height:1.4; color:var(--seat-text); }
 .seat-students-head span   { display:block; color:var(--seat-text-muted); font-size:11.5px; margin-top:2px; line-height:1.4; }
 .seat-student-list { display:grid; gap:6px; overflow:auto; min-height:0; flex:1 1 auto; padding-right:2px; }
+/* Drop-zone highlight khi đang kéo 1 học sinh từ ghế ra để bỏ chỗ ngồi */
+.seat-students.drag-over,
+.seat-student-list.drag-over {
+  outline:2px dashed var(--seat-accent);
+  outline-offset:-2px;
+  border-radius:12px;
+  background:color-mix(in srgb, var(--seat-accent) 8%, transparent);
+}
 .seat-student-card {
   border:1px solid var(--seat-border); border-radius:11px;
   background:var(--seat-card-bg); color:var(--seat-text);
@@ -381,6 +389,25 @@ body.seat-room-dragging * { cursor:grabbing !important; }
 /* Chừa chỗ phía trên để tên không bị badge đè lên khi ghế là của mình */
 .seat-cell.self-seat { padding-top:16px; }
 
+/* Ghế đã khoá — viền vàng đứt để phân biệt rõ với ghế thường */
+.seat-cell.locked {
+  box-shadow:inset 0 0 0 2px #d97706;
+  background:color-mix(in srgb, #d97706 12%, var(--seat-card-bg));
+}
+.seat-lock-btn {
+  position:absolute; top:3px; left:3px; z-index:3;
+  width:18px; height:18px; padding:0; display:flex; align-items:center; justify-content:center;
+  border:none; border-radius:5px; cursor:pointer;
+  background:color-mix(in srgb, var(--seat-text) 12%, transparent);
+  color:var(--seat-text-muted);
+  transition:background .15s, color .15s;
+}
+.seat-lock-btn:hover { background:color-mix(in srgb, var(--seat-text) 22%, transparent); color:var(--seat-text); }
+.seat-lock-btn.is-locked { background:#d97706; color:#fff; }
+.seat-lock-btn.is-locked:hover { filter:brightness(1.08); }
+/* Ghế có khoá thì chừa chỗ phía trên bên trái cho nút, tránh đè tên */
+.seat-cell:has(.seat-lock-btn) { padding-top:16px; }
+
 /* Tên ngắn — luôn hiện. Tên đầy đủ — chỉ hiện khi di chuột vào (dạng tooltip nổi) */
 .seat-short-name { font-weight:700; font-size:12.5px; line-height:1.2; }
 .seat-full-name {
@@ -389,7 +416,7 @@ body.seat-room-dragging * { cursor:grabbing !important; }
   align-items:center; justify-content:center; text-align:center;
   padding:4px 6px; border-radius:inherit;
   white-space:normal; word-break:break-word; line-height:1.25;
-  font-size:11px; font-weight:700; color:#fff; background:color-mix(in srgb, var(--seat-text) 92%, transparent);
+  font-size:11px; font-weight:700; color:#fff; background:rgba(15,23,42,.92);
   pointer-events:none;
 }
 /* Desktop hover — chỉ áp dụng khi thiết bị có chuột chính xác (không phải touch) */
@@ -521,6 +548,40 @@ body.seat-room-dragging * { cursor:grabbing !important; }
 }
 .seat-mini-btn.primary { background:var(--seat-accent); border-color:transparent; color:#fff; }
 .seat-mini-btn.primary:hover { filter:brightness(1.08); }
+.seat-mini-btn.danger { color:#dc2626; }
+.seat-mini-btn.danger:hover { background:color-mix(in srgb, #dc2626 12%, transparent); border-color:#dc2626; }
+.seat-mini-btn:disabled { opacity:.4; cursor:not-allowed; }
+.seat-mini-btn:disabled:hover { background:var(--seat-card-bg); border-color:var(--seat-border); }
+
+/* ── Modal "Quản lý sơ đồ" — đổi tên / sao chép / xoá ── */
+.seat-modal-sheets { width:min(480px,100%); }
+.seat-modal-actions:has(#modal-sheets-add) { justify-content:space-between; }
+.seat-sheets-list {
+  display:grid; gap:7px; max-height:min(50vh,380px); overflow-y:auto;
+  padding-right:2px;
+}
+.seat-sheets-row {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  border:1px solid var(--seat-border-soft); border-radius:12px; padding:7px 8px;
+}
+.seat-sheets-row-info { display:flex; align-items:center; gap:8px; min-width:0; flex:1 1 auto; }
+.seat-sheets-rename-input {
+  flex:1 1 auto; min-width:0; height:32px; border:1px solid transparent; border-radius:8px;
+  background:transparent; color:var(--seat-text); padding:0 8px;
+  font-weight:700; font-family:inherit; font-size:13px; outline:none;
+}
+.seat-sheets-rename-input:hover { border-color:var(--seat-border); }
+.seat-sheets-rename-input:focus {
+  border-color:var(--seat-accent); background:var(--seat-input-bg);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--seat-accent) 18%,transparent);
+}
+.seat-badge-current {
+  flex:0 0 auto; font-size:10px; font-weight:800; letter-spacing:.02em;
+  padding:2px 8px; border-radius:999px;
+  background:color-mix(in srgb, var(--seat-accent) 20%, transparent); color:var(--seat-accent);
+}
+.seat-sheets-row-actions { display:flex; gap:5px; flex:0 0 auto; }
+.seat-sheets-row-actions .seat-mini-btn { width:30px; height:30px; padding:0; display:flex; align-items:center; justify-content:center; }
 
 .seat-room-form { display:grid; gap:9px; border:1px solid var(--seat-border-soft); border-radius:13px; padding:11px; }
 .seat-room-form > strong { font-size:12.5px; font-weight:700; color:var(--seat-text); }
