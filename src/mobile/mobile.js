@@ -71,7 +71,7 @@ function mobBuildTopbar() {
     <header class="mob-topbar" id="mob-topbar">
       <div class="mob-topbar-brand">
         <div class="mob-topbar-logo">🛡</div>
-        <span class="mob-topbar-title">A3K64</span>
+        <span class="mob-topbar-title" data-class-name>${window.CLASS_NAME || ''}</span>
       </div>
       <div class="mob-topbar-right">
         <button class="mob-topbar-btn" title="Thông báo" onclick="mobOpenApp('dashboard')">

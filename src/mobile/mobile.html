@@ -6,7 +6,7 @@
   <meta name="mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <title>A3K64 - Quản Lí Thi Đua</title>
+  <title data-class-tpl="{class} - Quản Lí Thi Đua">Quản Lí Thi Đua</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -25,6 +25,7 @@
 
 <!-- Config dùng chung trước -->
 <script src="../assets/js/config.js"></script>
+<script src="../assets/js/class-config.js"></script>
 <!-- Desktop core (chứa helpers: icons, APPS, state, theme...) -->
 <script src="../desktop/desktop.js"></script>
 <!-- Mobile shell override -->
@@ -45,6 +46,9 @@
 
     // Hồi phục sessionStorage cho phiên hiện tại
     sessionStorage.setItem('a3k64-user', JSON.stringify(u));
+    // Khôi phục cả session token khi vào bằng "Ghi nhớ đăng nhập" (giống desktop.html)
+    const remembered = readRememberedSessionToken();
+    if (remembered) sessionStorage.setItem('a3k64-session-token', remembered);
 
     // Nếu user mở trên PC → chuyển sang desktop shell
     // (so cạnh nhỏ hơn giữa width/height để không bị nhầm khi điện
@@ -75,9 +79,23 @@
     return u;
   }
 
+  function readRememberedSessionToken() {
+    let t;
+    try { t = JSON.parse(localStorage.getItem('a3k64-session-token') || 'null'); }
+    catch { return null; }
+    if (!t || !t.token) return null;
+    if (t.expiresAt && Date.now() > t.expiresAt) {
+      localStorage.removeItem('a3k64-session-token');
+      return null;
+    }
+    return t.token;
+  }
+
   window.addEventListener('a3k64-logout', () => {
     sessionStorage.removeItem('a3k64-user');
+    sessionStorage.removeItem('a3k64-session-token');
     localStorage.removeItem('a3k64-user');
+    localStorage.removeItem('a3k64-session-token');
     window.location.href = '../auth/login.html';
   });
 </script>

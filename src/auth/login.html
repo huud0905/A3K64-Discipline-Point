@@ -6,7 +6,7 @@
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<title>A3K64 — Đăng nhập</title>
+<title data-class-tpl="{class} — Đăng nhập">Đăng nhập</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://a3k64-api.huud09052009.workers.dev">
@@ -442,6 +442,7 @@ body{
 #acc-green{background:#059669}#acc-amber{background:#d97706}#acc-red{background:#dc2626}
 </style>
 <script src="../assets/js/config.js"></script>
+<script src="../assets/js/class-config.js"></script>
 <script>
 /* ═══ STEP 1: Đăng ký Service Worker — chạy ngay khi <head> parse ═══
    SW sẽ intercept fetch getScoreboard và trả cache ngay (0ms) nếu có */
@@ -472,8 +473,8 @@ body{
       <div class="brand">
         <div class="logo" aria-hidden="true">🛡</div>
         <div class="brand-name">
-          <h1>Bảng điểm A3K64</h1>
-          <p>Quản lý thi đua lớp 12A3</p>
+          <h1 data-class-tpl="Bảng điểm {class}">Bảng điểm</h1>
+          <p data-class-tpl="Quản lý thi đua lớp {label}">Quản lý thi đua</p>
         </div>
       </div>
       <div class="controls">
@@ -546,7 +547,7 @@ body{
     <div class="mob-header">
       <div class="mob-brand">
         <div class="logo" aria-hidden="true">🛡</div>
-        <h1>A3K64</h1>
+        <h1 data-class-name></h1>
       </div>
       <div class="controls">
         <button class="settings-trigger" id="settings-trigger-m" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Cài đặt giao diện" title="Cài đặt giao diện">⚙</button>
