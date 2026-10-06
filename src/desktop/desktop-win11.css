@@ -1,0 +1,182 @@
+/* ============================================================
+   desktop-win11.css — làm desktop giống Windows 11 hơn
+   Nạp SAU desktop.css + desktop-fx.css (ghi đè). Xoá <link> trong desktop.html để gỡ.
+   Gồm: logo Start 4 ô, taskbar phân cấp (Start · Tìm kiếm · app | tray · giờ), icon desktop kiểu Win11,
+   giảm độ bão hòa màu xanh, vật liệu Mica/Acrylic, thanh tiêu đề thấp hơn + nút cửa sổ kiểu Windows.
+   ============================================================ */
+:root {
+  --w11-acrylic: rgba(24, 30, 44, .72);
+  --w11-acrylic-strong: rgba(20, 26, 40, .86);
+  --w11-stroke: rgba(255, 255, 255, .09);
+  --w11-hover: rgba(255, 255, 255, .08);
+  --w11-press: rgba(255, 255, 255, .05);
+  --w11-blur: blur(28px) saturate(1.5);
+}
+/* Màu nhấn dịu hơn: pha với xám xanh → bớt "neon" */
+.win-root { --accent-soft: color-mix(in srgb, var(--desktop-accent) 88%, #ffffff); }
+
+/* ---------- Start: logo Windows 4 ô ---------- */
+.task-start, .task-icon, .task-notif-bell {
+  width: 40px; height: 40px; border: 0; border-radius: 6px;
+  background: transparent; color: #f1f5f9;
+}
+.task-start svg.win-logo { width: 26px; height: 26px; fill: #4cc2ff; stroke: none; transition: transform .25s var(--fx-spring), filter .25s ease; }
+.task-start { background: transparent; }
+.task-start:hover, .task-icon:hover, .task-notif-bell:hover { background: var(--w11-hover); transform: none; box-shadow: none; }
+.task-start:hover svg.win-logo { transform: scale(1.12); filter: drop-shadow(0 0 6px rgba(76,194,255,.55)); transform-origin: center; }
+.task-start:active, .task-icon:active, .task-notif-bell:active { background: var(--w11-press); transform: scale(.94); }
+.task-icon svg, .task-notif-bell svg { width: 20px; height: 20px; }
+.task-icon.active { background: var(--w11-hover); }
+.task-notif-bell { border: 0; }
+.task-notif-bell.has-unread { border: 0; }
+
+/* ---------- Taskbar: Acrylic + phân cấp ---------- */
+.taskbar {
+  height: 48px; border-radius: 14px; padding: 0 8px;
+  border: 1px solid var(--w11-stroke);
+  background: var(--w11-acrylic); -webkit-backdrop-filter: var(--w11-blur); backdrop-filter: var(--w11-blur);
+  box-shadow: 0 8px 32px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+}
+.task-center { gap: 4px; }
+.task-sep { width: 1px; height: 22px; margin: 0 6px; background: var(--w11-stroke); flex: 0 0 auto; }
+/* Tìm kiếm: ô bo tròn kiểu Win11 */
+.task-search {
+  width: 240px; height: 34px; padding: 0 14px; margin: 0 2px; gap: 10px;
+  border: 1px solid var(--w11-stroke); border-radius: 999px;
+  background: rgba(255,255,255,.07); color: #cbd5e1; font-size: 13px;
+  transition: background .16s ease, border-color .16s ease;
+}
+.task-search:hover { background: rgba(255,255,255,.11); border-color: rgba(255,255,255,.16); }
+/* Chỉ báo app đang chạy: gạch nhỏ ở giữa, app đang focus dài hơn */
+.running-app::after { left: 50%; right: auto; width: 6px; height: 3px; bottom: 2px; transform: translateX(-50%); background: rgba(255,255,255,.55); transition: width .2s var(--fx-out), background .2s ease; }
+.task-icon.active.running-app::after { width: 16px; background: #4cc2ff; }
+.task-icon.active.running-app { animation: none; }
+/* Khay hệ thống: nhỏ, nhạt hơn */
+.task-right { gap: 4px; padding-right: 4px; }
+.task-focus-switch { height: 28px; min-width: 0; padding: 0 8px 0 3px; grid-template-columns: 24px auto; gap: 4px; border: 0; background: transparent; font-size: 11px; }
+.task-focus-switch:hover { background: var(--w11-hover); }
+.task-focus-switch.on { background: color-mix(in srgb, var(--desktop-accent) 55%, transparent); }
+.task-focus-knob { width: 22px; height: 22px; }
+.task-focus-knob::after { width: 10px; height: 10px; left: 6px; top: 6px; }
+.task-clock-wrap { font-size: 12px; line-height: 1.35; align-items: flex-end; padding: 0 10px; border-radius: 6px; }
+.task-clock-wrap:hover { background: var(--w11-hover); }
+
+/* ---------- Icon desktop: kiểu Win11 (chữ nhỏ, chọn = nền kính) ---------- */
+.desktop-icons { width: 92px; gap: 10px; }
+.desktop-shortcut { padding: 8px 4px 6px; border: 1px solid transparent; border-radius: 6px; }
+.desktop-shortcut:hover { background: rgba(255,255,255,.10); border-color: rgba(255,255,255,.12); box-shadow: none; transform: translateY(-1px); }
+.desktop-shortcut:active { background: rgba(255,255,255,.14); }
+.desktop-shortcut-icon { width: 44px; height: 44px; margin-bottom: 4px; color: var(--accent-soft); }
+.desktop-shortcut-icon svg { width: 36px; height: 36px; stroke-width: 1.7; filter: drop-shadow(0 2px 6px rgba(0,0,0,.45)); }
+.desktop-shortcut:hover .desktop-shortcut-icon svg { transform: scale(1.06); filter: drop-shadow(0 3px 8px rgba(0,0,0,.5)); }
+.desktop-shortcut span { font-size: 12px; font-weight: 500; line-height: 1.25; letter-spacing: .1px; text-shadow: 0 1px 3px rgba(0,0,0,.8), 0 0 8px rgba(0,0,0,.45); }
+/* Icon đang được chọn (bấm 1 lần / kéo khung): nền kính + viền theo màu accent */
+.win-root .desktop-shortcut.is-selected, .win-root .desktop-shortcut.is-selected:hover, .win-root .desktop-shortcut.is-selected:active { background: color-mix(in srgb, var(--desktop-accent) 26%, rgba(255,255,255,.06)); border-color: color-mix(in srgb, var(--desktop-accent) 75%, #ffffff); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.desktop-shortcut:focus { outline: none; }
+/* Khung kéo chọn */
+.desktop-marquee { position: absolute; z-index: 2; pointer-events: none; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--desktop-accent) 85%, #ffffff); background: color-mix(in srgb, var(--desktop-accent) 26%, transparent); }
+
+/* ---------- Cửa sổ: Mica + thanh tiêu đề thấp ---------- */
+.win-window {
+  background: rgba(14, 20, 34, .88);
+  border: 1px solid rgba(255,255,255,.10);
+  -webkit-backdrop-filter: var(--w11-blur); backdrop-filter: var(--w11-blur);
+  box-shadow: 0 24px 64px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.3);
+}
+.win-window.focused { border-color: rgba(255,255,255,.16); box-shadow: 0 32px 80px rgba(0,0,0,.52), 0 0 0 1px color-mix(in srgb, var(--desktop-accent) 22%, transparent); }
+.win-titlebar { height: 40px; border-bottom: 1px solid var(--w11-stroke); background: rgba(24, 31, 48, .78); }
+.win-body { height: calc(100% - 40px); }
+.title-left { gap: 9px; padding-left: 12px; font-size: 13px; }
+.title-left strong { font-size: 13px; font-weight: 600; }
+.title-icon { width: 22px; height: 22px; border-radius: 6px; background: color-mix(in srgb, var(--desktop-accent) 68%, #64748b); }
+.title-icon svg { width: 14px; height: 14px; }
+/* Nút cửa sổ kiểu Windows: phẳng, đóng = đỏ khi rê chuột */
+.window-actions button { width: 46px; height: 100%; margin: 0; border-radius: 0; color: #e5e9f0; background: transparent; }
+.window-actions button:hover { background: var(--w11-hover); transform: none; }
+.window-actions button:active { background: var(--w11-press); transform: none; }
+.window-actions button svg { width: 15px; height: 15px; stroke-width: 1.8; }
+.window-actions .btn-close { margin: 0; width: 46px; height: 100%; border-radius: 0 21px 0 0; background: transparent; }
+.window-actions .btn-close:hover { background: #c42b1c; color: #fff; }
+.window-actions .btn-close:hover svg { transform: none; }
+.win-window.maximized .window-actions .btn-close { border-radius: 0; }
+
+/* ---------- Start menu / tìm kiếm / menu chuột phải: Acrylic ---------- */
+.start-menu, .search-panel {
+  background: var(--w11-acrylic-strong); -webkit-backdrop-filter: var(--w11-blur); backdrop-filter: var(--w11-blur);
+  border: 1px solid var(--w11-stroke); border-radius: 14px; box-shadow: 0 24px 70px rgba(0,0,0,.5);
+  bottom: 68px;
+}
+.start-header, .search-header { border-bottom-color: var(--w11-stroke); }
+.start-footer { background: rgba(0,0,0,.22); border-top-color: var(--w11-stroke); }
+.start-app { border-radius: 8px; }
+.start-app:hover { background: var(--w11-hover); }
+.start-app-icon { color: var(--accent-soft); }
+.task-app-menu { background: var(--w11-acrylic-strong); -webkit-backdrop-filter: var(--w11-blur); backdrop-filter: var(--w11-blur); border-color: var(--w11-stroke); border-radius: 8px; }
+.task-app-menu button:hover { background: var(--w11-hover); }
+
+/* ---------- Giao diện sáng ---------- */
+.win-root.theme-light { --w11-acrylic: rgba(243,243,243,.78); --w11-acrylic-strong: rgba(246,246,246,.92); --w11-stroke: rgba(0,0,0,.09); --w11-hover: rgba(0,0,0,.06); --w11-press: rgba(0,0,0,.04); }
+.win-root.theme-light .taskbar, .win-root.theme-light .start-menu, .win-root.theme-light .search-panel, .win-root.theme-light .task-app-menu { background: var(--w11-acrylic); border-color: var(--w11-stroke); }
+.win-root.theme-light .win-window { background: rgba(248,250,252,.9); border-color: rgba(0,0,0,.12); }
+.win-root.theme-light .win-titlebar { background: rgba(243,246,250,.85); border-bottom-color: var(--w11-stroke); }
+.win-root.theme-light .task-icon, .win-root.theme-light .task-notif-bell { background: transparent; border: 0; color: #1e293b; }
+.win-root.theme-light .task-icon:hover, .win-root.theme-light .task-icon.active, .win-root.theme-light .task-start:hover { background: var(--w11-hover); }
+.win-root.theme-light .task-search { background: rgba(255,255,255,.7); color: #475569; border-color: var(--w11-stroke); }
+.win-root.theme-light .task-start svg.win-logo { fill: #0078d4; }
+.win-root.theme-light .task-sep { background: var(--w11-stroke); }
+.win-root.theme-light .desktop-shortcut:hover { background: rgba(0,0,0,.07); border-color: rgba(0,0,0,.08); }
+.win-root.theme-light .desktop-shortcut.is-selected, .win-root.theme-light .desktop-shortcut.is-selected:hover, .win-root.theme-light .desktop-shortcut.is-selected:active { background: color-mix(in srgb, var(--desktop-accent) 18%, rgba(255,255,255,.55)); border-color: color-mix(in srgb, var(--desktop-accent) 70%, #ffffff); }
+
+@media (prefers-reduced-transparency: reduce) {
+  .taskbar, .win-window, .start-menu, .search-panel, .task-app-menu { -webkit-backdrop-filter: none; backdrop-filter: none; background: #0f1626; }
+}
+
+/* ---------- Lịch (bấm vào ngày giờ) ---------- */
+.task-clock-wrap.panel-open { background: var(--w11-hover); }
+#cal-panel {
+  position: fixed; right: 8px; bottom: 66px; width: 340px; z-index: 9999; padding: 16px 16px 14px;
+  color: #f1f5f9; border: 1px solid var(--w11-stroke); border-radius: 14px;
+  background: var(--w11-acrylic-strong); -webkit-backdrop-filter: var(--w11-blur); backdrop-filter: var(--w11-blur);
+  box-shadow: 0 24px 70px rgba(0,0,0,.5);
+  animation: fxPanelIn .26s var(--fx-out) both; transform-origin: 100% 100%;
+  user-select: none;
+}
+.cal-head { padding: 2px 4px 12px; border-bottom: 1px solid var(--w11-stroke); }
+.cal-time { font-size: 34px; font-weight: 300; letter-spacing: -.5px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.cal-date { margin-top: 4px; font-size: 13px; color: #aab4c6; }
+.cal-bar { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 6px; padding: 0 4px; font-size: 14px; }
+.cal-nav { display: flex; align-items: center; gap: 2px; }
+.cal-nav button { height: 30px; min-width: 30px; padding: 0 6px; border: 0; border-radius: 6px; color: #e5e9f0; background: transparent; cursor: pointer; display: grid; place-items: center; font: inherit; font-size: 12px; transition: background .14s ease, transform .18s var(--fx-spring); }
+.cal-nav button:hover { background: var(--w11-hover); }
+.cal-nav button:active { background: var(--w11-press); transform: scale(.92); }
+.cal-nav svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.cal-today-btn { margin-right: 4px; color: #4cc2ff !important; font-weight: 600; }
+.cal-dow, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.cal-dow span { height: 28px; display: grid; place-items: center; font-size: 11px; color: #8d99ad; font-weight: 600; }
+.cal-grid { gap: 2px; }
+.cal-grid.slide-up   { animation: calUp .22s var(--fx-out) both; }
+.cal-grid.slide-down { animation: calDown .22s var(--fx-out) both; }
+@keyframes calUp   { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
+@keyframes calDown { from { opacity: 0; translate: 0 -14px; } to { opacity: 1; translate: 0 0; } }
+.cal-day { height: 38px; border: 0; border-radius: 999px; color: #f1f5f9; background: transparent; font: inherit; font-size: 13px; cursor: pointer; transition: background .14s ease, transform .16s var(--fx-spring); }
+.cal-day:hover { background: var(--w11-hover); }
+.cal-day:active { transform: scale(.9); }
+.cal-day.out { color: #6b7789; }
+.cal-day.sun:not(.out):not(.today) { color: #ff8a80; }
+.cal-day.sel:not(.today) { box-shadow: inset 0 0 0 1.5px #4cc2ff; }
+.cal-day.today { background: #4cc2ff; color: #06111f; font-weight: 700; }
+.cal-day.today:hover { background: #7bd3ff; }
+.win-root.theme-light #cal-panel { color: #0f172a; background: var(--w11-acrylic-strong); }
+.win-root.theme-light .cal-day { color: #0f172a; }
+.win-root.theme-light .cal-day.out { color: #94a3b8; }
+.win-root.theme-light .cal-day.today { background: #0078d4; color: #fff; }
+.win-root.theme-light .cal-nav button { color: #1e293b; }
+.win-root.theme-light .cal-today-btn { color: #0067c0 !important; }
+.win-root.theme-light .cal-date { color: #475569; }
+@media (prefers-reduced-motion: reduce) { #cal-panel, .cal-grid { animation: none !important; } }
+
+/* ---------- Nút "Thoát": icon bị phình to vì thiếu kích thước ---------- */
+.logout-button { height: 34px; border-radius: 6px; font-size: 13px; font-weight: 600; gap: 8px; padding: 0 12px; white-space: nowrap; color: #fecaca; background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.28); transition: background .16s ease, transform .18s var(--fx-spring); }
+.logout-button svg { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.logout-button:hover { background: rgba(239,68,68,.26); }
+.logout-button:active { transform: scale(.96); }
