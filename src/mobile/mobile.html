@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title data-class-tpl="{class} - Quản Lí Thi Đua">Quản Lí Thi Đua</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Preconnect GAS -->
+  <link rel="preconnect" href="https://script.google.com" />
+  <link rel="dns-prefetch" href="https://script.googleusercontent.com" />
+
+  <!-- Chỉ load CSS mobile (không kéo desktop.css nặng) -->
+  <link rel="stylesheet" href="mobile.css">
+</head>
+<body style="margin:0;background:#07111f">
+
+<div id="desktop-root" class="win-root theme-dark"></div>
+
+<!-- Config dùng chung trước -->
+<script src="../assets/js/config.js"></script>
+<script src="../assets/js/class-config.js"></script>
+<script src="../assets/js/session.js"></script>
+<script src="../assets/js/ai-proxy.js"></script>   <!-- tải trước giá + gói đang dùng ngay khi vào trang -->
+<!-- Desktop core (chứa helpers: icons, APPS, state, theme...) -->
+<script src="../assets/js/premium-themes.js"></script>
+<script src="../desktop/desktop.js"></script>
+<!-- Mobile shell override -->
+<script src="mobile.js"></script>
+<script>
+  (async function boot() {
+    // Cùng logic phiên dùng chung với desktop/desktop.html (xem assets/js/session.js)
+    let u = A3K64Session.restoreSync();
+    if (!u) u = await A3K64Session.restore();
+
+    if (!u) {
+      window.location.replace('../auth/login.html');
+      return;
+    }
+
+    // Nếu user mở trên PC → chuyển sang desktop shell
+    // (so cạnh nhỏ hơn giữa width/height để không bị nhầm khi điện
+    // thoại đang ở chế độ ngang lúc load trang)
+    if (Math.min(window.innerWidth, window.innerHeight) >= 768 && !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
+      window.location.replace('../desktop/desktop.html');
+      return;
+    }
+
+    initDesktop(u);
+
+    // Theo dõi phiên: nếu bị đăng xuất từ thiết bị khác → thông báo + buộc về trang đăng nhập
+    A3K64Session.watch();
+  })();
+
+  window.addEventListener('a3k64-logout', () => { A3K64Session.logout(); });
+</script>
+  <script src="../assets/js/disable-context-menu.js"></script>
+  <script src="../assets/js/touch-scroll-fix.js"></script>
+</body>
+</html>
