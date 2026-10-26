@@ -1,0 +1,321 @@
+/* ════════════════════════════════════════════════════════════════
+   a3k64-shared.css — Hiệu ứng & màu sắc DÙNG CHUNG mọi app con
+   Load order: tokens.css → a3k64-shared.css → <app>.css
+
+   Cung cấp:
+     • Aurora background (.a3k-bg)
+     • Glassmorphism topbar (.a3k-topbar)
+     • Sliding tab indicator (.a3k-tabs / .a3k-tab / .a3k-tab-ind)
+     • Gradient primary button — tự động áp cho .primary, .seat-btn-save
+     • Ripple effect (.a3k-ripple → JS inject .a3k-rip)
+     • Hover lift cho button thường
+     • Card glow on mousemove (.a3k-card)
+     • Entrance animation (.a3k-enter)
+     • Scrollbar + focus ring đồng bộ accent
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Easing tokens ────────────────────────────────────────── */
+:root {
+  --a3k-ease:   cubic-bezier(.16, 1, .3, 1);
+  --a3k-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --a3k-dur:    .26s;
+}
+
+/* ── Aurora background ────────────────────────────────────── */
+/* HTML: <div class="a3k-bg" aria-hidden="true"><i></i><i></i></div>
+   đặt làm con đầu tiên bên trong root element của mỗi app           */
+.a3k-bg {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.a3k-bg i {
+  position: absolute;
+  width: 50vmax;
+  height: 50vmax;
+  border-radius: 50%;
+  filter: blur(88px);
+  opacity: .22;
+  animation: a3kDrift 24s ease-in-out infinite alternate;
+}
+.a3k-bg i:first-child {
+  background: var(--accent, var(--seat-accent, var(--a3k64-accent-default, #14b8a6)));
+  left: -18vmax;
+  top: -26vmax;
+}
+.a3k-bg i:last-child {
+  background: #7c3aed;
+  right: -20vmax;
+  bottom: -30vmax;
+  opacity: .13;
+  animation-duration: 31s;
+  animation-direction: alternate-reverse;
+}
+[data-theme="light"] .a3k-bg i { opacity: .10; }
+@media (prefers-reduced-motion: reduce) {
+  .a3k-bg i { animation: none; }
+}
+@keyframes a3kDrift {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(8vmax, 5vmax) scale(1.14); }
+}
+
+/* ── Glassmorphism topbar ─────────────────────────────────── */
+/* Áp class a3k-topbar vào header / toolbar element của app   */
+.a3k-topbar {
+  position: relative;
+  z-index: 10;
+  background: color-mix(in srgb, var(--bg, var(--seat-page-bg, #0b1220)) 66%, transparent);
+  backdrop-filter: blur(18px) saturate(1.55);
+  -webkit-backdrop-filter: blur(18px) saturate(1.55);
+  border-bottom: 1px solid color-mix(in srgb,
+    var(--border, var(--seat-border, #263244)) 75%, transparent);
+  transition: box-shadow .3s var(--a3k-ease);
+}
+.a3k-topbar.scrolled {
+  box-shadow: 0 10px 28px -12px rgba(0, 0, 0, .55);
+}
+
+/* ── Sliding tab bar (pill indicator) ────────────────────── */
+.a3k-tabs {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface, #111827) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border, #263244) 65%, transparent);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.a3k-tabs::-webkit-scrollbar { display: none; }
+
+.a3k-tab-ind {
+  position: absolute;
+  top: 4px; bottom: 4px; left: 0;
+  width: 0;
+  border-radius: 10px;
+  background: linear-gradient(
+    135deg,
+    var(--accent, #14b8a6),
+    color-mix(in srgb, var(--accent, #14b8a6) 52%, #7c3aed)
+  );
+  box-shadow: 0 6px 20px -6px color-mix(in srgb, var(--accent, #14b8a6) 72%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+.a3k-tab-ind.ready {
+  opacity: 1;
+  transition:
+    transform .45s var(--a3k-spring),
+    width    .45s var(--a3k-spring);
+}
+
+.a3k-tab {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-3, var(--muted, #94a3b8));
+  padding: 7px 14px;
+  border-radius: 10px;
+  font: 600 13px/1 inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color .2s;
+}
+.a3k-tab:hover { color: var(--text, #f8fafc); }
+.a3k-tab.on,
+.a3k-tab.on:hover { color: #fff; }
+
+/* ── Gradient primary buttons ─────────────────────────────── */
+/* Tự động áp cho mọi .primary button, seat-btn-save, create-week */
+.da-btn.primary,
+.sm-btn.primary,
+.seat-tools button.primary,
+.seat-btn-save,
+.seat-btn-edit.active,
+.create-week-button,
+.a3k-btn-grad {
+  background: linear-gradient(
+    135deg,
+    var(--accent, var(--seat-accent, #14b8a6)),
+    color-mix(in srgb, var(--accent, var(--seat-accent, #14b8a6)) 55%, #7c3aed)
+  ) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow:
+    0 6px 18px -8px color-mix(in srgb, var(--accent, #14b8a6) 85%, transparent) !important;
+  transition:
+    transform var(--a3k-dur) var(--a3k-spring),
+    filter    var(--a3k-dur),
+    box-shadow var(--a3k-dur) !important;
+}
+.da-btn.primary:hover:not(:disabled),
+.sm-btn.primary:hover:not(:disabled),
+.seat-tools button.primary:hover:not(:disabled),
+.seat-btn-save:hover:not(:disabled),
+.seat-btn-edit.active:hover:not(:disabled),
+.create-week-button:hover:not(:disabled),
+.a3k-btn-grad:hover:not(:disabled) {
+  filter: brightness(1.1) !important;
+  transform: translateY(-2px) !important;
+  box-shadow:
+    0 12px 28px -10px color-mix(in srgb, var(--accent, #14b8a6) 90%, transparent) !important;
+}
+.da-btn.primary:active,
+.sm-btn.primary:active,
+.seat-tools button.primary:active,
+.seat-btn-save:active,
+.create-week-button:active,
+.a3k-btn-grad:active {
+  transform: scale(.96) translateY(0) !important;
+  filter: brightness(.98) !important;
+}
+
+/* ── Hover lift + accent border cho button thường ─────────── */
+.da-btn:not(.primary):not(.danger):not(:disabled),
+.sm-btn:not(.primary):not(:disabled),
+.seat-tools button:not(.primary):not(.seat-btn-save):not(.seat-btn-edit):not(:disabled) {
+  transition:
+    background var(--a3k-dur),
+    border-color var(--a3k-dur),
+    transform var(--a3k-dur) var(--a3k-spring),
+    box-shadow var(--a3k-dur) !important;
+}
+.da-btn:not(.primary):not(.danger):not(:disabled):hover,
+.sm-btn:not(.primary):not(:disabled):hover,
+.seat-tools button:not(.primary):not(.seat-btn-save):not(.seat-btn-edit):not(:disabled):hover {
+  transform: translateY(-1px) !important;
+  border-color:
+    color-mix(in srgb, var(--accent, #14b8a6) 38%,
+    var(--border, #263244)) !important;
+  box-shadow: 0 4px 12px -6px rgba(0,0,0,.3) !important;
+}
+
+/* ── Ripple ───────────────────────────────────────────────── */
+/* Thêm class "a3k-ripple" vào button để kích hoạt.
+   JS cần: see assets/js/esc.js cuối file hoặc dùng snippet riêng. */
+.a3k-ripple { position: relative; overflow: hidden; }
+.a3k-rip {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .26);
+  transform: scale(0);
+  animation: a3kRip .55s ease-out forwards;
+  pointer-events: none;
+}
+.a3k-ripple:not(.primary) .a3k-rip,
+.a3k-ripple.ghost .a3k-rip {
+  background: color-mix(in srgb, var(--accent, #14b8a6) 28%, transparent);
+}
+@keyframes a3kRip {
+  to { transform: scale(1); opacity: 0; }
+}
+
+/* ── Card glow on hover (.a3k-card) ─────────────────────── */
+/* JS cần:
+   el.addEventListener('mousemove', e => {
+     el.style.setProperty('--mx', e.offsetX + 'px');
+     el.style.setProperty('--my', e.offsetY + 'px');
+   });                                                          */
+.a3k-card {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform .3s var(--a3k-spring),
+    border-color .2s,
+    box-shadow .3s;
+}
+.a3k-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    200px circle at var(--mx, -200px) var(--my, -200px),
+    color-mix(in srgb, var(--accent, #14b8a6) 13%, transparent),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity .3s;
+  pointer-events: none;
+}
+.a3k-card:hover::before { opacity: 1; }
+.a3k-card:hover {
+  border-color:
+    color-mix(in srgb, var(--accent, #14b8a6) 42%, var(--border, #263244)) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -14px color-mix(in srgb, var(--accent, #14b8a6) 50%, transparent);
+}
+
+/* ── Entrance animation ───────────────────────────────────── */
+@keyframes a3kUp {
+  from { opacity: 0; transform: translateY(12px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+.a3k-enter > * {
+  animation: a3kUp .48s var(--a3k-ease) both;
+}
+.a3k-enter > *:nth-child(2) { animation-delay: .06s; }
+.a3k-enter > *:nth-child(3) { animation-delay: .12s; }
+.a3k-enter > *:nth-child(4) { animation-delay: .18s; }
+.a3k-enter > *:nth-child(5) { animation-delay: .23s; }
+@media (prefers-reduced-motion: reduce) {
+  .a3k-enter > * { animation: none; }
+}
+
+/* ── Logo spin-in ─────────────────────────────────────────── */
+.a3k-logo-anim {
+  animation: a3kLogo .85s var(--a3k-spring) both;
+}
+@keyframes a3kLogo {
+  from { opacity: 0; transform: rotate(-60deg) scale(.4); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Scrollbar đồng bộ accent ─────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color:
+    color-mix(in srgb, var(--accent, var(--seat-accent, var(--a3k64-accent-default, #14b8a6))) 38%, transparent)
+    transparent;
+}
+*::-webkit-scrollbar       { width: 5px; height: 5px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent, #14b8a6) 38%, transparent);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--accent, #14b8a6) 68%, transparent);
+}
+*::-webkit-scrollbar-corner { background: transparent; }
+
+/* ── Focus ring đồng bộ accent ───────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent, var(--seat-accent, var(--a3k64-accent-default, #14b8a6)));
+  outline-offset: 2px;
+}
+
+/* ── Input focus ──────────────────────────────────────────── */
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent, var(--seat-accent, #14b8a6)) !important;
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--accent, var(--seat-accent, #14b8a6)) 18%, transparent) !important;
+  outline: none !important;
+}
+
+/* ── Đảm bảo layout tĩnh (profile, settings) nằm trên aurora ─ */
+#shell,
+#app {
+  position: relative;
+  z-index: 1;
+}
