@@ -53,8 +53,13 @@
 }
 
 /* Đảm bảo nội dung ở trên aurora */
-.scoreboard-left-tools,
 .scoreboard-main { position: relative; z-index: 1; }
+/* Sidebar chỉ position:relative trên desktop. Trên mobile (≤720px) nó là ngăn kéo
+   position:fixed (z-index 4000) trong scoreboard.css — KHÔNG được ghi đè, nếu không
+   nó chiếm hàng grid và đẩy nội dung bảng điểm xuống ngoài màn hình (trang trống). */
+@media (min-width: 721px) {
+  .scoreboard-left-tools { position: relative; z-index: 1; }
+}
 
 /* GPU layer promotion để maximize animation mượt 60FPS */
 .scoreboard-app { transform: translateZ(0); }

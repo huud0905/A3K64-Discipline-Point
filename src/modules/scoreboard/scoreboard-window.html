@@ -20,9 +20,11 @@
       height: 100%;
       margin: 0; padding: 0;
       background: #07111f; color: #f8fafc;
-      overflow: hidden;
       overscroll-behavior: none;
     }
+    /* Chỉ html được overflow:hidden. body KHÔNG được hidden — để scoreboard.css
+       đặt overflow-y:auto (fix WKWebView nuốt gesture trong iframe). */
+    html { overflow: hidden; }
     #scoreboard-root {
       height: 100%;
       display: flex;
