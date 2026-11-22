@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="google-site-verification" content="Iafx45WIVIPT-xLb4yS9ZN3MiTb3MhCZ_jF0r8lKbBc" />
+  <title>Quản Lí Thi Đua</title>
+  
+  <style>
+    body { margin: 0; background: #07111f; }
+  </style>
+</head>
+<body>
+<script src="src/assets/js/disable-context-menu.js"></script>
+<script>
+  function isMobileDevice() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('view') === 'desktop') return false;
+    if (params.get('view') === 'mobile') return true;
+
+    const hasFinePointer = window.matchMedia && window.matchMedia('(pointer: fine) and (hover: hover)').matches;
+    const width = Math.min(window.innerWidth || 9999, window.screen?.width || 9999);
+    if (hasFinePointer && width >= 768) return false;
+
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isCoarseTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+
+    if (isMobileUA && width <= 1024) return true;
+    if (isCoarseTouch && width < 768) return true;
+    if (width < 768) return true;
+    return false;
+  }
+
+  if (isMobileDevice()) {
+    window.location.replace('src/mobile/mobile.html');
+  } else {
+    window.location.replace('src/desktop/desktop.html');
+  }
+</script>
+</body>
+</html>

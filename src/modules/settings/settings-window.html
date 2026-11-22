@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cài đặt A3K64</title>
+<script src="../../assets/js/session.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="../../assets/js/tokens.css" />
+<link rel="stylesheet" href="../../assets/css/a3k64-shared.css" />
+<link rel="stylesheet" href="settings.css"/>
+</head>
+<body><div class="a3k-bg" aria-hidden="true" style="z-index:0"><i></i><i></i></div>
+
+<div id="app">
+  <aside id="sidebar">
+    <div class="sidebar-top">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      Cài đặt
+    </div>
+
+    <div class="profile-card" id="sb-profile">
+      <div class="profile-avatar" id="sb-avatar">A3</div>
+      <div>
+        <div class="profile-name"  id="sb-name">Người dùng 12A3</div>
+        <div class="profile-email" id="sb-email">Đang đăng nhập</div>
+      </div>
+    </div>
+
+    <div id="sync-status-bar" class="sync-status" style="display:none;margin:0 4px 10px"></div>
+
+    <nav class="nav-section" id="sidebar-nav"><!-- injected by JS --></nav>
+  </aside>
+
+  <main id="content">
+    <div class="page active" id="page-home">
+      <div class="mobile-header">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        Cài đặt
+      </div>
+      <div class="page-title">Cá nhân hóa</div>
+      <div class="nav-grid" id="home-nav-grid"><!-- injected --></div>
+    </div>
+
+    <div class="page" id="page-account"></div>
+    <div class="page" id="page-account-profile"></div>
+    <div class="page" id="page-account-password"></div>
+    <div class="page" id="page-account-email"></div>
+    <div class="page" id="page-account-devices"></div>
+    <div class="page" id="page-color"></div>
+    <div class="page" id="page-background"></div>
+    <div class="page" id="page-taskbar"></div>
+    <div class="page" id="page-display"></div>
+    <div class="page" id="page-billing"></div>
+    <div class="page" id="page-about"></div>
+    <div class="page" id="page-system"></div>
+  </main>
+</div>
+
+<script src="../../assets/js/config.js"></script>
+<script src="../../assets/js/ai-proxy.js"></script>
+<script src="../../assets/js/premium-themes.js"></script>
+<script src="../../assets/js/esc.js"></script>
+<script src="settings-core.js"></script>
+<script src="settings-sync.js"></script>
+<script src="settings-ui.js"></script>
+
+<script>
+(function boot() {
+  if (window.A3K64Session) {
+    A3K64Session.watch();
+    try {
+      var ch = new BroadcastChannel('a3k64-auth');
+      ch.addEventListener('message', function(e) {
+        if (e.data === 'a3k64-logout' || (e.data && e.data.type === 'logout')) {
+          try { window.close(); } catch (_) {}
+          window.location.replace('../../auth/login.html');
+        }
+      });
+    } catch(e) {}
+  }
+
+  accent = readAccent();
+  theme  = readTheme();
+  document.documentElement.style.setProperty('--accent', accent);
+  applyTheme(theme);
+
+  buildSidebar();
+  renderHome();
+  renderSystem();
+
+  const mobileExtra = document.createElement('div');
+  mobileExtra.style.cssText = 'margin-top:20px';
+  mobileExtra.innerHTML = `<div class="color-label" style="margin:16px 0 8px">Hệ thống</div>
+    <div class="nav-grid">
+      ${[
+        { id: 'display', icon: 'monitor', label: 'Màn hình',   sub: 'Tỷ lệ và bố cục' },
+        { id: 'about',   icon: 'info',    label: 'Giới thiệu', sub: 'Thông tin ứng dụng' },
+      ].map(p => `<button class="nav-card" onclick="navigate('${p.id}')">${svg(ICONS[p.icon],22)}<div><strong>${p.label}</strong><span>${p.sub}</span></div><span class="chevron">${svg(ICONS.chevronRight,18)}</span></button>`).join('')}
+    </div>`;
+  $('#home-nav-grid').after(mobileExtra);
+
+  Sync.load();
+})();
+</script>
+
+<script src="../../assets/js/disable-context-menu.js"></script>
+</body>
+</html>

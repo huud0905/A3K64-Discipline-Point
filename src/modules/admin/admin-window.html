@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Quản trị</title>
+<script src="../../assets/js/error-shield.js"></script>
+<script src="../../assets/js/session.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../../assets/js/tokens.css" />
+<link rel="stylesheet" href="admin.css" />
+<style>html,body{height:100%;margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<div id="ad-root" class="ad-root"></div>
+<script>
+  // Theme + màu nhấn: cùng khoá với các module khác, đọc trước khi vẽ để không nháy sáng.
+  (function () {
+    function apply() {
+      var raw = 'dark';
+      try { raw = (localStorage.getItem('a3k64-theme') || localStorage.getItem('desktop-theme') || localStorage.getItem('theme-mode') || 'dark').toLowerCase(); } catch (e) {}
+      var m = ['dark', 'light', 'auto'].indexOf(raw) >= 0 ? raw : 'dark';
+      var r = m === 'auto' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : m;
+      document.documentElement.setAttribute('data-theme', r);
+      try { var a = localStorage.getItem('desktop-accent'); if (a && /^#[0-9a-f]{3,8}$/i.test(a)) document.documentElement.style.setProperty('--desktop-accent', a); } catch (e) {}
+    }
+    apply(); window.addEventListener('storage', apply);
+  })();
+</script>
+<script src="../../assets/js/config.js"></script>
+<script src="../../assets/js/esc.js"></script>
+<script src="admin.js"></script>
+<script>
+  (function () {
+    var S = window.A3K64Session;
+    if (!S) return;
+    var LOGIN_URL = (typeof S.loginUrl === 'function' && S.loginUrl()) || '../../auth/login.html';
+    var hadSession = !!(S.currentToken() || S.restoreSync());
+    var expiredHandled = false;
+
+    function leavePopup() {
+      if (window.self === window.top && window.opener && !window.opener.closed) {
+        try { window.close(); } catch (e) {}
+      }
+      try {
+        (window.top || window).location.replace(LOGIN_URL);
+      } catch (e) {
+        location.replace(LOGIN_URL);
+      }
+    }
+
+    function showExpiredNotice() {
+      if (expiredHandled) return;
+      expiredHandled = true;
+      S.clear();
+      if (!document.body) return leavePopup();
+      var ov = document.createElement('div');
+      ov.id = 'a3k64-popup-session-expired';
+      ov.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(2,6,23,.82);backdrop-filter:blur(6px);font-family:system-ui,-apple-system,"Segoe UI",sans-serif';
+      var box = document.createElement('div');
+      box.style.cssText = 'width:100%;max-width:400px;padding:24px;border:1px solid #334155;border-radius:18px;background:#0b1220;color:#f8fafc;box-shadow:0 24px 60px rgba(0,0,0,.5)';
+      var h = document.createElement('h3');
+      h.textContent = 'Phiên đăng nhập đã hết hạn';
+      h.style.cssText = 'margin:0 0 8px;font-size:17px;font-weight:800';
+      var p = document.createElement('p');
+      p.textContent = 'Phiên làm việc đã kết thúc hoặc được đăng xuất từ tab khác. Đang đóng cửa sổ hoặc chuyển về trang đăng nhập…';
+      p.style.cssText = 'margin:0 0 18px;font-size:13px;line-height:1.55;color:#cbd5e1';
+      var btn = document.createElement('button');
+      btn.textContent = 'Đăng nhập lại';
+      btn.style.cssText = 'height:36px;padding:0 16px;border:0;border-radius:10px;background:#2563eb;color:#fff;font:600 13px inherit;cursor:pointer;float:right';
+      btn.addEventListener('click', leavePopup);
+      box.appendChild(h); box.appendChild(p); box.appendChild(btn);
+      ov.appendChild(box);
+      document.body.appendChild(ov);
+      setTimeout(leavePopup, 1800);
+    }
+
+    function checkSessionAlive() {
+      if (hadSession && !S.currentToken() && !S.restoreSync()) {
+        showExpiredNotice();
+      }
+    }
+
+    function startSync() {
+      S.restore().then(function (u) {
+        if (u || S.currentToken()) hadSession = true;
+      });
+      S.watch();
+    }
+
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        var ch = new BroadcastChannel('a3k64-auth');
+        ch.addEventListener('message', function (ev) {
+          var m = ev.data;
+          if (m === 'a3k64-logout' || (m && m.type === 'a3k64-logout')) {
+            showExpiredNotice();
+          }
+        });
+      }
+    } catch (e) {}
+
+    window.addEventListener('message', function (ev) {
+      var d = ev.data;
+      if (d === 'a3k64-logout' || (d && (d.type === 'a3k64-logout' || d.type === 'logout'))) {
+        showExpiredNotice();
+      }
+    });
+    window.addEventListener('a3k64-logout', showExpiredNotice);
+    window.addEventListener('storage', function (ev) {
+      if (!ev.key || ev.key === 'a3k64-user' || ev.key === 'a3k64-session-token') {
+        checkSessionAlive();
+      }
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) checkSessionAlive();
+    });
+    window.addEventListener('focus', checkSessionAlive);
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', startSync);
+    } else {
+      startSync();
+    }
+  })();
+</script>
+</body>
+</html>
